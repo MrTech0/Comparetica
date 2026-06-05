@@ -1,0 +1,469 @@
+/* src/styles/components.css */
+
+/* ==========================================================================
+   BUTTONS (Material 3)
+   ========================================================================== */
+.m3-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  border: none;
+  cursor: pointer;
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-1);
+}
+
+.m3-btn:hover {
+  background-color: hsl(220, 85%, 35%);
+  box-shadow: var(--shadow-2);
+}
+
+.m3-btn:active {
+  transform: scale(0.98);
+}
+
+.m3-btn:disabled {
+  background-color: var(--color-outline-variant);
+  color: var(--color-on-surface-variant);
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+.m3-btn-tonal {
+  background-color: var(--color-secondary-container);
+  color: var(--color-on-secondary-container);
+  box-shadow: none;
+}
+
+.m3-btn-tonal:hover {
+  background-color: hsl(200, 20%, 82%);
+}
+
+.m3-btn-tertiary {
+  background-color: var(--color-tertiary-container);
+  color: var(--color-on-tertiary-container);
+  box-shadow: none;
+}
+
+.m3-btn-tertiary:hover {
+  background-color: hsl(150, 80%, 82%);
+}
+
+.m3-btn-outlined {
+  background-color: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-outline);
+  box-shadow: none;
+}
+
+.m3-btn-outlined:hover {
+  background-color: rgba(220, 85%, 45%, 0.05);
+  border-color: var(--color-primary);
+}
+
+.m3-btn-text {
+  background-color: transparent;
+  color: var(--color-primary);
+  box-shadow: none;
+  padding: 0 16px;
+}
+
+.m3-btn-text:hover {
+  background-color: rgba(220, 85%, 45%, 0.08);
+}
+
+.m3-btn-icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background-color: transparent;
+  color: var(--color-on-surface-variant);
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+}
+
+.m3-btn-icon:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+  color: var(--color-on-surface);
+}
+
+[data-theme="dark"] .m3-btn-icon:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.m3-btn-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+/* ==========================================================================
+   CARDS (Material 3)
+   ========================================================================== */
+.m3-card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-1);
+  border: 1px solid var(--color-outline-variant);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-medium);
+}
+
+.m3-card-elevated {
+  box-shadow: var(--shadow-2);
+}
+
+.m3-card-elevated:hover {
+  box-shadow: var(--shadow-3);
+  transform: translateY(-2px);
+}
+
+.m3-card-outlined {
+  background-color: transparent;
+  border: 1px solid var(--color-outline);
+  box-shadow: none;
+}
+
+.m3-card-title {
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--color-on-surface);
+}
+
+/* ==========================================================================
+   TEXT FIELDS & INPUTS (Material 3)
+   ========================================================================== */
+.m3-field {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.m3-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: 6px;
+  transition: color var(--transition-fast);
+}
+
+.m3-input {
+  height: 48px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-outline);
+  background-color: var(--color-surface-variant);
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+  font-size: 15px;
+  outline: none;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+  width: 100%;
+}
+
+.m3-input:focus {
+  border-color: var(--color-primary);
+  background-color: var(--color-surface);
+  border-width: 2px;
+}
+
+.m3-input::placeholder {
+  color: var(--color-on-surface-variant);
+  opacity: 0.6;
+}
+
+.m3-select {
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23666'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 24px;
+}
+
+.m3-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+/* ==========================================================================
+   DATA TABLES (Material 3)
+   ========================================================================== */
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  margin-top: 16px;
+}
+
+.m3-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.m3-table th {
+  background-color: var(--color-surface-variant);
+  color: var(--color-on-surface-variant);
+  padding: 16px;
+  font-weight: 600;
+  font-family: var(--font-title);
+  border-bottom: 1px solid var(--color-outline-variant);
+}
+
+.m3-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--color-outline-variant);
+  color: var(--color-on-surface);
+}
+
+.m3-table tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="dark"] .m3-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* ==========================================================================
+   SWITCH (Material 3 style)
+   ========================================================================== */
+.m3-switch-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.m3-switch-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-on-surface);
+}
+
+.m3-switch {
+  position: relative;
+  width: 52px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface-variant);
+  border: 2px solid var(--color-outline);
+  transition: all var(--transition-fast);
+}
+
+.m3-switch::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--color-outline);
+  transition: all var(--transition-fast);
+}
+
+input[type="checkbox"]:checked + .m3-switch {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+input[type="checkbox"]:checked + .m3-switch::after {
+  left: 24px;
+  background-color: var(--color-on-primary);
+  width: 20px;
+  height: 20px;
+}
+
+/* Hidden inputs helper */
+.hidden-checkbox {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* ==========================================================================
+   CHIPS (Material 3)
+   ========================================================================== */
+.m3-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-variant);
+  color: var(--color-on-surface-variant);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--color-outline);
+}
+
+.m3-chip-success {
+  background-color: var(--color-tertiary-container);
+  color: var(--color-on-tertiary-container);
+  border-color: transparent;
+}
+
+/* ==========================================================================
+   MODAL / DIALOG (Material 3)
+   ========================================================================== */
+.m3-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--color-scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-medium);
+}
+
+.m3-dialog-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.m3-dialog {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: var(--shadow-4);
+  transform: translateY(30px);
+  transition: transform var(--transition-medium);
+}
+
+.m3-dialog-overlay.active .m3-dialog {
+  transform: translateY(0);
+}
+
+.m3-dialog-title {
+  font-family: var(--font-title);
+  font-size: 22px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  color: var(--color-on-surface);
+}
+
+.m3-dialog-body {
+  margin-bottom: 24px;
+  color: var(--color-on-surface-variant);
+  font-size: 14px;
+  line-height: 1.5;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.m3-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ==========================================================================
+   PRIVATE MODE (Consultant Commissions Blurring)
+   ========================================================================== */
+/* Cuando el modo privado está activo, los valores privados se ocultan con blur y transición */
+body.private-mode-active .private-value {
+  filter: blur(5px) grayscale(0.5);
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.4;
+  position: relative;
+}
+
+body.private-mode-active .private-value::after {
+  content: '🔒';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  filter: none;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ==========================================================================
+   UTILITIES & DECORATION
+   ========================================================================== */
+.flex-row-center-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.margin-top-md {
+  margin-top: 16px;
+}
+
+.margin-top-lg {
+  margin-top: 24px;
+}
+
+.text-success {
+  color: var(--color-tertiary);
+  font-weight: 600;
+}
+
+.text-muted {
+  color: var(--color-on-surface-variant);
+  opacity: 0.7;
+}
+
+.tabs-header {
+  display: flex;
+  border-bottom: 1px solid var(--color-outline-variant);
+  margin-bottom: 20px;
+}
+
+.m3-tab-btn {
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--color-on-surface-variant);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.m3-tab-btn:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.m3-tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}

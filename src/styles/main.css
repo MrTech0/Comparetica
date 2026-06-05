@@ -1,0 +1,445 @@
+/* src/styles/main.css */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+/* MD3 Design Tokens & System */
+:root {
+  /* Font Family */
+  --font-title: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Transitions */
+  --transition-fast: 0.15s cubic-bezier(0.2, 0, 0, 1);
+  --transition-medium: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --transition-slow: 0.5s cubic-bezier(0.2, 0, 0, 1);
+  
+  /* Elevation Shadows (Material 3) */
+  --shadow-1: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-2: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.08);
+  --shadow-3: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+  --shadow-4: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+
+  /* Border Radii (Material 3) */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+}
+
+/* Light Theme Variables (Default) */
+:root {
+  --color-primary: hsl(220, 85%, 45%);
+  --color-on-primary: hsl(0, 0%, 100%);
+  --color-primary-container: hsl(220, 85%, 90%);
+  --color-on-primary-container: hsl(220, 85%, 15%);
+  
+  --color-secondary: hsl(200, 15%, 40%);
+  --color-on-secondary: hsl(0, 0%, 100%);
+  --color-secondary-container: hsl(200, 20%, 90%);
+  --color-on-secondary-container: hsl(200, 20%, 15%);
+
+  --color-tertiary: hsl(150, 80%, 25%); /* Green for savings & success */
+  --color-on-tertiary: hsl(0, 0%, 100%);
+  --color-tertiary-container: hsl(150, 80%, 90%);
+  --color-on-tertiary-container: hsl(150, 80%, 10%);
+
+  --color-error: hsl(0, 75%, 45%);
+  --color-on-error: hsl(0, 0%, 100%);
+  --color-error-container: hsl(0, 75%, 92%);
+  --color-on-error-container: hsl(0, 75%, 15%);
+
+  --color-background: hsl(220, 20%, 98%);
+  --color-on-background: hsl(220, 25%, 10%);
+
+  --color-surface: hsl(0, 0%, 100%);
+  --color-on-surface: hsl(220, 25%, 12%);
+  --color-surface-variant: hsl(220, 15%, 94%);
+  --color-on-surface-variant: hsl(220, 15%, 30%);
+
+  --color-outline: hsl(220, 15%, 80%);
+  --color-outline-variant: hsl(220, 15%, 90%);
+
+  --color-scrim: rgba(0, 0, 0, 0.4);
+}
+
+/* Dark Theme Variables (System Preference) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-primary: hsl(220, 90%, 70%);
+    --color-on-primary: hsl(220, 90%, 15%);
+    --color-primary-container: hsl(220, 80%, 25%);
+    --color-on-primary-container: hsl(220, 90%, 90%);
+    
+    --color-secondary: hsl(200, 20%, 70%);
+    --color-on-secondary: hsl(200, 20%, 15%);
+    --color-secondary-container: hsl(200, 20%, 25%);
+    --color-on-secondary-container: hsl(200, 20%, 90%);
+
+    --color-tertiary: hsl(150, 70%, 65%);
+    --color-on-tertiary: hsl(150, 70%, 12%);
+    --color-tertiary-container: hsl(150, 80%, 22%);
+    --color-on-tertiary-container: hsl(150, 70%, 90%);
+
+    --color-error: hsl(0, 85%, 75%);
+    --color-on-error: hsl(0, 85%, 15%);
+    --color-error-container: hsl(0, 85%, 22%);
+    --color-on-error-container: hsl(0, 85%, 90%);
+
+    --color-background: hsl(220, 20%, 8%);
+    --color-on-background: hsl(220, 15%, 90%);
+
+    --color-surface: hsl(220, 15%, 12%);
+    --color-on-surface: hsl(220, 10%, 95%);
+    --color-surface-variant: hsl(220, 15%, 18%);
+    --color-on-surface-variant: hsl(220, 10%, 80%);
+
+    --color-outline: hsl(220, 10%, 35%);
+    --color-outline-variant: hsl(220, 10%, 25%);
+
+    --color-scrim: rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Manual Dark Theme */
+[data-theme="dark"] {
+  --color-primary: hsl(220, 90%, 70%);
+  --color-on-primary: hsl(220, 90%, 15%);
+  --color-primary-container: hsl(220, 80%, 25%);
+  --color-on-primary-container: hsl(220, 90%, 90%);
+  
+  --color-secondary: hsl(200, 20%, 70%);
+  --color-on-secondary: hsl(200, 20%, 15%);
+  --color-secondary-container: hsl(200, 20%, 25%);
+  --color-on-secondary-container: hsl(200, 20%, 90%);
+
+  --color-tertiary: hsl(150, 70%, 65%);
+  --color-on-tertiary: hsl(150, 70%, 12%);
+  --color-tertiary-container: hsl(150, 80%, 22%);
+  --color-on-tertiary-container: hsl(150, 70%, 90%);
+
+  --color-error: hsl(0, 85%, 75%);
+  --color-on-error: hsl(0, 85%, 15%);
+  --color-error-container: hsl(0, 85%, 22%);
+  --color-on-error-container: hsl(0, 85%, 90%);
+
+  --color-background: hsl(220, 20%, 8%);
+  --color-on-background: hsl(220, 15%, 90%);
+
+  --color-surface: hsl(220, 15%, 12%);
+  --color-on-surface: hsl(220, 10%, 95%);
+  --color-surface-variant: hsl(220, 15%, 18%);
+  --color-on-surface-variant: hsl(220, 10%, 80%);
+
+  --color-outline: hsl(220, 10%, 35%);
+  --color-outline-variant: hsl(220, 10%, 25%);
+
+  --color-scrim: rgba(0, 0, 0, 0.6);
+}
+
+/* Manual Light Theme */
+[data-theme="light"] {
+  --color-primary: hsl(220, 85%, 45%);
+  --color-on-primary: hsl(0, 0%, 100%);
+  --color-primary-container: hsl(220, 85%, 90%);
+  --color-on-primary-container: hsl(220, 85%, 15%);
+  
+  --color-secondary: hsl(200, 15%, 40%);
+  --color-on-secondary: hsl(0, 0%, 100%);
+  --color-secondary-container: hsl(200, 20%, 90%);
+  --color-on-secondary-container: hsl(200, 20%, 15%);
+
+  --color-tertiary: hsl(150, 80%, 25%);
+  --color-on-tertiary: hsl(0, 0%, 100%);
+  --color-tertiary-container: hsl(150, 80%, 90%);
+  --color-on-tertiary-container: hsl(150, 80%, 10%);
+
+  --color-error: hsl(0, 75%, 45%);
+  --color-on-error: hsl(0, 0%, 100%);
+  --color-error-container: hsl(0, 75%, 92%);
+  --color-on-error-container: hsl(0, 75%, 15%);
+
+  --color-background: hsl(220, 20%, 98%);
+  --color-on-background: hsl(220, 25%, 10%);
+
+  --color-surface: hsl(0, 0%, 100%);
+  --color-on-surface: hsl(220, 25%, 12%);
+  --color-surface-variant: hsl(220, 15%, 94%);
+  --color-on-surface-variant: hsl(220, 15%, 30%);
+
+  --color-outline: hsl(220, 15%, 80%);
+  --color-outline-variant: hsl(220, 15%, 90%);
+
+  --color-scrim: rgba(0, 0, 0, 0.4);
+}
+
+/* Base resets */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-background);
+  color: var(--color-on-background);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  transition: background-color var(--transition-medium), color var(--transition-medium);
+}
+
+/* App Layout Grid */
+#app-container {
+  display: grid;
+  grid-template-columns: 80px 1fr; /* Navigation Rail + Main View */
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+@media (min-width: 1024px) {
+  #app-container {
+    grid-template-columns: 240px 1fr; /* Navigation Drawer + Main View */
+  }
+}
+
+/* Navigation Drawer / Rail */
+aside.app-navigation {
+  background-color: var(--color-surface-variant);
+  border-right: 1px solid var(--color-outline-variant);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 12px;
+  justify-content: space-between;
+  height: 100vh;
+  z-index: 10;
+  transition: width var(--transition-medium), background-color var(--transition-medium);
+}
+
+.nav-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  margin-bottom: 32px;
+}
+
+.logo-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 20px;
+  box-shadow: var(--shadow-2);
+}
+
+.logo-text {
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-on-background);
+}
+
+/* Navigation items */
+.nav-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-grow: 1;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 56px;
+  padding: 0 16px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  color: var(--color-on-surface-variant);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all var(--transition-fast);
+  position: relative;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.nav-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background-color: var(--color-primary);
+  opacity: 0;
+  transform: scaleX(0.85);
+  transition: all var(--transition-medium);
+  z-index: -1;
+}
+
+.nav-item:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.nav-item.active {
+  color: var(--color-on-primary-container);
+  font-weight: 600;
+}
+
+.nav-item.active::before {
+  opacity: 1;
+  transform: scaleX(1);
+  background-color: var(--color-primary-container);
+}
+
+.nav-item svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+/* Expand labels helper */
+@media (max-width: 1023px) {
+  .logo-text, .nav-item span {
+    display: none;
+  }
+  aside.app-navigation {
+    align-items: center;
+    padding: 24px 8px;
+  }
+  .nav-header {
+    padding: 0;
+  }
+  .nav-item {
+    justify-content: center;
+    padding: 0;
+    width: 56px;
+  }
+}
+
+/* Main Content Area */
+main.app-content {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Header */
+header.app-header {
+  height: 64px;
+  border-bottom: 1px solid var(--color-outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background-color: var(--color-surface);
+  flex-shrink: 0;
+}
+
+.header-title h1 {
+  font-family: var(--font-title);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--color-on-surface);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Views manager container */
+.view-container {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 24px;
+  position: relative;
+}
+
+.view-section {
+  display: none;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity var(--transition-medium), transform var(--transition-medium);
+  height: 100%;
+}
+
+.view-section.active {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Hourly Grid for Energy Prices Dashboard */
+.hourly-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.hour-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  box-shadow: var(--shadow-1);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.hour-card:hover {
+  box-shadow: var(--shadow-2);
+  transform: translateY(-2px);
+}
+
+.hour-card-time {
+  font-family: var(--font-title);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-on-surface-variant);
+}
+
+.hour-card-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-on-surface);
+  font-family: var(--font-title);
+}
+
+.hour-card-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

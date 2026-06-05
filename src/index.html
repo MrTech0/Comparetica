@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Comparetica - Comparador B2B de tarifas eléctricas y de gas para consultorías energéticas en España." />
+    <title>Comparetica - Comparador Energético B2B</title>
+    <link rel="stylesheet" href="styles/main.css" />
+    <link rel="stylesheet" href="styles/components.css" />
+    <!-- Cargamos jsPDF localmente para soporte 100% offline -->
+    <script src="assets/lib/jspdf.umd.min.js"></script>
+    <!-- Módulos de Javascript -->
+    <script type="module" src="js/app.js" defer></script>
+  </head>
+
+  <body>
+    <div id="app-container">
+      
+      <!-- Lateral Navigation -->
+      <aside class="app-navigation">
+        <div class="nav-top">
+          <div class="nav-header">
+            <div class="logo-icon">C</div>
+            <span class="logo-text">Comparetica</span>
+          </div>
+          
+          <nav class="nav-menu">
+            <button id="nav-home" class="nav-item active">
+              <!-- Icon: Home -->
+              <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+              <span>Inicio</span>
+            </button>
+            <button id="nav-calculator" class="nav-item">
+              <!-- Icon: Calculate / Dashboard -->
+              <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-2.4-6.4l-2.6 2.6 2.6 2.6-1.4 1.4-2.6-2.6-2.6 2.6-1.4-1.4 2.6-2.6-2.6-2.6 1.4-1.4 2.6 2.6 2.6-2.6 1.4 1.4zM7 7h4v2H7V7zm0 4h4v2H7v-2zm7-4h3v2h-3V7zm0 4h3v2h-3v-2z"/></svg>
+              <span>Comparador</span>
+            </button>
+            <button id="nav-tariffs" class="nav-item">
+              <!-- Icon: Store / Tariffs -->
+              <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-4h11v4zm0-5H4V9h11v4zm5 5h-4V9h4v9z"/></svg>
+              <span>Gestión de Tarifas</span>
+            </button>
+            <button id="nav-history" class="nav-item">
+              <!-- Icon: History -->
+              <svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+              <span>Historial</span>
+            </button>
+            <button id="nav-backup" class="nav-item">
+              <!-- Icon: Backup Cloud -->
+              <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3zm-5.55-8h-2.9v3H8l4 4 4-4h-2.55z"/></svg>
+              <span>Copia de Seguridad</span>
+            </button>
+          </nav>
+        </div>
+
+        <div class="nav-bottom">
+          <!-- Theme selector Switch -->
+          <button id="theme-toggle" class="m3-btn-icon" title="Alternar Tema">
+            <svg id="theme-icon-sun" viewBox="0 0 24 24" style="display:none;"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.01c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
+            <svg id="theme-icon-moon" viewBox="0 0 24 24"><path d="M12.3 22h-.1c-5.5 0-10-4.5-10-10 0-4.8 3.5-8.9 8.2-9.8.6-.1 1.2.3 1.3.9.1.6-.2 1.2-.8 1.4-3.5.9-6 4.1-6 7.8 0 4.4 3.6 8 8 8 3.7 0 6.9-2.5 7.8-6 .2-.6.8-.9 1.4-.8.6.1 1 .7.9 1.3-.9 4.7-5 8.2-9.8 8.2z"/></svg>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="app-content">
+        <!-- Top App Header -->
+        <header class="app-header">
+          <div class="header-title">
+            <h1 id="view-title">Precio de la Energía (Hoy)</h1>
+          </div>
+          <div class="header-actions">
+            <!-- Private Mode Toggle Switch -->
+            <label class="m3-switch-container">
+              <input type="checkbox" id="private-mode-checkbox" class="hidden-checkbox" />
+              <div class="m3-switch"></div>
+              <span class="m3-switch-label">Modo Privado (Ocultar comisiones)</span>
+            </label>
+          </div>
+        </header>
+
+        <!-- View Container -->
+        <div class="view-container">
+          
+          <!-- ==========================================
+               SECTION: HOME (DASHBOARD)
+               ========================================== -->
+          <section id="section-home" class="view-section active">
+            <div class="flex-row-center-between margin-top-md">
+              <h2 id="home-date-label" style="font-family: var(--font-title); font-size: 18px; font-weight: 500; color: var(--color-on-background);">Cargando fecha...</h2>
+              <button id="refresh-market-btn" class="m3-btn m3-btn-icon" title="Actualizar Datos">
+                <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              </button>
+            </div>
+
+            <!-- KPI Cards -->
+            <div class="m3-field-row margin-top-md">
+              <div class="m3-card m3-card-elevated" style="border-left: 5px solid var(--color-primary);">
+                <h4 style="font-weight: 600; color: var(--color-primary); margin-bottom: 8px;">Precio Medio PVPC (Luz)</h4>
+                <div id="market-avg-kwh" style="font-size: 24px; font-weight: 700; color: var(--color-on-surface);">Cargando...</div>
+                <p class="text-muted" style="font-size: 12px; margin-top: 4px;">Precio medio diario regulado de la energía para consumidores particulares.</p>
+              </div>
+              <div class="m3-card m3-card-elevated" style="border-left: 5px solid var(--color-secondary);">
+                <h4 style="font-weight: 600; color: var(--color-secondary); margin-bottom: 8px;">Precio Mercado Mayorista (MWh)</h4>
+                <div id="market-avg-mwh" style="font-size: 24px; font-weight: 700; color: var(--color-on-surface);">Cargando...</div>
+                <p class="text-muted" style="font-size: 12px; margin-top: 4px;">Precio medio diario del mercado pool (OMIE) en España.</p>
+              </div>
+            </div>
+
+            <!-- Loader and Error -->
+            <div id="market-loader" class="margin-top-lg" style="display:none; text-align: center; padding: 40px;">
+              <p class="text-muted">Obteniendo datos de Red Eléctrica de España...</p>
+            </div>
+            <div id="market-error" class="margin-top-lg" style="display:none; text-align: center; padding: 40px; border: 1px dashed var(--color-error); border-radius: var(--radius-md);">
+              <p style="color: var(--color-error); font-weight: 600;">Error al obtener los precios de fuentes oficiales (REE).</p>
+              <p class="text-muted" style="font-size: 12px; margin-top: 4px;">Por favor, comprueba tu conexión a internet o inténtalo más tarde.</p>
+            </div>
+
+            <!-- Hourly grid container -->
+            <div class="margin-top-lg">
+              <h3 class="m3-card-title">Desglose de Precios Regulados por Horas (PVPC)</h3>
+              <div id="market-hourly-grid" class="hourly-grid">
+                <!-- Cards will be injected by home.js -->
+              </div>
+            </div>
+          </section>
+
+          <!-- ==========================================
+               SECTION: CALCULATOR
+               ========================================== -->
+          <section id="section-calculator" class="view-section">
+            <div class="m3-card margin-top-md">
+              <h2 class="m3-card-title">Datos del Cliente y Factura Actual</h2>
+              
+              <form id="calc-form">
+                <!-- Cliente inputs -->
+                <div class="m3-field-row">
+                  <div class="m3-field">
+                    <label class="m3-label" for="calc-client-name">Nombre del Cliente *</label>
+                    <input type="text" id="calc-client-name" class="m3-input" placeholder="Ej. Juan Pérez" required />
+                  </div>
+                  <div class="m3-field">
+                    <label class="m3-label" for="calc-client-cups">CUPS (Opcional)</label>
+                    <input type="text" id="calc-client-cups" class="m3-input" placeholder="Ej. ES0021..." />
+                  </div>
+                  <div class="m3-field">
+                    <label class="m3-label" for="calc-energy-type">Tipo de Suministro *</label>
+                    <select id="calc-energy-type" class="m3-input m3-select" required>
+                      <option value="LUZ">Luz (2.0TD)</option>
+                      <option value="GAS">Gas (RL.1 / TUR 1)</option>
+                      <option value="DUAL">Dual (Luz + Gas)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Bloque de Luz -->
+                <div id="calc-light-block" class="margin-top-md">
+                  <h3 class="text-muted" style="font-size: 14px; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 6px; margin-bottom: 12px;">Detalle Factura Luz (Tarifa 2.0TD)</h3>
+                  
+                  <div class="m3-field-row">
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-days">Días de Periodo (días) *</label>
+                      <input type="number" id="calc-light-days" class="m3-input" value="30" min="1" required />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-tax">Impuesto Eléctrico (%) *</label>
+                      <input type="number" id="calc-light-tax" class="m3-input" value="5.11269" step="0.00001" min="0" required />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-vat">IVA / IGIC *</label>
+                      <select id="calc-light-vat" class="m3-input m3-select" required>
+                        <option value="21">IVA 21%</option>
+                        <option value="10">IVA 10% (Reducido)</option>
+                        <option value="5">IVA 5%</option>
+                        <option value="7">IGIC Canario 7%</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="m3-field-row">
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-p1-pot">Potencia P1 (kW) *</label>
+                      <input type="number" id="calc-light-p1-pot" class="m3-input" placeholder="Ej. 4.6" step="0.01" min="0" required />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-p2-pot">Potencia P2 (kW) *</label>
+                      <input type="number" id="calc-light-p2-pot" class="m3-input" placeholder="Ej. 4.6" step="0.01" min="0" required />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-meter">Alquiler Contador (€/periodo)</label>
+                      <input type="number" id="calc-light-meter" class="m3-input" value="0.81" step="0.01" min="0" />
+                    </div>
+                  </div>
+
+                  <div class="m3-field-row">
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-p1-cons">Consumo P1 (kWh) *</label>
+                      <input type="number" id="calc-light-p1-cons" class="m3-input" placeholder="Ej. 120" min="0" required />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-p2-cons">Consumo P2 (kWh) *</label>
+                      <input type="number" id="calc-light-p2-cons" class="m3-input" placeholder="Ej. 100" min="0" required />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-p3-cons">Consumo P3 (kWh) *</label>
+                      <input type="number" id="calc-light-p3-cons" class="m3-input" placeholder="Ej. 180" min="0" required />
+                    </div>
+                  </div>
+
+                  <div class="m3-field-row">
+                    <!-- Precios actuales pagados por el cliente (para calcular ahorro real) -->
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-p1-pot-price">Precio Pot. P1 Actual (€/kW/año)</label>
+                      <input type="number" id="calc-light-p1-pot-price" class="m3-input" placeholder="Ej. 28.500000" step="0.000001" min="0" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-p2-pot-price">Precio Pot. P2 Actual (€/kW/año)</label>
+                      <input type="number" id="calc-light-p2-pot-price" class="m3-input" placeholder="Ej. 12.100000" step="0.000001" min="0" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-p1-ene-price">Precio Energ. P1 Actual (€/kWh)</label>
+                      <input type="number" id="calc-light-p1-ene-price" class="m3-input" placeholder="Ej. 0.180000" step="0.000001" min="0" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-p2-ene-price">Precio Energ. P2 Actual (€/kWh)</label>
+                      <input type="number" id="calc-light-p2-ene-price" class="m3-input" placeholder="Ej. 0.140000" step="0.000001" min="0" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-p3-ene-price">Precio Energ. P3 Actual (€/kWh)</label>
+                      <input type="number" id="calc-light-p3-ene-price" class="m3-input" placeholder="Ej. 0.090000" step="0.000001" min="0" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bloque de Gas -->
+                <div id="calc-gas-block" class="margin-top-md" style="display:none;">
+                  <h3 class="text-muted" style="font-size: 14px; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 6px; margin-bottom: 12px;">Detalle Factura Gas (Tarifa RL.1 / TUR 1)</h3>
+                  
+                  <div class="m3-field-row">
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-gas-days">Días de Periodo (días) *</label>
+                      <input type="number" id="calc-gas-days" class="m3-input" value="30" min="1" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-gas-tax">Imp. Hidrocarburos (€/kWh) *</label>
+                      <input type="number" id="calc-gas-tax" class="m3-input" value="0.00234" step="0.00001" min="0" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-gas-vat">IVA / IGIC *</label>
+                      <select id="calc-gas-vat" class="m3-input m3-select">
+                        <option value="21">IVA 21%</option>
+                        <option value="10">IVA 10% (Reducido)</option>
+                        <option value="5">IVA 5%</option>
+                        <option value="7">IGIC Canario 7%</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="m3-field-row">
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-gas-consumption">Consumo en el Periodo (kWh) *</label>
+                      <input type="number" id="calc-gas-consumption" class="m3-input" placeholder="Ej. 350" min="0" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-gas-meter">Alquiler Contador (€/periodo)</label>
+                      <input type="number" id="calc-gas-meter" class="m3-input" value="0.69" step="0.01" min="0" />
+                    </div>
+                  </div>
+
+                  <div class="m3-field-row">
+                    <!-- Precios actuales gas del cliente -->
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-gas-fixed-price">Término Fijo Actual (€/mes)</label>
+                      <input type="number" id="calc-gas-fixed-price" class="m3-input" placeholder="Ej. 5.500000" step="0.000001" min="0" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-gas-var-price">Término Variable Actual (€/kWh)</label>
+                      <input type="number" id="calc-gas-var-price" class="m3-input" placeholder="Ej. 0.080000" step="0.000001" min="0" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="margin-top-lg" style="display: flex; gap: 12px; justify-content: flex-end;">
+                  <button type="reset" class="m3-btn m3-btn-outlined">Limpiar Datos</button>
+                  <button type="submit" class="m3-btn">Calcular Comparativa</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- RESULTADOS DEL COMPARADOR -->
+            <div id="calc-results-wrapper" class="margin-top-lg" style="display:none;">
+              <h2 class="m3-card-title">Propuestas Comparativas Recomendadas</h2>
+              
+              <!-- Resumen Gasto Actual del Cliente -->
+              <div class="m3-card m3-card-outlined" style="margin-bottom: 20px; border-left: 5px solid var(--color-error);">
+                <div class="flex-row-center-between">
+                  <div>
+                    <h4 style="font-weight: 600; color: var(--color-error)">Gasto Anualizado Actual Estimado</h4>
+                    <p class="text-muted">Cálculo en base a los precios introducidos prorrateados a 12 meses.</p>
+                  </div>
+                  <div style="font-size: 24px; font-weight: 700;" id="calc-current-annual-cost">0,00 €</div>
+                </div>
+              </div>
+
+              <!-- Listado de Tarifa Propuesta Luz -->
+              <div id="results-light-container" class="margin-top-md">
+                <h3 class="text-muted" style="font-size: 16px; margin-bottom: 12px;">Mejores Opciones de Luz (2.0TD)</h3>
+                <div class="results-list" id="results-light-list">
+                  <!-- Tarjetas de resultados de luz inyectadas dinámicamente -->
+                </div>
+              </div>
+
+              <!-- Listado de Tarifa Propuesta Gas -->
+              <div id="results-gas-container" class="margin-top-lg">
+                <h3 class="text-muted" style="font-size: 16px; margin-bottom: 12px;">Mejores Opciones de Gas (RL.1)</h3>
+                <div class="results-list" id="results-gas-list">
+                  <!-- Tarjetas de resultados de gas inyectadas dinámicamente -->
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ==========================================
+               SECTION: TARIFFS (CRUD)
+               ========================================== -->
+          <section id="section-tariffs" class="view-section">
+            <div class="tabs-header">
+              <button class="m3-tab-btn active" id="tab-btn-comercializadoras">Comercializadoras</button>
+              <button class="m3-tab-btn" id="tab-btn-luz">Tarifas Luz (2.0TD)</button>
+              <button class="m3-tab-btn" id="tab-btn-gas">Tarifas Gas (RL.1)</button>
+            </div>
+
+            <!-- PANEL: COMERCIALIZADORAS -->
+            <div id="panel-comercializadoras" class="tab-panel active">
+              <div class="m3-field-row" style="align-items: flex-end; max-width: 600px;">
+                <div class="m3-field" style="margin-bottom: 0;">
+                  <label class="m3-label" for="new-comercializadora-name">Nueva Comercializadora</label>
+                  <input type="text" id="new-comercializadora-name" class="m3-input" placeholder="Nombre comercializadora..." />
+                </div>
+                <button id="add-comercializadora-btn" class="m3-btn" style="height: 48px;">Añadir</button>
+              </div>
+
+              <div class="table-container">
+                <table class="m3-table" id="table-comercializadoras">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Nombre Comercializadora</th>
+                      <th>Fecha Registro</th>
+                      <th style="text-align: right;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Inyectado dinámicamente -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- PANEL: TARIFAS LUZ -->
+            <div id="panel-luz" class="tab-panel" style="display:none;">
+              <div class="flex-row-center-between">
+                <h3 class="text-muted" style="font-size: 16px;">Lista de Tarifas 2.0TD registradas</h3>
+                <button id="open-light-dialog-btn" class="m3-btn">
+                  <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:currentColor;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                  Nueva Tarifa Luz
+                </button>
+              </div>
+
+              <div class="table-container">
+                <table class="m3-table" id="table-luz">
+                  <thead>
+                    <tr>
+                      <th>Comercializadora</th>
+                      <th>Nombre Tarifa</th>
+                      <th>Pot. P1 / P2 (€/kW/año)</th>
+                      <th>Ene. P1 / P2 / P3 (€/kWh)</th>
+                      <th class="private-value">Comisión</th>
+                      <th>Notas</th>
+                      <th style="text-align: right;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Inyectado dinámicamente -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- PANEL: TARIFAS GAS -->
+            <div id="panel-gas" class="tab-panel" style="display:none;">
+              <div class="flex-row-center-between">
+                <h3 class="text-muted" style="font-size: 16px;">Lista de Tarifas RL.1 registradas</h3>
+                <button id="open-gas-dialog-btn" class="m3-btn">
+                  <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:currentColor;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                  Nueva Tarifa Gas
+                </button>
+              </div>
+
+              <div class="table-container">
+                <table class="m3-table" id="table-gas">
+                  <thead>
+                    <tr>
+                      <th>Comercializadora</th>
+                      <th>Nombre Tarifa</th>
+                      <th>Tér. Fijo (€/mes)</th>
+                      <th>Tér. Variable (€/kWh)</th>
+                      <th class="private-value">Comisión</th>
+                      <th>Notas</th>
+                      <th style="text-align: right;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Inyectado dinámicamente -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- ==========================================
+               SECTION: HISTORY
+               ========================================== -->
+          <section id="section-history" class="view-section">
+            <div class="table-container margin-top-md">
+              <table class="m3-table" id="table-history">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>CUPS</th>
+                    <th>Tipo</th>
+                    <th>Ahorro Anual</th>
+                    <th class="private-value">Comisión Asesor</th>
+                    <th style="text-align: right;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Inyectado dinámicamente -->
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- ==========================================
+               SECTION: BACKUP (SETTINGS)
+               ========================================== -->
+          <section id="section-backup" class="view-section">
+            <div class="m3-card margin-top-md">
+              <h2 class="m3-card-title">Copias de Seguridad de Datos</h2>
+              <p class="text-muted" style="margin-bottom: 20px;">
+                Crea una copia de seguridad manual de toda la información de la aplicación (comercializadoras, tarifas y el historial de comparativas) para poder migrarla o restaurarla en otro equipo.
+              </p>
+              
+              <!-- Info alert box -->
+              <div class="m3-card m3-card-outlined" style="border-left: 5px solid var(--color-primary); background-color: var(--color-primary-container); color: var(--color-on-primary-container); margin-bottom: 24px; padding: 16px;">
+                <h4 style="font-weight: 600; margin-bottom: 6px;">¿Qué se incluye en la copia de seguridad?</h4>
+                <ul style="margin-left: 20px; font-size: 13px; line-height: 1.5;">
+                  <li>Todas las comercializadoras registradas.</li>
+                  <li>Todas las tarifas de luz (2.0TD) y tarifas de gas (RL.1) guardadas con sus comisiones.</li>
+                  <li>Todo el historial de comparativas de facturas y clientes generados.</li>
+                </ul>
+              </div>
+
+              <!-- Action buttons row -->
+              <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <button id="export-backup-btn" class="m3-btn">
+                  <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+                  Crear Copia...
+                </button>
+                <button id="import-backup-btn" class="m3-btn m3-btn-outlined">
+                  <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13h-4v3H8l4 4 4-4h-2z"/></svg>
+                  Restaurar Copia...
+                </button>
+              </div>
+            </div>
+
+            <!-- Configuración del Directorio de Copia Automática -->
+            <div class="m3-card margin-top-lg">
+              <h3 class="m3-card-title">Configuración de Copias de Seguridad Automáticas</h3>
+              <p class="text-muted" style="margin-bottom: 16px; font-size: 13px;">
+                La aplicación creará automáticamente una copia de seguridad con fecha y hora en este directorio cada vez que la cierres, eliminando los archivos que superen los días de retención.
+              </p>
+              
+              <div class="m3-field">
+                <label class="m3-label">Directorio Destino</label>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                  <input type="text" id="backup-directory-input" class="m3-input" readonly style="flex-grow: 1; background-color: var(--color-surface-variant); cursor: default;" placeholder="Cargando directorio..." />
+                  <button id="change-backup-dir-btn" class="m3-btn m3-btn-outlined" style="height: 48px; flex-shrink: 0; padding: 0 16px;">Seleccionar Carpeta...</button>
+                  <button id="reset-backup-dir-btn" class="m3-btn m3-btn-text" style="height: 48px; flex-shrink: 0; padding: 0 16px; color: var(--color-error)">Restablecer</button>
+                </div>
+              </div>
+
+              <div class="m3-field" style="margin-bottom: 0; margin-top: 16px; max-width: 250px;">
+                <label class="m3-label" for="backup-retention-input">Días de Retención *</label>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                  <input type="number" id="backup-retention-input" class="m3-input" min="1" max="365" value="7" required style="width: 100px;" />
+                  <span class="text-muted" style="font-size: 13px;">días</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Danger Alert Box for Restore -->
+            <div class="m3-card m3-card-outlined" style="border-left: 5px solid var(--color-error); background-color: var(--color-error-container); color: var(--color-on-error-container); margin-top: 24px; padding: 16px;">
+              <h4 style="font-weight: 600; margin-bottom: 6px;">⚠️ Advertencia de Seguridad</h4>
+              <p style="font-size: 13px; line-height: 1.5;">
+                Al restaurar una copia de seguridad, <strong>se eliminarán y sobrescribirán todos los datos locales actuales</strong> de la aplicación por los datos contenidos en el archivo seleccionado. Esta operación no se puede deshacer. La aplicación se <strong>reiniciará automáticamente</strong> tras completar la importación para cargar los datos de forma segura.
+              </p>
+            </div>
+          </section>
+
+        </div>
+      </main>
+
+      <!-- ==========================================
+           DIÁLOGOS / DIALOGS (M3)
+           ========================================== -->
+           
+      <!-- DIÁLOGO: NUEVA TARIFA LUZ -->
+      <div id="dialog-light" class="m3-dialog-overlay">
+        <div class="m3-dialog">
+          <h3 class="m3-dialog-title" id="dialog-light-title">Registrar Tarifa Luz 2.0TD</h3>
+          
+          <form id="dialog-light-form">
+            <input type="hidden" id="dialog-light-id" value="" />
+            
+            <div class="m3-field">
+              <label class="m3-label" for="dialog-light-com">Comercializadora *</label>
+              <select id="dialog-light-com" class="m3-input m3-select" required></select>
+            </div>
+            
+            <div class="m3-field">
+              <label class="m3-label" for="dialog-light-name">Nombre de Tarifa *</label>
+              <input type="text" id="dialog-light-name" class="m3-input" placeholder="Ej. Tarifa Fija Luz" required />
+            </div>
+            
+            <div class="m3-field-row">
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-light-p1-pot">Pot. P1 (€/kW/año) *</label>
+                <input type="number" id="dialog-light-p1-pot" class="m3-input" placeholder="0.000000" step="0.000001" min="0" required />
+              </div>
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-light-p2-pot">Pot. P2 (€/kW/año) *</label>
+                <input type="number" id="dialog-light-p2-pot" class="m3-input" placeholder="0.000000" step="0.000001" min="0" required />
+              </div>
+            </div>
+
+            <div class="m3-field-row">
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-light-p1-ene">Ene. P1 (€/kWh) *</label>
+                <input type="number" id="dialog-light-p1-ene" class="m3-input" placeholder="0.000000" step="0.000001" min="0" required />
+              </div>
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-light-p2-ene">Ene. P2 (€/kWh) *</label>
+                <input type="number" id="dialog-light-p2-ene" class="m3-input" placeholder="0.000000" step="0.000001" min="0" required />
+              </div>
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-light-p3-ene">Ene. P3 (€/kWh) *</label>
+                <input type="number" id="dialog-light-p3-ene" class="m3-input" placeholder="0.000000" step="0.000001" min="0" required />
+              </div>
+            </div>
+
+            <div class="m3-field">
+              <label class="m3-label" for="dialog-light-commission">Comisión Asesor (€) *</label>
+              <input type="number" id="dialog-light-commission" class="m3-input" placeholder="0.00" step="0.01" min="0" required />
+            </div>
+
+            <div class="m3-field">
+              <label class="m3-label" for="dialog-light-notes">Notas / Condiciones</label>
+              <input type="text" id="dialog-light-notes" class="m3-input" placeholder="Detalles de la tarifa..." />
+            </div>
+
+            <div class="m3-dialog-actions">
+              <button type="button" id="dialog-light-close" class="m3-btn m3-btn-text">Cancelar</button>
+              <button type="submit" class="m3-btn">Guardar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: NUEVA TARIFA GAS -->
+      <div id="dialog-gas" class="m3-dialog-overlay">
+        <div class="m3-dialog">
+          <h3 class="m3-dialog-title" id="dialog-gas-title">Registrar Tarifa Gas RL.1</h3>
+          
+          <form id="dialog-gas-form">
+            <input type="hidden" id="dialog-gas-id" value="" />
+            
+            <div class="m3-field">
+              <label class="m3-label" for="dialog-gas-com">Comercializadora *</label>
+              <select id="dialog-gas-com" class="m3-input m3-select" required></select>
+            </div>
+            
+            <div class="m3-field">
+              <label class="m3-label" for="dialog-gas-name">Nombre de Tarifa *</label>
+              <input type="text" id="dialog-gas-name" class="m3-input" placeholder="Ej. Tarifa Gas Estable" required />
+            </div>
+
+            <div class="m3-field-row">
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-gas-fixed">Término Fijo (€/mes) *</label>
+                <input type="number" id="dialog-gas-fixed" class="m3-input" placeholder="0.000000" step="0.000001" min="0" required />
+              </div>
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-gas-var">Término Variable (€/kWh) *</label>
+                <input type="number" id="dialog-gas-var" class="m3-input" placeholder="0.000000" step="0.000001" min="0" required />
+              </div>
+            </div>
+
+            <div class="m3-field">
+              <label class="m3-label" for="dialog-gas-commission">Comisión Asesor (€) *</label>
+              <input type="number" id="dialog-gas-commission" class="m3-input" placeholder="0.00" step="0.01" min="0" required />
+            </div>
+
+            <div class="m3-field">
+              <label class="m3-label" for="dialog-gas-notes">Notas / Condiciones</label>
+              <input type="text" id="dialog-gas-notes" class="m3-input" placeholder="Detalles de la tarifa..." />
+            </div>
+
+            <div class="m3-dialog-actions">
+              <button type="button" id="dialog-gas-close" class="m3-btn m3-btn-text">Cancelar</button>
+              <button type="submit" class="m3-btn">Guardar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: PREVISUALIZAR PDF -->
+      <div id="dialog-pdf-preview" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 90%; width: 900px; height: 90vh; display: flex; flex-direction: column; padding: 24px;">
+          <div class="flex-row-center-between" style="margin-bottom: 16px; align-items: center;">
+            <h3 class="m3-dialog-title" style="margin: 0;">Previsualización de Comparativa</h3>
+            <button id="dialog-pdf-preview-close" class="m3-btn-icon" title="Cerrar Previsualización">
+              <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+          </div>
+          <div style="flex-grow: 1; position: relative; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); overflow: hidden; background-color: #525659;">
+            <iframe id="pdf-preview-iframe" style="width: 100%; height: 100%; border: none;" src=""></iframe>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </body>
+</html>
