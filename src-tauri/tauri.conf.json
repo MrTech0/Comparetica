@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
+  "productName": "Comparetica",
   "version": "0.1.0",
-  "identifier": "com.polca.tauri-app",
+  "identifier": "com.mrtech0.comparetica",
   "build": {
     "frontendDist": "../src"
   },
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "tauri-app",
+        "title": "Comparetica",
         "width": 800,
         "height": 600
       }
