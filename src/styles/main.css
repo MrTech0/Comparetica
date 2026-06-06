@@ -443,3 +443,88 @@ header.app-header {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+/* ==========================================================================
+   COLOR THEMES (Material 3)
+   ========================================================================== */
+
+/* --- GREEN THEME --- */
+[data-color-theme="green"] {
+  --color-primary: hsl(140, 80%, 30%);
+  --color-primary-container: hsl(140, 80%, 90%);
+  --color-on-primary-container: hsl(140, 80%, 10%);
+}
+[data-color-theme="green"][data-theme="dark"],
+@media (prefers-color-scheme: dark) {
+  :root[data-color-theme="green"]:not([data-theme="light"]) {
+    --color-primary: hsl(140, 70%, 65%);
+    --color-primary-container: hsl(140, 80%, 22%);
+    --color-on-primary-container: hsl(140, 70%, 90%);
+  }
+}
+[data-color-theme="green"][data-theme="dark"] {
+  --color-primary: hsl(140, 70%, 65%);
+  --color-primary-container: hsl(140, 80%, 22%);
+  --color-on-primary-container: hsl(140, 70%, 90%);
+}
+
+/* --- RED THEME --- */
+[data-color-theme="red"] {
+  --color-primary: hsl(0, 75%, 45%);
+  --color-primary-container: hsl(0, 75%, 90%);
+  --color-on-primary-container: hsl(0, 75%, 15%);
+}
+[data-color-theme="red"][data-theme="dark"],
+@media (prefers-color-scheme: dark) {
+  :root[data-color-theme="red"]:not([data-theme="light"]) {
+    --color-primary: hsl(0, 85%, 75%);
+    --color-primary-container: hsl(0, 85%, 22%);
+    --color-on-primary-container: hsl(0, 85%, 90%);
+  }
+}
+[data-color-theme="red"][data-theme="dark"] {
+  --color-primary: hsl(0, 85%, 75%);
+  --color-primary-container: hsl(0, 85%, 22%);
+  --color-on-primary-container: hsl(0, 85%, 90%);
+}
+
+/* --- YELLOW THEME --- */
+[data-color-theme="yellow"] {
+  --color-primary: hsl(42, 95%, 45%);
+  --color-primary-container: hsl(42, 95%, 88%);
+  --color-on-primary-container: hsl(42, 95%, 12%);
+}
+[data-color-theme="yellow"][data-theme="dark"],
+@media (prefers-color-scheme: dark) {
+  :root[data-color-theme="yellow"]:not([data-theme="light"]) {
+    --color-primary: hsl(42, 90%, 65%);
+    --color-primary-container: hsl(42, 90%, 20%);
+    --color-on-primary-container: hsl(42, 90%, 88%);
+  }
+}
+[data-color-theme="yellow"][data-theme="dark"] {
+  --color-primary: hsl(42, 90%, 65%);
+  --color-primary-container: hsl(42, 90%, 20%);
+  --color-on-primary-container: hsl(42, 90%, 88%);
+}
+
+/* --- BLUE THEME (Default) --- */
+[data-color-theme="blue"] {
+  --color-primary: hsl(220, 85%, 45%);
+  --color-primary-container: hsl(220, 85%, 90%);
+  --color-on-primary-container: hsl(220, 85%, 15%);
+}
+[data-color-theme="blue"][data-theme="dark"],
+@media (prefers-color-scheme: dark) {
+  :root[data-color-theme="blue"]:not([data-theme="light"]) {
+    --color-primary: hsl(220, 90%, 70%);
+    --color-primary-container: hsl(220, 80%, 25%);
+    --color-on-primary-container: hsl(220, 90%, 90%);
+  }
+}
+[data-color-theme="blue"][data-theme="dark"] {
+  --color-primary: hsl(220, 90%, 70%);
+  --color-primary-container: hsl(220, 80%, 25%);
+  --color-on-primary-container: hsl(220, 90%, 90%);
+}
+

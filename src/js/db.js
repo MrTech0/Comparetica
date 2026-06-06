@@ -350,3 +350,27 @@ export async function deleteComparativa(id) {
   const db = await getDb();
   return await db.execute("DELETE FROM comparativas WHERE id = $1;", [id]);
 }
+
+/**
+ * Elimina todos los registros de todas las tablas de la base de datos para el Factory Reset.
+ */
+export async function clearAllTables() {
+  const db = await getDb();
+  if (window.__TAURI__ && window.__TAURI__.sql) {
+    try {
+      await db.execute("DELETE FROM comparativas;");
+      await db.execute("DELETE FROM tarifas_luz;");
+      await db.execute("DELETE FROM tarifas_gas;");
+      await db.execute("DELETE FROM comercializadoras;");
+    } catch (e) {
+      console.error("Error al vaciar tablas SQLite:", e);
+      throw e;
+    }
+  } else {
+    // Modo mock
+    localStorage.removeItem('mock_comercializadoras');
+    localStorage.removeItem('mock_tarifas_luz');
+    localStorage.removeItem('mock_tarifas_gas');
+    localStorage.removeItem('mock_comparativas');
+  }
+}

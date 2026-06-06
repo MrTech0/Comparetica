@@ -71,7 +71,11 @@ function setupComercializadoras() {
       // Actualizar selectores en diálogos
       await updateComercializadorasSelectors();
     } catch (error) {
-      alert("Error al guardar la comercializadora. Asegúrese de que el nombre sea único.");
+      if (window.showToast) {
+        window.showToast("Error al guardar la comercializadora. Asegúrese de que el nombre sea único.", "error");
+      } else {
+        alert("Error al guardar la comercializadora. Asegúrese de que el nombre sea único.");
+      }
       console.error(error);
     }
   });
@@ -166,7 +170,11 @@ function setupTarifasLuz() {
       dialog.classList.remove('active');
       await loadTarifasLuz();
     } catch (error) {
-      alert("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.");
+      if (window.showToast) {
+        window.showToast("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.", "error");
+      } else {
+        alert("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.");
+      }
       console.error(error);
     }
   });
@@ -284,7 +292,11 @@ function setupTarifasGas() {
       dialog.classList.remove('active');
       await loadTarifasGas();
     } catch (error) {
-      alert("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.");
+      if (window.showToast) {
+        window.showToast("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.", "error");
+      } else {
+        alert("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.");
+      }
       console.error(error);
     }
   });

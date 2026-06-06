@@ -5,12 +5,38 @@
  * @param {Object} data - Datos consolidados de la comparación.
  * @param {boolean} previewMode - Si se debe previsualizar en modal en lugar de guardar/descargar.
  */
-export function generatePDFReport(data, previewMode = false) {
+export async function generatePDFReport(data, previewMode = false) {
   const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
   if (!jsPDFClass) {
-    alert("Error: No se ha cargado la librería jsPDF. No se puede generar el reporte.");
+    if (window.showToast) {
+      window.showToast("Error: No se ha cargado la librería jsPDF. No se puede generar el reporte.", "error");
+    } else {
+      alert("Error: No se ha cargado la librería jsPDF. No se puede generar el reporte.");
+    }
     return;
   }
+
+  // Cargar configuración de consultora y logotipo
+  let config = {};
+  let logoDataUri = null;
+
+  if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+    try {
+      config = await window.__TAURI__.core.invoke('get_company_config');
+      logoDataUri = await window.__TAURI__.core.invoke('get_company_logo');
+    } catch (e) {
+      console.error("Error al obtener la configuración de la consultora:", e);
+    }
+  } else {
+    // Modo mock
+    try {
+      config = JSON.parse(localStorage.getItem('company_config') || '{}');
+      logoDataUri = localStorage.getItem('company_logo');
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   const doc = new jsPDFClass({
     orientation: 'portrait',
     unit: 'mm',
@@ -31,28 +57,41 @@ export function generatePDFReport(data, previewMode = false) {
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.rect(0, 0, 210, 15, 'F');
 
+  // Cargar logotipo (SVG/AVIF/Bombilla) convertida a PNG
+  const logoPng = await loadAndConvertLogo(logoDataUri);
+
+  // Pintar logotipo en la cabecera
+  if (logoPng) {
+    try {
+      doc.addImage(logoPng, 'PNG', 15, 18, 20, 20);
+    } catch (e) {
+      console.error("Error al insertar logotipo en el PDF:", e);
+    }
+  }
+
   // Título e Identidad
+  const companyName = config.consultora_nombre || 'Comparetica';
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.setFontSize(26);
+  doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text('Comparetica', 15, 30);
+  doc.text(companyName, 38, 28);
   
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.text('Estudio de Ahorro y Optimización Energética', 15, 35);
+  doc.text('Estudio de Ahorro y Optimización Energética', 38, 34);
 
   // Fecha del informe
   const todayStr = new Date().toLocaleDateString('es-ES', {
     year: 'numeric', month: 'long', day: 'numeric'
   });
-  doc.text(`Fecha: ${todayStr}`, 155, 30);
-  doc.text(`Suministro: ${data.energyType}`, 155, 35);
+  doc.text(`Fecha: ${todayStr}`, 155, 28);
+  doc.text(`Suministro: ${data.energyType}`, 155, 34);
 
   // Línea divisoria de cabecera
   doc.setDrawColor(220, 225, 230);
   doc.setLineWidth(0.5);
-  doc.line(15, 40, 195, 40);
+  doc.line(15, 41, 195, 41);
 
   // --- DATOS DEL CLIENTE ---
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -150,7 +189,6 @@ export function generatePDFReport(data, previewMode = false) {
   // Insertar filas según el tipo de energía
   if (data.energyType === 'LUZ') {
     const details = data.costDetail.annual;
-    // Asumimos prorratas proporcionales sencillas para la factura actual para comparación estética
     const rows = [
       { name: 'Término de Potencia (Capacidad)', cur: data.currentCost * 0.28, prop: details.potenciaTotal },
       { name: 'Término de Energía (Consumos P1/P2/P3)', cur: data.currentCost * 0.52, prop: details.energiaTotal },
@@ -224,7 +262,45 @@ export function generatePDFReport(data, previewMode = false) {
 
   // --- FIRMA Y FOOTER ---
   doc.line(15, 250, 195, 250);
-  doc.text('Comparetica App', 15, 256);
+  
+  doc.setFontSize(7);
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  
+  const footerLines = [];
+  if (config.consultora_nombre) {
+    let line1 = `Documento preparado por: ${config.consultora_nombre}`;
+    
+    // Construir dirección a partir de los campos individuales
+    const addressParts = [];
+    if (config.consultora_calle) addressParts.push(config.consultora_calle);
+    if (config.consultora_numero) addressParts.push(`Nº ${config.consultora_numero}`);
+    if (config.consultora_cp) addressParts.push(config.consultora_cp);
+    if (config.consultora_ciudad) addressParts.push(config.consultora_ciudad);
+    if (config.consultora_provincia) addressParts.push(`(${config.consultora_provincia})`);
+    
+    const fullAddress = addressParts.join(', ');
+    if (fullAddress) {
+      line1 += ` | Dirección: ${fullAddress}`;
+    }
+    footerLines.push(line1);
+
+    let line2 = "";
+    if (config.consultora_telefono) line2 += `Tel: ${config.consultora_telefono}  `;
+    if (config.consultora_email) line2 += `Email: ${config.consultora_email}  `;
+    if (config.consultora_web) line2 += `Web: ${config.consultora_web}  `;
+    if (line2.trim()) footerLines.push(line2.trim());
+  } else {
+    footerLines.push('Generado de forma automatizada por Comparetica App');
+  }
+
+  if (footerLines.length === 1) {
+    doc.text(footerLines[0], 15, 256);
+  } else if (footerLines.length === 2) {
+    doc.text(footerLines[0], 15, 255);
+    doc.text(footerLines[1], 15, 258);
+  }
+
+  doc.setFontSize(8);
   doc.text('Página 1 de 1', 180, 256);
 
   // Si está activo el modo previsualización, mostramos en modal
@@ -242,7 +318,11 @@ export function generatePDFReport(data, previewMode = false) {
       }
     } catch (e) {
       console.error("Error al previsualizar el PDF:", e);
-      alert("Error al previsualizar el reporte.");
+      if (window.showToast) {
+        window.showToast("Error al previsualizar el reporte.", "error");
+      } else {
+        alert("Error al previsualizar el reporte.");
+      }
     }
     return;
   }
@@ -259,10 +339,78 @@ export function generatePDFReport(data, previewMode = false) {
       })
       .catch(err => {
         if (err !== "Cancelado por el usuario") {
-          alert("Error al guardar el PDF: " + err);
+          window.showToast("Error al guardar el PDF: " + err, "error");
         }
       });
   } else {
     doc.save(filename);
   }
 }
+
+// Convertir logotipo a canvas/PNG
+function loadAndConvertLogo(logoDataUri) {
+  return new Promise((resolve) => {
+    if (!logoDataUri) {
+      resolve(getDefaultLogoAsPng());
+      return;
+    }
+    
+    const img = new Image();
+    img.src = logoDataUri;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || 200;
+      canvas.height = img.naturalHeight || 200;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => {
+      resolve(getDefaultLogoAsPng());
+    };
+  });
+}
+
+// Dibujar logotipo de bombilla por defecto en canvas 2D
+function getDefaultLogoAsPng() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  
+  ctx.clearRect(0, 0, 128, 128);
+  
+  // Dibujar círculo bombilla (amarillo suave)
+  ctx.beginPath();
+  ctx.arc(64, 52, 32, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFEB3B';
+  ctx.fill();
+  
+  // Dibujar base (gris)
+  ctx.beginPath();
+  ctx.rect(52, 78, 24, 16);
+  ctx.fillStyle = '#9E9E9E';
+  ctx.fill();
+  
+  // Roscas
+  ctx.fillStyle = '#757575';
+  ctx.beginPath();
+  ctx.rect(52, 83, 24, 3);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.rect(52, 89, 24, 3);
+  ctx.fill();
+  
+  // Filamento (naranja)
+  ctx.beginPath();
+  ctx.moveTo(56, 73);
+  ctx.lineTo(60, 52);
+  ctx.lineTo(68, 52);
+  ctx.lineTo(72, 73);
+  ctx.strokeStyle = '#FF9800';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  
+  return canvas.toDataURL('image/png');
+}
+

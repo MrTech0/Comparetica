@@ -6,6 +6,8 @@ import { initCalculatorView } from './views/calculator_view.js';
 import { initTariffsView, updateComercializadorasSelectors } from './views/tariffs.js';
 import { initHistoryView } from './views/history.js';
 import { initBackupView } from './views/backup.js';
+import { initWizard } from './views/wizard.js';
+import { initSettingsView } from './views/settings.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Inicializar la base de datos y esquema
@@ -32,6 +34,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   await initHistoryView();
   initBackupView();
   initPdfPreviewDialog();
+  initWizard();
+  initSettingsView();
 
   // Alimentar selectores dinámicos
   await updateComercializadorasSelectors();
@@ -100,7 +104,8 @@ function initNavigation() {
     { btn: 'nav-calculator', section: 'section-calculator', title: 'Comparador de Tarifas' },
     { btn: 'nav-tariffs', section: 'section-tariffs', title: 'Gestión de Tarifas y Comisiones' },
     { btn: 'nav-history', section: 'section-history', title: 'Historial de Comparativas' },
-    { btn: 'nav-backup', section: 'section-backup', title: 'Copia de Seguridad' }
+    { btn: 'nav-backup', section: 'section-backup', title: 'Copia de Seguridad' },
+    { btn: 'nav-settings', section: 'section-settings', title: 'Configuración de la Aplicación' }
   ];
 
   const viewTitle = document.getElementById('view-title');
@@ -159,3 +164,24 @@ function initPrivateMode() {
     }
   });
 }
+
+// --- NOTIFICACIONES TOAST (Material 3) ---
+window.showToast = function(message, type = 'success') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `m3-toast ${type}`;
+  toast.innerText = message;
+
+  container.appendChild(toast);
+
+  // Auto-eliminar después de 4 segundos
+  setTimeout(() => {
+    toast.classList.add('m3-toast-fadeout');
+    toast.addEventListener('animationend', () => {
+      toast.remove();
+    });
+  }, 4000);
+};
+

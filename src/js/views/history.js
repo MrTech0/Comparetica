@@ -90,7 +90,7 @@ async function loadHistoryTable() {
 }
 
 // --- Reimprimir reporte a partir de datos guardados ---
-function reprintPDF(record, previewMode = false) {
+async function reprintPDF(record, previewMode = false) {
   try {
     const datosCliente = JSON.parse(record.datos_cliente_json);
     
@@ -163,9 +163,9 @@ function reprintPDF(record, previewMode = false) {
       costDetail: costDetail
     };
 
-    generatePDFReport(reportData, previewMode);
+    await generatePDFReport(reportData, previewMode);
   } catch (error) {
-    alert("Error al regenerar el reporte PDF.");
+    window.showToast("Error al regenerar el reporte PDF.", "error");
     console.error(error);
   }
 }

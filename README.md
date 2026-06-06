@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="src-tauri/icons/128x128.png" width="128" height="128" alt="Comparetica Logo" />
+</p>
+
 # Comparetica
 
 **Comparetica** es una aplicación de escritorio B2B diseñada para consultores y asesores energéticos en España. Permite realizar estudios comparativos detallados de facturas de luz (tarifa 2.0TD) y gas (tarifa RL.1) de manera offline y local, identificando oportunidades de ahorro y gestionando las comisiones del asesor de forma profesional y discreta.

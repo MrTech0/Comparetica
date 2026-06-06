@@ -467,3 +467,78 @@ body.private-mode-active .private-value::after {
   color: var(--color-primary);
   border-bottom-color: var(--color-primary);
 }
+
+/* ==========================================================================
+   TOASTS & SNACKBARS (Material 3)
+   ========================================================================== */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  width: 100%;
+  max-width: 400px;
+  padding: 0 16px;
+}
+
+.m3-toast {
+  pointer-events: auto;
+  background-color: var(--color-on-surface);
+  color: var(--color-surface);
+  border-radius: var(--radius-sm);
+  padding: 12px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: toast-slide-up 0.3s cubic-bezier(0.2, 0, 0, 1) forwards;
+  opacity: 0;
+  border-left: 4px solid var(--color-outline);
+}
+
+.m3-toast.success {
+  border-left-color: var(--color-tertiary);
+}
+
+.m3-toast.error {
+  border-left-color: var(--color-error);
+}
+
+.m3-toast.info {
+  border-left-color: var(--color-primary);
+}
+
+@keyframes toast-slide-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.m3-toast-fadeout {
+  animation: toast-fade-out 0.25s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+@keyframes toast-fade-out {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+}
+

@@ -122,7 +122,13 @@ pub fn run() {
             set_backup_directory,
             select_backup_directory,
             get_backup_retention,
-            set_backup_retention
+            set_backup_retention,
+            save_company_logo,
+            get_company_logo,
+            get_company_config,
+            save_company_config,
+            delete_company_logo,
+            factory_reset
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -315,4 +321,152 @@ fn set_backup_retention(app_handle: tauri::AppHandle, days: u32) -> Result<u32, 
     std::fs::write(&config_path, config_str).map_err(|e| e.to_string())?;
 
     Ok(days)
+}
+
+fn delete_all_logos(app_data_dir: &std::path::Path) {
+    let extensions = ["svg", "png", "jpg", "jpeg", "webp", "avif"];
+    for ext in &extensions {
+        let path = app_data_dir.join(format!("logo.{}", ext));
+        if path.exists() {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+}
+
+#[tauri::command]
+fn save_company_logo(app_handle: tauri::AppHandle, base64_data: String, extension: String) -> Result<String, String> {
+    use base64::{Engine as _, engine::general_purpose};
+    use std::fs;
+    use tauri::Manager;
+
+    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    if !app_data_dir.exists() {
+        fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
+    }
+
+    // Limpiar logos previos
+    delete_all_logos(&app_data_dir);
+
+    let bytes = general_purpose::STANDARD
+        .decode(&base64_data)
+        .map_err(|e| e.to_string())?;
+
+    let ext = extension.to_lowercase();
+    let supported = ["svg", "png", "jpg", "jpeg", "webp", "avif"];
+    if !supported.contains(&ext.as_str()) {
+        return Err("Formato de imagen no soportado".to_string());
+    }
+
+    let file_name = format!("logo.{}", ext);
+    let logo_path = app_data_dir.join(&file_name);
+    fs::write(&logo_path, &bytes).map_err(|e| e.to_string())?;
+
+    Ok(file_name)
+}
+
+#[tauri::command]
+fn get_company_logo(app_handle: tauri::AppHandle) -> Result<Option<String>, String> {
+    use base64::{Engine as _, engine::general_purpose};
+    use std::fs;
+    use tauri::Manager;
+
+    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    
+    let extensions = [
+        ("svg", "image/svg+xml"),
+        ("png", "image/png"),
+        ("jpg", "image/jpeg"),
+        ("jpeg", "image/jpeg"),
+        ("webp", "image/webp"),
+        ("avif", "image/avif"),
+    ];
+
+    for &(ext, mime) in &extensions {
+        let path = app_data_dir.join(format!("logo.{}", ext));
+        if path.exists() {
+            let content = fs::read(&path).map_err(|e| e.to_string())?;
+            let base64_str = general_purpose::STANDARD.encode(&content);
+            return Ok(Some(format!("data:{};base64,{}", mime, base64_str)));
+        }
+    }
+
+    Ok(None)
+}
+
+#[tauri::command]
+fn get_company_config(app_handle: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    use tauri::Manager;
+    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let config_path = app_data_dir.join("config.json");
+
+    if config_path.exists() {
+        let config_str = std::fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
+        let config: serde_json::Value = serde_json::from_str(&config_str).unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+        Ok(config)
+    } else {
+        Ok(serde_json::Value::Object(serde_json::Map::new()))
+    }
+}
+
+#[tauri::command]
+fn save_company_config(app_handle: tauri::AppHandle, config: serde_json::Value) -> Result<(), String> {
+    use tauri::Manager;
+    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+
+    if !app_data_dir.exists() {
+        std::fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
+    }
+
+    let config_path = app_data_dir.join("config.json");
+    
+    let mut current_config = if config_path.exists() {
+        let config_str = std::fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&config_str).unwrap_or(serde_json::Value::Object(serde_json::Map::new()))
+    } else {
+        serde_json::Value::Object(serde_json::Map::new())
+    };
+
+    if let (Some(current_obj), Some(new_obj)) = (current_config.as_object_mut(), config.as_object()) {
+        for (k, v) in new_obj {
+            current_obj.insert(k.clone(), v.clone());
+        }
+    } else {
+        current_config = config;
+    }
+
+    let config_str = serde_json::to_string_pretty(&current_config).map_err(|e| e.to_string())?;
+    std::fs::write(&config_path, config_str).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_company_logo(app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    delete_all_logos(&app_data_dir);
+    Ok(())
+}
+
+#[tauri::command]
+fn factory_reset(app_handle: tauri::AppHandle) -> Result<String, String> {
+    use std::fs;
+    use tauri::Manager;
+    
+    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    
+    let config_path = app_data_dir.join("config.json");
+    if config_path.exists() {
+        let _ = fs::remove_file(&config_path);
+    }
+    
+    // Limpiar todos los logos posibles
+    delete_all_logos(&app_data_dir);
+
+    // No eliminamos comparetica.db ni reiniciamos el proceso aquí
+    // para evitar bloqueos del sistema de archivos en Windows y desconexiones
+    // del servidor de desarrollo del WebView (puertos ocupados/refusales).
+    // El frontend se encarga de vaciar las tablas con DELETE queries y recargar la página.
+
+    Ok("Configuración y logotipos eliminados con éxito.".to_string())
 }

@@ -165,7 +165,11 @@ function setupCalcFormSubmit() {
       });
 
       // Ordenar por ahorro descendente
-      lightResults.sort((a, b) => b.ahorro - a.ahorro);
+      lightResults.sort((a, b) => {
+        const ahorroA = isNaN(a.ahorro) || a.ahorro === null ? -Infinity : a.ahorro;
+        const ahorroB = isNaN(b.ahorro) || b.ahorro === null ? -Infinity : b.ahorro;
+        return ahorroB - ahorroA;
+      });
 
       if (lightResults.length > 0) {
         bestLightOption = lightResults[0];
@@ -194,7 +198,11 @@ function setupCalcFormSubmit() {
       });
 
       // Ordenar por ahorro descendente
-      gasResults.sort((a, b) => b.ahorro - a.ahorro);
+      gasResults.sort((a, b) => {
+        const ahorroA = isNaN(a.ahorro) || a.ahorro === null ? -Infinity : a.ahorro;
+        const ahorroB = isNaN(b.ahorro) || b.ahorro === null ? -Infinity : b.ahorro;
+        return ahorroB - ahorroA;
+      });
 
       if (gasResults.length > 0) {
         bestGasOption = gasResults[0];
@@ -374,13 +382,13 @@ async function saveComparisonToDb(item, type, buttonEl) {
   } catch (error) {
     buttonEl.disabled = false;
     buttonEl.innerHTML = 'Guardar Comparativa';
-    alert("Error al guardar la comparativa en el historial.");
+    window.showToast("Error al guardar la comparativa en el historial.", "error");
     console.error(error);
   }
 }
 
 // --- Exportación a PDF ---
-function exportPDF(item, type, previewMode = false) {
+async function exportPDF(item, type, previewMode = false) {
   const reportData = {
     clientName: lastComparisonData.clientName,
     clientCups: lastComparisonData.clientCups,
@@ -393,7 +401,12 @@ function exportPDF(item, type, previewMode = false) {
     costDetail: item.costDetail
   };
 
-  generatePDFReport(reportData, previewMode);
+  try {
+    await generatePDFReport(reportData, previewMode);
+  } catch (e) {
+    console.error(e);
+    window.showToast("Error al generar el PDF.", "error");
+  }
 }
 
 // Auxiliares

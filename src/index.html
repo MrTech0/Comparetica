@@ -20,7 +20,7 @@
       <aside class="app-navigation">
         <div class="nav-top">
           <div class="nav-header">
-            <div class="logo-icon">C</div>
+            <img src="assets/light-bulb.svg" style="width: 36px; height: 36px; display: block; border-radius: var(--radius-md); box-shadow: var(--shadow-1);" alt="Comparetica Logo" />
             <span class="logo-text">Comparetica</span>
           </div>
           
@@ -53,11 +53,15 @@
           </nav>
         </div>
 
-        <div class="nav-bottom">
+        <div class="nav-bottom" style="display: flex; gap: 8px; align-items: center;">
           <!-- Theme selector Switch -->
           <button id="theme-toggle" class="m3-btn-icon" title="Alternar Tema">
             <svg id="theme-icon-sun" viewBox="0 0 24 24" style="display:none;"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.01c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
             <svg id="theme-icon-moon" viewBox="0 0 24 24"><path d="M12.3 22h-.1c-5.5 0-10-4.5-10-10 0-4.8 3.5-8.9 8.2-9.8.6-.1 1.2.3 1.3.9.1.6-.2 1.2-.8 1.4-3.5.9-6 4.1-6 7.8 0 4.4 3.6 8 8 8 3.7 0 6.9-2.5 7.8-6 .2-.6.8-.9 1.4-.8.6.1 1 .7.9 1.3-.9 4.7-5 8.2-9.8 8.2z"/></svg>
+          </button>
+          <!-- Settings gear button -->
+          <button id="nav-settings" class="m3-btn-icon" title="Configuración">
+            <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
           </button>
         </div>
       </aside>
@@ -509,6 +513,132 @@
             </div>
           </section>
 
+          <!-- ==========================================
+               SECTION: SETTINGS
+               ========================================== -->
+          <section id="section-settings" class="view-section">
+            <div class="tabs-header">
+              <button class="m3-tab-btn active" id="tab-btn-settings-appearance">Apariencia</button>
+              <button class="m3-tab-btn" id="tab-btn-settings-company">Consultora</button>
+              <button class="m3-tab-btn" id="tab-btn-settings-cleanup">Limpieza</button>
+            </div>
+
+            <!-- PANEL: APARIENCIA -->
+            <div id="panel-settings-appearance" class="tab-panel active">
+              <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Tema de Color</h3>
+                <p class="text-muted" style="margin-bottom: 20px; font-size: 13px;">
+                  Elige la paleta de colores para personalizar la interfaz de la aplicación de acuerdo a la identidad visual de tu consultora.
+                </p>
+
+                 <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                   <button class="m3-btn color-theme-btn" data-theme-color="blue" style="background-color: hsl(220, 85%, 45%); color: white; border-color: transparent;">
+                     Azul
+                   </button>
+                   <button class="m3-btn color-theme-btn" data-theme-color="green" style="background-color: hsl(140, 80%, 30%); color: white; border-color: transparent;">
+                     Verde
+                   </button>
+                   <button class="m3-btn color-theme-btn" data-theme-color="red" style="background-color: hsl(0, 75%, 45%); color: white; border-color: transparent;">
+                     Rojo
+                   </button>
+                   <button class="m3-btn color-theme-btn" data-theme-color="yellow" style="background-color: hsl(42, 95%, 45%); color: white; border-color: transparent;">
+                     Amarillo
+                   </button>
+                 </div>
+              </div>
+            </div>
+
+            <!-- PANEL: CONSULTORA -->
+            <div id="panel-settings-company" class="tab-panel" style="display:none;">
+              <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Datos de tu Consultora</h3>
+                <p class="text-muted" style="margin-bottom: 20px; font-size: 13px;">
+                  Modifica los datos de tu empresa. Estos cambios se aplicarán automáticamente a la cabecera y el pie de página de los nuevos reportes PDF generados.
+                </p>
+
+                <form id="settings-company-form">
+                  <div class="m3-field">
+                    <label class="m3-label" for="settings-company-name">Nombre de la Consultora *</label>
+                    <input type="text" id="settings-company-name" class="m3-input" placeholder="Ej. Ahorro Energético S.L." required />
+                  </div>
+
+                  <div class="m3-field">
+                    <label class="m3-label" for="settings-company-logo">Logotipo de la Empresa (Subir nueva imagen para cambiar)</label>
+                    <div style="display: flex; gap: 16px; align-items: center;">
+                      <input type="file" id="settings-company-logo" class="m3-input" accept=".svg, .png, .jpg, .jpeg, .webp, .avif" style="padding-top: 10px; cursor: pointer; flex: 1;" />
+                      <div id="settings-company-logo-preview" style="width: 50px; height: 50px; border: 1px dashed var(--color-outline); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; overflow: hidden; background-color: var(--color-surface-variant);">
+                        <span class="text-muted" style="font-size: 9px;">Sin Logo</span>
+                      </div>
+                    </div>
+                    <span class="text-muted" style="font-size: 11px; margin-top: 4px;">Formatos: SVG, PNG, JPG, WebP, AVIF. Si deseas borrar tu logo y usar la bombilla por defecto, usa el botón de abajo.</span>
+                  </div>
+
+                  <div class="m3-field">
+                    <label class="m3-label" for="settings-company-street">Calle</label>
+                    <input type="text" id="settings-company-street" class="m3-input" placeholder="Ej. Calle Mayor" />
+                  </div>
+
+                  <div class="m3-field-row">
+                    <div class="m3-field">
+                      <label class="m3-label" for="settings-company-number">Número</label>
+                      <input type="text" id="settings-company-number" class="m3-input" placeholder="Ej. 12" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="settings-company-cp">Código Postal</label>
+                      <input type="text" id="settings-company-cp" class="m3-input" placeholder="Ej. 28001" />
+                    </div>
+                  </div>
+
+                  <div class="m3-field-row">
+                    <div class="m3-field">
+                      <label class="m3-label" for="settings-company-city">Ciudad</label>
+                      <input type="text" id="settings-company-city" class="m3-input" placeholder="Ej. Madrid" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="settings-company-province">Provincia</label>
+                      <input type="text" id="settings-company-province" class="m3-input" placeholder="Ej. Madrid" />
+                    </div>
+                  </div>
+
+                  <div class="m3-field-row">
+                    <div class="m3-field">
+                      <label class="m3-label" for="settings-company-web">Página Web</label>
+                      <input type="url" id="settings-company-web" class="m3-input" placeholder="Ej. https://misitio.com" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="settings-company-email">Email de Contacto</label>
+                      <input type="email" id="settings-company-email" class="m3-input" placeholder="Ej. info@misitio.com" />
+                    </div>
+                  </div>
+
+                  <div class="m3-field" style="max-width: 50%;">
+                    <label class="m3-label" for="settings-company-phone">Teléfono de Contacto</label>
+                    <input type="tel" id="settings-company-phone" class="m3-input" placeholder="Ej. +34 600 000 000" />
+                  </div>
+
+                  <div style="display: flex; gap: 16px; margin-top: 24px;">
+                    <button type="submit" class="m3-btn">Guardar Datos de Consultora</button>
+                    <button type="button" id="settings-company-logo-clear-btn" class="m3-btn m3-btn-text" style="color: var(--color-error); border-color: transparent;">Borrar Logotipo Personalizado</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- PANEL: LIMPIEZA -->
+            <div id="panel-settings-cleanup" class="tab-panel" style="display:none;">
+              <div class="m3-card margin-top-md" style="border-left: 5px solid var(--color-error);">
+                <h3 class="m3-card-title" style="color: var(--color-error);">Inicializar Aplicación</h3>
+                <p class="text-muted" style="margin-bottom: 20px; font-size: 13px; line-height: 1.5;">
+                  Esta opción restablece de fábrica la aplicación. Al hacer clic en el botón se <strong>eliminará de forma irreversible</strong> toda la información que hayas ingresado: comercializadoras, tarifas, historial de comparativas de clientes, datos de la consultora y logotipo. La aplicación se cerrará y se iniciará de nuevo en un estado completamente limpio.
+                </p>
+
+                <button id="factory-reset-btn" class="m3-btn" style="background-color: var(--color-error); color: var(--color-on-error); border-color: transparent;">
+                  Restablecer de Fábrica...
+                </button>
+              </div>
+            </div>
+          </section>
+
         </div>
       </main>
 
@@ -636,6 +766,141 @@
           </div>
           <div style="flex-grow: 1; position: relative; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); overflow: hidden; background-color: #525659;">
             <iframe id="pdf-preview-iframe" style="width: 100%; height: 100%; border: none;" src=""></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTENEDOR DE TOASTS -->
+      <div id="toast-container"></div>
+
+      <!-- DIÁLOGO: ASISTENTE DE BIENVENIDA (WIZARD) -->
+      <div id="dialog-welcome-wizard" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 600px; padding: 32px;">
+          <!-- Paso 1: Bienvenida -->
+          <div id="wizard-step-1" class="wizard-step">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <img src="assets/light-bulb.svg" style="width: 72px; height: 72px; margin: 0 auto 16px; display: block; border-radius: var(--radius-lg); box-shadow: var(--shadow-2);" alt="Comparetica Logo" />
+              <h2 class="m3-dialog-title" style="margin-bottom: 8px;">¡Bienvenido a Comparetica!</h2>
+              <p class="text-muted" style="font-size: 14px; line-height: 1.6; max-width: 460px; margin: 0 auto;">
+                Tu herramienta local para la optimización de costes de luz y gas. Realiza estudios B2B offline de forma ágil, precisa y confidencial.
+              </p>
+            </div>
+            
+            <div class="m3-card m3-card-outlined" style="background-color: var(--color-surface-variant); padding: 16px; margin-bottom: 24px; border: none;">
+              <h4 style="font-weight: 600; margin-bottom: 6px; font-size: 13px; color: var(--color-primary);">Lo que puedes hacer:</h4>
+              <ul style="margin-left: 20px; font-size: 13px; line-height: 1.6; color: var(--color-on-surface-variant);">
+                <li>Calcular estudios de ahorro energético combinados.</li>
+                <li>Gestionar comisiones de forma discreta (Modo Privado).</li>
+                <li>Generar y previsualizar reportes ejecutivos en PDF al instante.</li>
+                <li>Almacenar toda la información de forma local y 100% segura.</li>
+              </ul>
+            </div>
+
+            <div class="m3-dialog-actions">
+              <button type="button" id="wizard-next-btn" class="m3-btn">Comenzar Configuración</button>
+            </div>
+          </div>
+
+          <!-- Paso 2: Datos de la Consultora -->
+          <div id="wizard-step-2" class="wizard-step" style="display: none;">
+            <h3 class="m3-dialog-title" style="margin-bottom: 8px;">Datos de tu Consultora</h3>
+            <p class="text-muted" style="font-size: 13px; margin-bottom: 20px; line-height: 1.4;">
+              Estos datos se utilizarán para personalizar el pie de página e inyectar el logotipo en la cabecera de tus informes PDF.
+            </p>
+
+            <form id="wizard-form">
+              <div class="m3-field">
+                <label class="m3-label" for="wizard-company-name">Nombre de la Consultora *</label>
+                <input type="text" id="wizard-company-name" class="m3-input" placeholder="Ej. Ahorro Energético S.L." required />
+              </div>
+
+              <div class="m3-field">
+                <label class="m3-label" for="wizard-company-logo">Logotipo de la Empresa (Opcional)</label>
+                <input type="file" id="wizard-company-logo" class="m3-input" accept=".svg, .png, .jpg, .jpeg, .webp, .avif" style="padding-top: 10px; cursor: pointer;" />
+                <span class="text-muted" style="font-size: 11px; margin-top: 4px;">Formatos: SVG, PNG, JPG, WebP, AVIF. Si no se sube nada, se usará el icono de bombilla por defecto.</span>
+              </div>
+
+              <div class="m3-field">
+                <label class="m3-label" for="wizard-company-street">Calle</label>
+                <input type="text" id="wizard-company-street" class="m3-input" placeholder="Ej. Calle Mayor" />
+              </div>
+
+              <div class="m3-field-row">
+                <div class="m3-field">
+                  <label class="m3-label" for="wizard-company-number">Número</label>
+                  <input type="text" id="wizard-company-number" class="m3-input" placeholder="Ej. 12" />
+                </div>
+                <div class="m3-field">
+                  <label class="m3-label" for="wizard-company-cp">Código Postal</label>
+                  <input type="text" id="wizard-company-cp" class="m3-input" placeholder="Ej. 28001" />
+                </div>
+              </div>
+
+              <div class="m3-field-row">
+                <div class="m3-field">
+                  <label class="m3-label" for="wizard-company-city">Ciudad</label>
+                  <input type="text" id="wizard-company-city" class="m3-input" placeholder="Ej. Madrid" />
+                </div>
+                <div class="m3-field">
+                  <label class="m3-label" for="wizard-company-province">Provincia</label>
+                  <input type="text" id="wizard-company-province" class="m3-input" placeholder="Ej. Madrid" />
+                </div>
+              </div>
+
+              <div class="m3-field-row">
+                <div class="m3-field">
+                  <label class="m3-label" for="wizard-company-web">Página Web</label>
+                  <input type="url" id="wizard-company-web" class="m3-input" placeholder="Ej. https://misitio.com" />
+                </div>
+                <div class="m3-field">
+                  <label class="m3-label" for="wizard-company-email">Email de Contacto</label>
+                  <input type="email" id="wizard-company-email" class="m3-input" placeholder="Ej. info@misitio.com" />
+                </div>
+              </div>
+
+              <div class="m3-field" style="max-width: 50%;">
+                <label class="m3-label" for="wizard-company-phone">Teléfono de Contacto</label>
+                <input type="tel" id="wizard-company-phone" class="m3-input" placeholder="Ej. +34 600 000 000" />
+              </div>
+
+              <div class="m3-dialog-actions" style="margin-top: 24px;">
+                <button type="button" id="wizard-back-btn" class="m3-btn m3-btn-text">Atrás</button>
+                <button type="submit" class="m3-btn">Finalizar y Guardar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <!-- DIÁLOGO: DOBLE CONFIRMACIÓN RESTABLECIMIENTO -->
+      <div id="dialog-reset-confirm" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="border-left: 6px solid var(--color-error);">
+          <h3 class="m3-dialog-title" style="color: var(--color-error);" id="reset-confirm-title">¿Restablecer Aplicación?</h3>
+          <div class="m3-dialog-body">
+            <p style="margin-bottom: 12px;"><strong>Paso 1 de 2:</strong> Esta acción borrará todas las tarifas, comercializadoras, historial de clientes y configuración.</p>
+            <p>Escribe <code style="background-color: var(--color-error-container); color: var(--color-on-error-container); padding: 2px 6px; border-radius: 4px; font-weight: 600;">BORRAR</code> en el campo inferior para habilitar el botón de continuación.</p>
+            
+            <div class="m3-field" style="margin-top: 16px; margin-bottom: 0;">
+              <input type="text" id="reset-confirm-input" class="m3-input" placeholder="Escribe BORRAR..." autocomplete="off" />
+            </div>
+          </div>
+          <div class="m3-dialog-actions">
+            <button type="button" id="dialog-reset-close" class="m3-btn m3-btn-text">Cancelar</button>
+            <button type="button" id="dialog-reset-next" class="m3-btn" style="background-color: var(--color-error); color: var(--color-on-error); border-color: transparent;" disabled>Continuar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: DOBLE CONFIRMACIÓN PASO 2 -->
+      <div id="dialog-reset-confirm-2" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="border-left: 6px solid var(--color-error);">
+          <h3 class="m3-dialog-title" style="color: var(--color-error);">⚠️ Confirmación Final</h3>
+          <div class="m3-dialog-body">
+            <p style="margin-bottom: 12px; font-weight: bold;">Paso 2 de 2: Esta es la última advertencia.</p>
+            <p>¿Seguro que deseas proceder con la inicialización total? Esta operación es definitiva y no se puede deshacer de ninguna manera.</p>
+          </div>
+          <div class="m3-dialog-actions">
+            <button type="button" id="dialog-reset-close-2" class="m3-btn m3-btn-text">Cancelar</button>
+            <button type="button" id="dialog-reset-submit" class="m3-btn" style="background-color: var(--color-error); color: var(--color-on-error); border-color: transparent;">Sí, borrar todo</button>
           </div>
         </div>
       </div>

@@ -32,7 +32,7 @@ export function initBackupView() {
   if (changeDirBtn) {
     changeDirBtn.addEventListener('click', async () => {
       if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
-        alert("Esta acción solo está disponible en modo de escritorio (Tauri).");
+        window.showToast("Esta acción solo está disponible en modo de escritorio (Tauri).", "info");
         return;
       }
 
@@ -43,7 +43,7 @@ export function initBackupView() {
         if (dirInput) dirInput.value = savedPath;
       } catch (error) {
         if (error !== "Cancelado por el usuario") {
-          alert(`Error al configurar el directorio: ${error}`);
+          window.showToast(`Error al configurar el directorio: ${error}`, "error");
         }
       } finally {
         changeDirBtn.disabled = false;
@@ -55,7 +55,7 @@ export function initBackupView() {
   if (resetDirBtn) {
     resetDirBtn.addEventListener('click', async () => {
       if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
-        alert("Esta acción solo está disponible en modo de escritorio (Tauri).");
+        window.showToast("Esta acción solo está disponible en modo de escritorio (Tauri).", "info");
         return;
       }
 
@@ -63,9 +63,9 @@ export function initBackupView() {
         resetDirBtn.disabled = true;
         const savedPath = await window.__TAURI__.core.invoke('set_backup_directory', { path: "" });
         if (dirInput) dirInput.value = savedPath;
-        alert("Ubicación de copia automática restablecida al directorio Home del usuario.");
+        window.showToast("Ubicación de copia automática restablecida al directorio Home del usuario.", "success");
       } catch (error) {
-        alert(`Error al restablecer el directorio: ${error}`);
+        window.showToast(`Error al restablecer el directorio: ${error}`, "error");
       } finally {
         resetDirBtn.disabled = false;
       }
@@ -85,7 +85,7 @@ export function initBackupView() {
         try {
           await window.__TAURI__.core.invoke('set_backup_retention', { days });
         } catch (err) {
-          alert(`Error al guardar los días de retención: ${err}`);
+          window.showToast(`Error al guardar los días de retención: ${err}`, "error");
         }
       }
     });
@@ -95,7 +95,7 @@ export function initBackupView() {
   if (exportBtn) {
     exportBtn.addEventListener('click', async () => {
       if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
-        alert("Las copias de seguridad nativas solo están disponibles ejecutando la aplicación de escritorio (Tauri).");
+        window.showToast("Las copias de seguridad nativas solo están disponibles ejecutando la aplicación de escritorio (Tauri).", "info");
         return;
       }
 
@@ -105,12 +105,12 @@ export function initBackupView() {
         exportBtn.innerText = "Exportando...";
 
         const resultPath = await window.__TAURI__.core.invoke('export_backup');
-        alert(`Copia de seguridad guardada con éxito en:\n${resultPath}`);
+        window.showToast(`Copia de seguridad guardada con éxito en: ${resultPath}`, "success");
         
         exportBtn.innerHTML = originalText;
       } catch (error) {
         if (error !== "Cancelado por el usuario") {
-          alert(`Error al exportar la copia de seguridad: ${error}`);
+          window.showToast(`Error al exportar la copia de seguridad: ${error}`, "error");
         }
       } finally {
         exportBtn.disabled = false;
@@ -129,7 +129,7 @@ export function initBackupView() {
   if (importBtn) {
     importBtn.addEventListener('click', async () => {
       if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
-        alert("Las copias de seguridad nativas solo están disponibles ejecutando la aplicación de escritorio (Tauri).");
+        window.showToast("Las copias de seguridad nativas solo están disponibles ejecutando la aplicación de escritorio (Tauri).", "info");
         return;
       }
 
@@ -147,10 +147,10 @@ export function initBackupView() {
         importBtn.innerText = "Restaurando...";
 
         const msg = await window.__TAURI__.core.invoke('import_backup');
-        alert(msg);
+        window.showToast(msg, "success");
       } catch (error) {
         if (error !== "Cancelado por el usuario") {
-          alert(`Error al importar la copia de seguridad: ${error}`);
+          window.showToast(`Error al importar la copia de seguridad: ${error}`, "error");
         }
       } finally {
         importBtn.disabled = false;
