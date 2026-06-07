@@ -29,6 +29,7 @@
 
 /* Light Theme Variables (Default) */
 :root {
+  color-scheme: light;
   --color-primary: hsl(220, 85%, 45%);
   --color-on-primary: hsl(0, 0%, 100%);
   --color-primary-container: hsl(220, 85%, 90%);
@@ -66,6 +67,7 @@
 /* Dark Theme Variables (System Preference) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --color-primary: hsl(220, 90%, 70%);
     --color-on-primary: hsl(220, 90%, 15%);
     --color-primary-container: hsl(220, 80%, 25%);
@@ -103,6 +105,7 @@
 
 /* Manual Dark Theme */
 [data-theme="dark"] {
+  color-scheme: dark;
   --color-primary: hsl(220, 90%, 70%);
   --color-on-primary: hsl(220, 90%, 15%);
   --color-primary-container: hsl(220, 80%, 25%);
@@ -139,6 +142,7 @@
 
 /* Manual Light Theme */
 [data-theme="light"] {
+  color-scheme: light;
   --color-primary: hsl(220, 85%, 45%);
   --color-on-primary: hsl(0, 0%, 100%);
   --color-primary-container: hsl(220, 85%, 90%);
@@ -199,11 +203,15 @@ body {
   width: 100vw;
   height: 100vh;
   position: relative;
+  transition: grid-template-columns var(--transition-medium);
 }
 
 @media (min-width: 1024px) {
   #app-container {
     grid-template-columns: 240px 1fr; /* Navigation Drawer + Main View */
+  }
+  #app-container.collapsed-sidebar {
+    grid-template-columns: 80px 1fr;
   }
 }
 
@@ -526,5 +534,66 @@ header.app-header {
   --color-primary: hsl(220, 90%, 70%);
   --color-primary-container: hsl(220, 80%, 25%);
   --color-on-primary-container: hsl(220, 90%, 90%);
+}
+
+/* ==========================================================================
+   COLLAPSED SIDEBAR (Navigation Rail) OVERRIDES
+   ========================================================================== */
+@media (min-width: 1024px) {
+  .collapsed-sidebar .logo-text,
+  .collapsed-sidebar .nav-item span {
+    display: none !important;
+  }
+  
+  .collapsed-sidebar aside.app-navigation {
+    align-items: center;
+    padding: 24px 8px;
+  }
+  
+  .collapsed-sidebar .nav-header {
+    flex-direction: column;
+    gap: 16px;
+    padding: 0;
+    align-items: center;
+  }
+  
+  .collapsed-sidebar .logo-group {
+    justify-content: center;
+    width: 100%;
+  }
+
+  #sidebar-logo-toggle img {
+    transition: transform var(--transition-fast);
+  }
+
+  #sidebar-logo-toggle:hover img {
+    transform: scale(1.08);
+  }
+  
+  #sidebar-logo-toggle:active img {
+    transform: scale(0.95);
+  }
+  
+  .collapsed-sidebar .nav-item {
+    justify-content: center;
+    padding: 0;
+    width: 48px;
+    height: 48px;
+  }
+
+  .collapsed-sidebar .nav-bottom {
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100%;
+    align-items: center;
+  }
+}
+
+/* Disable logo toggle interaction on smaller devices where sidebar is always collapsed */
+@media (max-width: 1023px) {
+  #sidebar-logo-toggle {
+    cursor: default !important;
+    pointer-events: none;
+  }
 }
 

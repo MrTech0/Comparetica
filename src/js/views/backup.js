@@ -133,10 +133,11 @@ export function initBackupView() {
         return;
       }
 
-      const confirmRestore = confirm(
+      const confirmRestore = await window.showConfirm(
         "¿Estás seguro de que deseas restaurar una copia de seguridad?\n\n" +
         "Esta acción eliminará de forma permanente TODOS tus datos locales actuales (tarifas, comercializadoras e historial) y los reemplazará por los del archivo de copia de seguridad.\n\n" +
-        "La aplicación se REINICIARÁ automáticamente tras completarse la importación."
+        "La aplicación se REINICIARÁ automáticamente tras completarse la importación.",
+        "Restaurar Copia de Seguridad"
       );
 
       if (!confirmRestore) return;
@@ -147,7 +148,16 @@ export function initBackupView() {
         importBtn.innerText = "Restaurando...";
 
         const msg = await window.__TAURI__.core.invoke('import_backup');
-        window.showToast(msg, "success");
+        localStorage.setItem('first_run_completed', 'true');
+        
+        if (msg === "DEV_MODE") {
+          window.showToast("Copia de seguridad restaurada. Recargando aplicación...", "success");
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } else {
+          window.showToast(msg, "success");
+        }
       } catch (error) {
         if (error !== "Cancelado por el usuario") {
           window.showToast(`Error al importar la copia de seguridad: ${error}`, "error");

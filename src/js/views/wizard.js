@@ -6,6 +6,7 @@ export function initWizard() {
   const step2 = document.getElementById('wizard-step-2');
   const nextBtn = document.getElementById('wizard-next-btn');
   const backBtn = document.getElementById('wizard-back-btn');
+  const restoreBtn = document.getElementById('wizard-restore-btn');
   const form = document.getElementById('wizard-form');
 
   if (!wizardOverlay) return;
@@ -14,6 +15,50 @@ export function initWizard() {
   const isFirstRunCompleted = localStorage.getItem('first_run_completed');
   if (!isFirstRunCompleted) {
     wizardOverlay.classList.add('active');
+  }
+
+  // Evento de restauración de copia de seguridad en el arranque
+  if (restoreBtn) {
+    restoreBtn.addEventListener('click', async () => {
+      if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
+        window.showToast("Las copias de seguridad nativas solo están disponibles ejecutando la aplicación de escritorio (Tauri).", "info");
+        return;
+      }
+
+      const confirmRestore = await window.showConfirm(
+        "¿Estás seguro de que deseas restaurar una copia de seguridad?\n\n" +
+        "Esta acción eliminará de forma permanente TODOS tus datos locales actuales y los reemplazará por los del archivo de copia de seguridad.\n\n" +
+        "La aplicación se REINICIARÁ automáticamente tras completarse la importación.",
+        "Restaurar Copia de Seguridad"
+      );
+
+      if (!confirmRestore) return;
+
+      try {
+        restoreBtn.disabled = true;
+        restoreBtn.innerText = "Restaurando...";
+
+        const msg = await window.__TAURI__.core.invoke('import_backup');
+        // Marcamos el primer arranque como completado para evitar que el wizard vuelva a salir tras reiniciar
+        localStorage.setItem('first_run_completed', 'true');
+        
+        if (msg === "DEV_MODE") {
+          window.showToast("Copia de seguridad restaurada. Recargando aplicación...", "success");
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } else {
+          window.showToast(msg, "success");
+        }
+      } catch (error) {
+        if (error !== "Cancelado por el usuario") {
+          window.showToast(`Error al importar la copia de seguridad: ${error}`, "error");
+        }
+      } finally {
+        restoreBtn.disabled = false;
+        restoreBtn.innerText = "Restaurar Copia de Seguridad";
+      }
+    });
   }
 
   // Eventos de navegación entre pasos

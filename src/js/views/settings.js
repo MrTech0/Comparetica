@@ -23,7 +23,7 @@ function setupTabs() {
 
     if (!button || !panel) return;
 
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
       // Desactivar todos
       tabs.forEach(t => {
         const b = document.getElementById(t.btn);
@@ -39,6 +39,11 @@ function setupTabs() {
       button.classList.add('active');
       panel.classList.add('active');
       panel.style.display = 'block';
+
+      // Recargar datos si es la pestaña de la consultora
+      if (item.btn === 'tab-btn-settings-company') {
+        await loadCurrentCompanyData();
+      }
     });
   });
 }
@@ -257,7 +262,7 @@ async function setupCompanySettings() {
   // Limpiar logotipo personalizado
   if (clearLogoBtn) {
     clearLogoBtn.addEventListener('click', async () => {
-      if (!confirm("¿Estás seguro de que deseas eliminar tu logotipo personalizado y usar la bombilla por defecto?")) {
+      if (!await window.showConfirm("¿Estás seguro de que deseas eliminar tu logotipo personalizado y usar la bombilla por defecto?", "Borrar Logotipo Personalizado")) {
         return;
       }
 
@@ -277,46 +282,62 @@ async function setupCompanySettings() {
       }
     });
   }
+}
 
-  // Helper para cargar y pintar datos actuales en los inputs
-  async function loadCurrentCompanyData() {
-    let config = {};
-    let logoDataUri = null;
+// Exportar función para refrescar la configuración al navegar
+export async function refreshCompanySettings() {
+  await loadCurrentCompanyData();
+}
 
-    if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-      try {
-        config = await window.__TAURI__.core.invoke('get_company_config');
-        logoDataUri = await window.__TAURI__.core.invoke('get_company_logo');
-      } catch (e) {
-        console.error(e);
-      }
-    } else {
-      try {
-        config = JSON.parse(localStorage.getItem('company_config') || '{}');
-        logoDataUri = localStorage.getItem('company_logo');
-      } catch (e) {
-        console.error(e);
-      }
+// Helper para cargar y pintar datos actuales en los inputs
+async function loadCurrentCompanyData() {
+  let config = {};
+  let logoDataUri = null;
+  const logoPreview = document.getElementById('settings-company-logo-preview');
+
+  if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+    try {
+      config = await window.__TAURI__.core.invoke('get_company_config');
+      logoDataUri = await window.__TAURI__.core.invoke('get_company_logo');
+    } catch (e) {
+      console.error(e);
     }
+  } else {
+    try {
+      config = JSON.parse(localStorage.getItem('company_config') || '{}');
+      logoDataUri = localStorage.getItem('company_logo');
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
-    // Llenar inputs
-    document.getElementById('settings-company-name').value = config.consultora_nombre || '';
-    document.getElementById('settings-company-street').value = config.consultora_calle || '';
-    document.getElementById('settings-company-number').value = config.consultora_numero || '';
-    document.getElementById('settings-company-cp').value = config.consultora_cp || '';
-    document.getElementById('settings-company-city').value = config.consultora_ciudad || '';
-    document.getElementById('settings-company-province').value = config.consultora_provincia || '';
-    document.getElementById('settings-company-web').value = config.consultora_web || '';
-    document.getElementById('settings-company-email').value = config.consultora_email || '';
-    document.getElementById('settings-company-phone').value = config.consultora_telefono || '';
+  // Llenar inputs
+  const nameInput = document.getElementById('settings-company-name');
+  const streetInput = document.getElementById('settings-company-street');
+  const numberInput = document.getElementById('settings-company-number');
+  const cpInput = document.getElementById('settings-company-cp');
+  const cityInput = document.getElementById('settings-company-city');
+  const provinceInput = document.getElementById('settings-company-province');
+  const webInput = document.getElementById('settings-company-web');
+  const emailInput = document.getElementById('settings-company-email');
+  const phoneInput = document.getElementById('settings-company-phone');
 
-    // Pintar preview
-    if (logoPreview) {
-      if (logoDataUri) {
-        logoPreview.innerHTML = `<img src="${logoDataUri}" style="width: 100%; height: 100%; object-fit: contain;" />`;
-      } else {
-        logoPreview.innerHTML = `<span class="text-muted" style="font-size: 9px; text-align: center; padding: 4px;">Bombilla (Defecto)</span>`;
-      }
+  if (nameInput) nameInput.value = config.consultora_nombre || '';
+  if (streetInput) streetInput.value = config.consultora_calle || '';
+  if (numberInput) numberInput.value = config.consultora_numero || '';
+  if (cpInput) cpInput.value = config.consultora_cp || '';
+  if (cityInput) cityInput.value = config.consultora_ciudad || '';
+  if (provinceInput) provinceInput.value = config.consultora_provincia || '';
+  if (webInput) webInput.value = config.consultora_web || '';
+  if (emailInput) emailInput.value = config.consultora_email || '';
+  if (phoneInput) phoneInput.value = config.consultora_telefono || '';
+
+  // Pintar preview
+  if (logoPreview) {
+    if (logoDataUri) {
+      logoPreview.innerHTML = `<img src="${logoDataUri}" style="width: 100%; height: 100%; object-fit: contain;" />`;
+    } else {
+      logoPreview.innerHTML = `<span class="text-muted" style="font-size: 9px; text-align: center; padding: 4px;">Bombilla (Defecto)</span>`;
     }
   }
 }

@@ -29,19 +29,19 @@
 
 ### Requisitos del Sistema
 Para compilar y ejecutar el proyecto desde el código fuente, necesitas:
-- **Node.js** (versión 16 o superior) y **npm**.
+- **Node.js** (versión 16 o superior) y **pnpm** (versión 11 o superior).
 - **Rust** (entorno de compilación cargo) y herramientas de compilación de C++ (requerido por Tauri).
 
 ### Instalación de Dependencias
 Ejecuta el siguiente comando en la raíz del proyecto para descargar las librerías necesarias:
 ```bash
-npm install
+pnpm install
 ```
 
 ### Ejecutar en Desarrollo
 Para iniciar la aplicación de escritorio en modo de desarrollo local:
 ```bash
-npm run tauri dev
+pnpm tauri dev
 ```
 
 ---
@@ -50,7 +50,7 @@ npm run tauri dev
 
 Para generar un instalador optimizado de producción para Windows (.MSI):
 ```bash
-npm run tauri build
+pnpm tauri build
 ```
 
 > [!WARNING]

@@ -86,7 +86,14 @@ export async function generatePDFReport(data, previewMode = false) {
     year: 'numeric', month: 'long', day: 'numeric'
   });
   doc.text(`Fecha: ${todayStr}`, 155, 28);
-  doc.text(`Suministro: ${data.energyType}`, 155, 34);
+  const is30TD = data.energyType === 'LUZ' && data.tariffDetails && data.tariffDetails.tipo_tarifa === '3.0TD';
+  let supplyText = data.energyType;
+  if (is30TD) {
+    supplyText += ' (3.0TD)';
+  } else if (data.energyType === 'GAS' && data.tariffDetails && data.tariffDetails.tipo_tarifa) {
+    supplyText += ` (${data.tariffDetails.tipo_tarifa})`;
+  }
+  doc.text(`Suministro: ${supplyText}`, 155, 34);
 
   // Línea divisoria de cabecera
   doc.setDrawColor(220, 225, 230);
@@ -190,8 +197,8 @@ export async function generatePDFReport(data, previewMode = false) {
   if (data.energyType === 'LUZ') {
     const details = data.costDetail.annual;
     const rows = [
-      { name: 'Término de Potencia (Capacidad)', cur: data.currentCost * 0.28, prop: details.potenciaTotal },
-      { name: 'Término de Energía (Consumos P1/P2/P3)', cur: data.currentCost * 0.52, prop: details.energiaTotal },
+      { name: is30TD ? 'Término de Potencia (P1-P6)' : 'Término de Potencia (Capacidad)', cur: data.currentCost * 0.28, prop: details.potenciaTotal },
+      { name: is30TD ? 'Término de Energía (P1-P6)' : 'Término de Energía (Consumos P1/P2/P3)', cur: data.currentCost * 0.52, prop: details.energiaTotal },
       { name: 'Impuesto de Electricidad (IEE)', cur: data.currentCost * 0.045, prop: details.iee },
       { name: 'Alquiler de Medida y Bono Social', cur: data.currentCost * 0.015, prop: details.alquiler + details.bonoSocial },
       { name: 'IVA / IGIC aplicable', cur: data.currentCost * 0.14, prop: details.impuestos },
@@ -249,6 +256,33 @@ export async function generatePDFReport(data, previewMode = false) {
         doc.text(`${diff.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €`, 160, currentY);
       }
     });
+  }
+
+  // --- PRECIOS DE LA TARIFA PROPUESTA ---
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PRECIOS UNITARIOS DE LA TARIFA PROPUESTA', 15, 194);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(30, 30, 30);
+  if (data.energyType === 'LUZ') {
+    if (is30TD) {
+      const potStr = `Potencia (€/kW/año): P1: ${data.tariffDetails.potencia_p1.toFixed(6)} | P2: ${data.tariffDetails.potencia_p2.toFixed(6)} | P3: ${data.tariffDetails.potencia_p3.toFixed(6)} | P4: ${data.tariffDetails.potencia_p4.toFixed(6)} | P5: ${data.tariffDetails.potencia_p5.toFixed(6)} | P6: ${data.tariffDetails.potencia_p6.toFixed(6)}`;
+      const eneStr = `Energía (€/kWh):     P1: ${data.tariffDetails.energia_p1.toFixed(6)} | P2: ${data.tariffDetails.energia_p2.toFixed(6)} | P3: ${data.tariffDetails.energia_p3.toFixed(6)} | P4: ${data.tariffDetails.energia_p4.toFixed(6)} | P5: ${data.tariffDetails.energia_p5.toFixed(6)} | P6: ${data.tariffDetails.energia_p6.toFixed(6)}`;
+      doc.text(potStr, 15, 200);
+      doc.text(eneStr, 15, 204.5);
+    } else {
+      const potStr = `Potencia (€/kW/año): P1: ${data.tariffDetails.potencia_p1.toFixed(6)} | P2: ${data.tariffDetails.potencia_p2.toFixed(6)}`;
+      const eneStr = `Energía (€/kWh):     P1: ${data.tariffDetails.energia_p1.toFixed(6)} | P2: ${data.tariffDetails.energia_p2.toFixed(6)} | P3: ${data.tariffDetails.energia_p3.toFixed(6)}`;
+      doc.text(potStr, 15, 200);
+      doc.text(eneStr, 15, 204.5);
+    }
+  } else {
+    const gasType = data.tariffDetails.tipo_tarifa || 'RL.1';
+    const gasStr = `Peaje: ${gasType} | Término Fijo: ${data.tariffDetails.termino_fijo.toFixed(6)} €/mes | Término Variable: ${data.tariffDetails.termino_variable.toFixed(6)} €/kWh`;
+    doc.text(gasStr, 15, 200);
   }
 
   // --- NOTAS LEGALES Y PRIVACIDAD ---

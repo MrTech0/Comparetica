@@ -75,7 +75,7 @@ async function loadHistoryTable() {
 
       // Evento de borrado
       tr.querySelector('.btn-delete-history').addEventListener('click', async () => {
-        if (confirm(`¿Está seguro de eliminar del historial la comparativa de ${c.cliente_nombre}?`)) {
+        if (await window.showConfirm(`¿Está seguro de eliminar del historial la comparativa de ${c.cliente_nombre}?`, "Eliminar Comparativa")) {
           await deleteComparativa(c.id);
           await loadHistoryTable();
         }
@@ -93,72 +93,87 @@ async function loadHistoryTable() {
 async function reprintPDF(record, previewMode = false) {
   try {
     const datosCliente = JSON.parse(record.datos_cliente_json);
+    const isLuzReport = !!(record.tipo_energia === 'LUZ' || (record.tipo_energia === 'DUAL' && record.tarifa_luz_propuesta_id));
     
     // Configurar tarifa para simulación
-    let tariffDetails = null;
-    let costDetail = null;
+    let tariffDetails = datosCliente.proposedTariffSnapshot || null;
+    let costDetail = datosCliente.proposedCostDetail || null;
     let currentCost = 0;
     let proposedCost = 0;
     let ahorro = 0;
-    
-    // Si la comparativa guardada fue de luz
-    if (record.tipo_energia === 'LUZ' || (record.tipo_energia === 'DUAL' && record.tarifa_luz_propuesta_id)) {
-      tariffDetails = {
-        comercializadora_nombre: record.comercializadora_luz_nombre || 'N/A',
-        nombre: record.tarifa_luz_nombre || 'Tarifa Luz',
-        // Intentar rescatar detalles básicos o dejar por defecto los del cálculo
-        potencia_p1: datosCliente.lightInput ? (datosCliente.lightInput.p1PotPrice || 0) : 0,
-        potencia_p2: datosCliente.lightInput ? (datosCliente.lightInput.p2PotPrice || 0) : 0,
-        energia_p1: datosCliente.lightInput ? (datosCliente.lightInput.p1EnePrice || 0) : 0,
-        energia_p2: datosCliente.lightInput ? (datosCliente.lightInput.p2EnePrice || 0) : 0,
-        energia_p3: datosCliente.lightInput ? (datosCliente.lightInput.p3EnePrice || 0) : 0,
-      };
 
-      currentCost = record.ahorro_luz_anual + (datosCliente.currentLightCost || 0); // Estimado
-      proposedCost = datosCliente.currentLightCost || 0;
-      ahorro = record.ahorro_luz_anual;
-      
-      // Estructuramos un mock de costDetail para evitar nulos en reporte
-      costDetail = {
-        annual: {
-          total: proposedCost,
-          potenciaTotal: proposedCost * 0.3, // estimado
-          energiaTotal: proposedCost * 0.6, // estimado
-          iee: proposedCost * 0.05,
-          impuestos: proposedCost * 0.15
-        }
-      };
-    } else if (record.tipo_energia === 'GAS' || (record.tipo_energia === 'DUAL' && record.tarifa_gas_propuesta_id)) {
-      tariffDetails = {
-        comercializadora_nombre: record.comercializadora_gas_nombre || 'N/A',
-        nombre: record.tarifa_gas_nombre || 'Tarifa Gas',
-        termino_fijo: 0,
-        termino_variable: 0
-      };
+    if (tariffDetails && costDetail) {
+      proposedCost = costDetail.annual.total;
+      if (isLuzReport) {
+        currentCost = record.ahorro_luz_anual + proposedCost;
+        ahorro = record.ahorro_luz_anual;
+      } else {
+        currentCost = record.ahorro_gas_anual + proposedCost;
+        ahorro = record.ahorro_gas_anual;
+      }
+    } else {
+      // Fallback para comparativas antiguas que no tienen el snapshot guardado
+      if (isLuzReport) {
+        tariffDetails = {
+          comercializadora_nombre: record.comercializadora_luz_nombre || 'N/A',
+          nombre: record.tarifa_luz_nombre || 'Tarifa Luz',
+          tipo_tarifa: '2.0TD',
+          potencia_p1: 0,
+          potencia_p2: 0,
+          energia_p1: 0,
+          energia_p2: 0,
+          energia_p3: 0
+        };
 
-      currentCost = record.ahorro_gas_anual + (datosCliente.currentGasCost || 0);
-      proposedCost = datosCliente.currentGasCost || 0;
-      ahorro = record.ahorro_gas_anual;
+        currentCost = record.ahorro_luz_anual + (datosCliente.currentLightCost || 0);
+        proposedCost = datosCliente.currentLightCost || 0;
+        ahorro = record.ahorro_luz_anual;
+        
+        costDetail = {
+          annual: {
+            total: proposedCost,
+            potenciaTotal: proposedCost * 0.3,
+            energiaTotal: proposedCost * 0.6,
+            iee: proposedCost * 0.05,
+            alquiler: 0,
+            bonoSocial: 0,
+            impuestos: proposedCost * 0.15
+          }
+        };
+      } else {
+        tariffDetails = {
+          comercializadora_nombre: record.comercializadora_gas_nombre || 'N/A',
+          nombre: record.tarifa_gas_nombre || 'Tarifa Gas',
+          tipo_tarifa: 'RL.1',
+          termino_fijo: 0,
+          termino_variable: 0
+        };
 
-      costDetail = {
-        annual: {
-          total: proposedCost,
-          fijo: proposedCost * 0.2,
-          variable: proposedCost * 0.7,
-          hidrocarburos: proposedCost * 0.02,
-          impuestos: proposedCost * 0.15
-        }
-      };
+        currentCost = record.ahorro_gas_anual + (datosCliente.currentGasCost || 0);
+        proposedCost = datosCliente.currentGasCost || 0;
+        ahorro = record.ahorro_gas_anual;
+
+        costDetail = {
+          annual: {
+            total: proposedCost,
+            fijo: proposedCost * 0.2,
+            variable: proposedCost * 0.7,
+            hidrocarburos: proposedCost * 0.02,
+            alquiler: 0,
+            impuestos: proposedCost * 0.15
+          }
+        };
+      }
     }
 
     const reportData = {
       clientName: record.cliente_nombre,
       clientCups: record.cliente_cups,
-      energyType: record.tipo_energia,
+      energyType: isLuzReport ? 'LUZ' : 'GAS',
       currentCost: currentCost,
       proposedCost: proposedCost,
       ahorro: ahorro,
-      inputDetails: record.tipo_energia === 'LUZ' ? datosCliente.lightInput : datosCliente.gasInput,
+      inputDetails: isLuzReport ? datosCliente.lightInput : datosCliente.gasInput,
       tariffDetails: tariffDetails,
       costDetail: costDetail
     };

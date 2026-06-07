@@ -14,6 +14,33 @@ function setupRefreshButton() {
   }
 }
 
+async function fetchDayData(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
+  
+  // Añadimos un parámetro de marca de tiempo para evitar respuestas cacheadas de la CDN de REE
+  const url = `https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real?start_date=${dateStr}T00:00&end_date=${dateStr}T23:59&time_trunc=hour&_=${Date.now()}`;
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Network response was not OK");
+  const json = await response.json();
+
+  if (!json || !json.included) {
+    throw new Error("Invalid response format from REE");
+  }
+
+  const pvpcIndicator = json.included.find(i => i.id === '1001' || i.type === 'PVPC');
+  const spotIndicator = json.included.find(i => i.id === '600' || i.type.includes('spot'));
+
+  if (!pvpcIndicator || !pvpcIndicator.attributes.values || pvpcIndicator.attributes.values.length === 0) {
+    throw new Error("PVPC data not found in REE response");
+  }
+
+  return { pvpcIndicator, spotIndicator };
+}
+
 async function loadMarketData() {
   const loader = document.getElementById('market-loader');
   const errorDiv = document.getElementById('market-error');
@@ -27,39 +54,28 @@ async function loadMarketData() {
   errorDiv.style.display = 'none';
   grid.style.display = 'none';
 
-  // Obtener fecha local de hoy en España en formato YYYY-MM-DD
   const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  const dateStr = `${year}-${month}-${day}`;
-
-  // Actualizar etiqueta de fecha
-  const friendlyDate = today.toLocaleDateString('es-ES', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-  });
-  if (dateLabel) dateLabel.innerText = friendlyDate;
-
-  // Endpoint oficial sin token de Red Eléctrica de España (REData)
-  const url = `https://apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real?start_date=${dateStr}T00:00&end_date=${dateStr}T23:59&time_trunc=hour`;
 
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("Network response was not OK");
-    const json = await response.json();
+    let data;
+    let isFallback = false;
 
-    // 1. Localizar los indicadores en la respuesta
-    const pvpcIndicator = json.included.find(i => i.id === '1001' || i.type === 'PVPC');
-    const spotIndicator = json.included.find(i => i.id === '600' || i.type.includes('spot'));
-
-    if (!pvpcIndicator || !pvpcIndicator.attributes.values || pvpcIndicator.attributes.values.length === 0) {
-      throw new Error("PVPC data not found in REE response");
+    try {
+      // Intentamos obtener los datos de hoy
+      data = await fetchDayData(today);
+    } catch (e) {
+      console.warn("No se pudieron obtener los datos de hoy en la API de REE. Intentando con los de ayer...", e);
+      // Fallback: intentar ayer
+      const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+      data = await fetchDayData(yesterday);
+      isFallback = true;
     }
 
+    const { pvpcIndicator, spotIndicator } = data;
     const pvpcValues = pvpcIndicator.attributes.values;
     const spotValues = spotIndicator ? spotIndicator.attributes.values : [];
 
-    // 2. Calcular los precios medios
+    // Calcular los precios medios
     // PVPC viene en €/MWh. Dividimos entre 1000 para pasarlo a €/kWh
     const avgPvpcMwh = pvpcValues.reduce((sum, item) => sum + item.value, 0) / pvpcValues.length;
     const avgPvpcKwh = avgPvpcMwh / 1000;
@@ -74,8 +90,30 @@ async function loadMarketData() {
       avgMwhEl.innerText = `${(avgPvpcMwh * 0.85).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/MWh`;
     }
 
-    // 3. Renderizar rejilla horaria de precios
+    // Actualizar etiqueta de fecha
+    const targetDate = isFallback ? new Date(today.getTime() - 24 * 60 * 60 * 1000) : today;
+    let friendlyDate = targetDate.toLocaleDateString('es-ES', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+
+    if (isFallback) {
+      friendlyDate += " (Precios de ayer - Los de hoy no se han publicado aún)";
+    }
+    
+    if (dateLabel) dateLabel.innerText = friendlyDate;
+
+    // Renderizar rejilla horaria de precios
     renderHourlyGrid(pvpcValues);
+
+    // Actualizar hora de sincronización
+    const syncTimeEl = document.getElementById('market-sync-time');
+    if (syncTimeEl) {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      syncTimeEl.innerText = `Sincronizado: ${h}:${m}:${s}`;
+    }
 
     // Ajustar visibilidad
     loader.style.display = 'none';

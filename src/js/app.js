@@ -7,7 +7,7 @@ import { initTariffsView, updateComercializadorasSelectors } from './views/tarif
 import { initHistoryView } from './views/history.js';
 import { initBackupView } from './views/backup.js';
 import { initWizard } from './views/wizard.js';
-import { initSettingsView } from './views/settings.js';
+import { initSettingsView, refreshCompanySettings } from './views/settings.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Inicializar la base de datos y esquema
@@ -39,6 +39,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Alimentar selectores dinámicos
   await updateComercializadorasSelectors();
+
+  // Inicializar contraer/expandir barra lateral
+  initSidebarCollapse();
+
+  // Inicializar desplegables personalizados
+  initCustomSelects();
 });
 
 // --- PREVISUALIZACIÓN DE PDF GLOBAL ---
@@ -144,6 +150,9 @@ function initNavigation() {
       } else if (item.btn === 'nav-history') {
         // Disparar evento para refrescar historial
         window.dispatchEvent(new CustomEvent('comparison-saved'));
+      } else if (item.btn === 'nav-settings') {
+        // Recargar datos de la consultora por si se han actualizado
+        await refreshCompanySettings();
       }
     });
   });
@@ -184,4 +193,199 @@ window.showToast = function(message, type = 'success') {
     });
   }, 4000);
 };
+
+/**
+ * Muestra un diálogo de confirmación personalizado de Material Design 3.
+ * @param {string} mensaje - Mensaje a mostrar.
+ * @param {string} titulo - Título del diálogo.
+ * @returns {Promise<boolean>} Devuelve una promesa que se resuelve a true si el usuario acepta, o false si cancela.
+ */
+window.showConfirm = function(mensaje, titulo = "Confirmación") {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('dialog-confirm');
+    const titleEl = document.getElementById('dialog-confirm-title');
+    const msgEl = document.getElementById('dialog-confirm-message');
+    const btnCancel = document.getElementById('dialog-confirm-cancel');
+    const btnAccept = document.getElementById('dialog-confirm-accept');
+
+    if (!overlay || !titleEl || !msgEl || !btnCancel || !btnAccept) {
+      // Fallback a confirm nativo si por alguna razón no se encuentra el HTML
+      resolve(confirm(mensaje));
+      return;
+    }
+
+    titleEl.innerText = titulo;
+    msgEl.innerText = mensaje;
+
+    // Clonar botones para limpiar cualquier event listener previo
+    const cancelClone = btnCancel.cloneNode(true);
+    const acceptClone = btnAccept.cloneNode(true);
+    btnCancel.replaceWith(cancelClone);
+    btnAccept.replaceWith(acceptClone);
+
+    cancelClone.addEventListener('click', () => {
+      overlay.classList.remove('active');
+      resolve(false);
+    });
+
+    acceptClone.addEventListener('click', () => {
+      overlay.classList.remove('active');
+      resolve(true);
+    });
+
+    overlay.classList.add('active');
+  });
+};
+
+// --- MATERIAL 3 CUSTOM STYLED SELECT DROPDOWNS ---
+export function initCustomSelects() {
+  const originalValueProp = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  if (originalValueProp && !HTMLSelectElement.prototype._customValueHooked) {
+    Object.defineProperty(HTMLSelectElement.prototype, 'value', {
+      get: function() {
+        return originalValueProp.get.call(this);
+      },
+      set: function(val) {
+        originalValueProp.set.call(this, val);
+        this.dispatchEvent(new CustomEvent('custom-value-set'));
+      }
+    });
+    HTMLSelectElement.prototype._customValueHooked = true;
+  }
+
+  const nativeSelects = document.querySelectorAll('select.m3-select');
+  nativeSelects.forEach(select => {
+    if (select.dataset.customized) return;
+    select.dataset.customized = 'true';
+    
+    select.style.display = 'none';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'm3-custom-select';
+    if (select.classList.contains('m3-select-sm')) {
+      wrapper.classList.add('m3-select-sm');
+    }
+    if (select.id) {
+      wrapper.id = 'custom-select-for-' + select.id;
+    }
+    
+    const trigger = document.createElement('div');
+    trigger.className = 'm3-custom-select-trigger';
+    
+    const triggerText = document.createElement('span');
+    const selectedOption = select.options[select.selectedIndex];
+    triggerText.textContent = selectedOption ? selectedOption.textContent : '-- Seleccionar --';
+    
+    const arrowSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    arrowSvg.setAttribute('class', 'm3-custom-select-arrow');
+    arrowSvg.setAttribute('viewBox', '0 0 24 24');
+    const arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arrowPath.setAttribute('d', 'M7 10l5 5 5-5z');
+    arrowSvg.appendChild(arrowPath);
+    
+    trigger.appendChild(triggerText);
+    trigger.appendChild(arrowSvg);
+    wrapper.appendChild(trigger);
+
+    const optionsContainer = document.createElement('div');
+    optionsContainer.className = 'm3-custom-select-options';
+    wrapper.appendChild(optionsContainer);
+
+    const populateOptions = () => {
+      optionsContainer.innerHTML = '';
+      Array.from(select.options).forEach(opt => {
+        const optEl = document.createElement('div');
+        optEl.className = 'm3-custom-select-option';
+        if (opt.value === select.value) {
+          optEl.classList.add('active');
+        }
+        optEl.textContent = opt.textContent;
+        optEl.dataset.value = opt.value;
+
+        optEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          select.value = opt.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          select.dispatchEvent(new Event('input', { bubbles: true }));
+          wrapper.classList.remove('open');
+        });
+
+        optionsContainer.appendChild(optEl);
+      });
+      
+      const currentSelected = select.options[select.selectedIndex];
+      triggerText.textContent = currentSelected ? currentSelected.textContent : '-- Seleccionar --';
+    };
+
+    populateOptions();
+
+    select.parentNode.insertBefore(wrapper, select.nextSibling);
+
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.m3-custom-select').forEach(cs => {
+        if (cs !== wrapper) cs.classList.remove('open');
+      });
+      wrapper.classList.toggle('open');
+    });
+
+    select.addEventListener('custom-value-set', () => {
+      populateOptions();
+    });
+
+    select.addEventListener('change', () => {
+      populateOptions();
+    });
+
+    const form = select.form;
+    if (form) {
+      form.addEventListener('reset', () => {
+        setTimeout(() => {
+          populateOptions();
+        }, 0);
+      });
+    }
+
+    const observer = new MutationObserver(() => {
+      populateOptions();
+    });
+    observer.observe(select, { childList: true, subtree: true });
+  });
+}
+
+// Global click handler to close dropdowns when clicking outside
+if (!window._customSelectGlobalInitialized) {
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.m3-custom-select').forEach(cs => {
+      cs.classList.remove('open');
+    });
+  });
+  window._customSelectGlobalInitialized = true;
+}
+
+// --- COLLAPSIBLE SIDEBAR ---
+function initSidebarCollapse() {
+  const logoToggle = document.getElementById('sidebar-logo-toggle');
+  const appContainer = document.getElementById('app-container');
+  if (!logoToggle || !appContainer) return;
+
+  // Load initial collapsed state from localStorage
+  const isCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+  if (isCollapsed) {
+    appContainer.classList.add('collapsed-sidebar');
+    logoToggle.title = "Expandir Menú";
+  } else {
+    appContainer.classList.remove('collapsed-sidebar');
+    logoToggle.title = "Contraer Menú";
+  }
+
+  logoToggle.addEventListener('click', () => {
+    // Only toggle if on desktop (width >= 1024px)
+    if (window.innerWidth < 1024) return;
+
+    const currentlyCollapsed = appContainer.classList.toggle('collapsed-sidebar');
+    localStorage.setItem('sidebar_collapsed', currentlyCollapsed);
+    logoToggle.title = currentlyCollapsed ? "Expandir Menú" : "Contraer Menú";
+  });
+}
 

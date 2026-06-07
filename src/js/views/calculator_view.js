@@ -19,6 +19,7 @@ let lastComparisonData = {
 
 export function initCalculatorView() {
   setupEnergyTypeToggle();
+  setupLightTariffTypeToggle();
   setupCalcFormSubmit();
 }
 
@@ -37,6 +38,11 @@ function setupEnergyTypeToggle() {
       gasBlock.style.display = 'none';
       setInputsRequired(lightBlock, true);
       setInputsRequired(gasBlock, false);
+      // Disparar cambio en el tipo de tarifa luz para ajustar subcampos de periodos
+      const lightTariffTypeSelect = document.getElementById('calc-light-tariff-type');
+      if (lightTariffTypeSelect) {
+        lightTariffTypeSelect.dispatchEvent(new Event('change'));
+      }
     } else if (value === 'GAS') {
       lightBlock.style.display = 'none';
       gasBlock.style.display = 'block';
@@ -47,15 +53,64 @@ function setupEnergyTypeToggle() {
       gasBlock.style.display = 'block';
       setInputsRequired(lightBlock, true);
       setInputsRequired(gasBlock, true);
+      const lightTariffTypeSelect = document.getElementById('calc-light-tariff-type');
+      if (lightTariffTypeSelect) {
+        lightTariffTypeSelect.dispatchEvent(new Event('change'));
+      }
     }
   });
+}
+
+function setupLightTariffTypeToggle() {
+  const lightTariffTypeSelect = document.getElementById('calc-light-tariff-type');
+  const extraPotRow = document.getElementById('calc-light-30td-pot-row');
+  const extraConsRow = document.getElementById('calc-light-30td-cons-row');
+  const extraPotPriceRow = document.getElementById('calc-light-30td-pot-price-row');
+  const extraEnePriceRow = document.getElementById('calc-light-30td-ene-price-row');
+
+  if (lightTariffTypeSelect) {
+    lightTariffTypeSelect.addEventListener('change', () => {
+      const is30td = lightTariffTypeSelect.value === '3.0TD';
+      if (extraPotRow) extraPotRow.style.display = is30td ? 'flex' : 'none';
+      if (extraConsRow) extraConsRow.style.display = is30td ? 'flex' : 'none';
+      if (extraPotPriceRow) extraPotPriceRow.style.display = is30td ? 'flex' : 'none';
+      if (extraEnePriceRow) extraEnePriceRow.style.display = is30td ? 'flex' : 'none';
+
+      // Set required attribute on extra inputs if 3.0TD
+      const extraInputs = [
+        'calc-light-p3-pot', 'calc-light-p4-pot', 'calc-light-p5-pot', 'calc-light-p6-pot',
+        'calc-light-p4-cons', 'calc-light-p5-cons', 'calc-light-p6-cons'
+      ];
+      extraInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          if (is30td) {
+            el.setAttribute('required', 'required');
+          } else {
+            el.removeAttribute('required');
+            el.value = "";
+          }
+        }
+      });
+    });
+  }
 }
 
 function setInputsRequired(container, isRequired) {
   const inputs = container.querySelectorAll('input[required], select[required], input[data-req]');
   inputs.forEach(input => {
     if (isRequired) {
-      input.setAttribute('required', 'required');
+      // Si el elemento es un campo condicional de 3.0TD, solo hacerlo requerido si el tipo es 3.0TD
+      if (input.id.includes('30td') || ['calc-light-p3-pot', 'calc-light-p4-pot', 'calc-light-p5-pot', 'calc-light-p6-pot', 'calc-light-p4-cons', 'calc-light-p5-cons', 'calc-light-p6-cons'].includes(input.id)) {
+        const is30td = document.getElementById('calc-light-tariff-type').value === '3.0TD';
+        if (is30td) {
+          input.setAttribute('required', 'required');
+        } else {
+          input.removeAttribute('required');
+        }
+      } else {
+        input.setAttribute('required', 'required');
+      }
     } else {
       input.removeAttribute('required');
     }
@@ -83,29 +138,70 @@ function setupCalcFormSubmit() {
     let lightInput = null;
     let currentLightAnnual = 0;
     if (energyType === 'LUZ' || energyType === 'DUAL') {
-      lightInput = {
-        dias: parseInt(document.getElementById('calc-light-days').value),
-        p1Pot: parseFloat(document.getElementById('calc-light-p1-pot').value),
-        p2Pot: parseFloat(document.getElementById('calc-light-p2-pot').value),
-        p1Cons: parseFloat(document.getElementById('calc-light-p1-cons').value),
-        p2Cons: parseFloat(document.getElementById('calc-light-p2-cons').value),
-        p3Cons: parseFloat(document.getElementById('calc-light-p3-cons').value),
-        alquiler: parseFloat(document.getElementById('calc-light-meter').value || 0),
-        impuestoElectrico: parseFloat(document.getElementById('calc-light-tax').value),
-        iva: parseFloat(document.getElementById('calc-light-vat').value)
-      };
+      const is30td = document.getElementById('calc-light-tariff-type').value === '3.0TD';
+      if (is30td) {
+        lightInput = {
+          dias: parseInt(document.getElementById('calc-light-days').value),
+          p1Pot: parseFloat(document.getElementById('calc-light-p1-pot').value),
+          p2Pot: parseFloat(document.getElementById('calc-light-p2-pot').value),
+          p3Pot: parseFloat(document.getElementById('calc-light-p3-pot').value || 0),
+          p4Pot: parseFloat(document.getElementById('calc-light-p4-pot').value || 0),
+          p5Pot: parseFloat(document.getElementById('calc-light-p5-pot').value || 0),
+          p6Pot: parseFloat(document.getElementById('calc-light-p6-pot').value || 0),
+          p1Cons: parseFloat(document.getElementById('calc-light-p1-cons').value),
+          p2Cons: parseFloat(document.getElementById('calc-light-p2-cons').value),
+          p3Cons: parseFloat(document.getElementById('calc-light-p3-cons').value),
+          p4Cons: parseFloat(document.getElementById('calc-light-p4-cons').value || 0),
+          p5Cons: parseFloat(document.getElementById('calc-light-p5-cons').value || 0),
+          p6Cons: parseFloat(document.getElementById('calc-light-p6-cons').value || 0),
+          alquiler: parseFloat(document.getElementById('calc-light-meter').value || 0),
+          impuestoElectrico: parseFloat(document.getElementById('calc-light-tax').value),
+          iva: parseFloat(document.getElementById('calc-light-vat').value)
+        };
 
-      // Construir mock de tarifa actual del cliente para cálculo homogéneo
-      const currentTariffMock = {
-        potencia_p1: parseFloat(document.getElementById('calc-light-p1-pot-price').value || 0),
-        potencia_p2: parseFloat(document.getElementById('calc-light-p2-pot-price').value || 0),
-        energia_p1: parseFloat(document.getElementById('calc-light-p1-ene-price').value || 0),
-        energia_p2: parseFloat(document.getElementById('calc-light-p2-ene-price').value || 0),
-        energia_p3: parseFloat(document.getElementById('calc-light-p3-ene-price').value || 0)
-      };
+        const currentTariffMock = {
+          tipo_tarifa: '3.0TD',
+          potencia_p1: parseFloat(document.getElementById('calc-light-p1-pot-price').value || 0),
+          potencia_p2: parseFloat(document.getElementById('calc-light-p2-pot-price').value || 0),
+          potencia_p3: parseFloat(document.getElementById('calc-light-p3-pot-price').value || 0),
+          potencia_p4: parseFloat(document.getElementById('calc-light-p4-pot-price').value || 0),
+          potencia_p5: parseFloat(document.getElementById('calc-light-p5-pot-price').value || 0),
+          potencia_p6: parseFloat(document.getElementById('calc-light-p6-pot-price').value || 0),
+          energia_p1: parseFloat(document.getElementById('calc-light-p1-ene-price').value || 0),
+          energia_p2: parseFloat(document.getElementById('calc-light-p2-ene-price').value || 0),
+          energia_p3: parseFloat(document.getElementById('calc-light-p3-ene-price').value || 0),
+          energia_p4: parseFloat(document.getElementById('calc-light-p4-ene-price').value || 0),
+          energia_p5: parseFloat(document.getElementById('calc-light-p5-ene-price').value || 0),
+          energia_p6: parseFloat(document.getElementById('calc-light-p6-ene-price').value || 0)
+        };
 
-      const billDetail = calculateLightBill(lightInput, currentTariffMock);
-      currentLightAnnual = billDetail.annual.total;
+        const billDetail = calculateLightBill(lightInput, currentTariffMock);
+        currentLightAnnual = billDetail.annual.total;
+      } else {
+        lightInput = {
+          dias: parseInt(document.getElementById('calc-light-days').value),
+          p1Pot: parseFloat(document.getElementById('calc-light-p1-pot').value),
+          p2Pot: parseFloat(document.getElementById('calc-light-p2-pot').value),
+          p1Cons: parseFloat(document.getElementById('calc-light-p1-cons').value),
+          p2Cons: parseFloat(document.getElementById('calc-light-p2-cons').value),
+          p3Cons: parseFloat(document.getElementById('calc-light-p3-cons').value),
+          alquiler: parseFloat(document.getElementById('calc-light-meter').value || 0),
+          impuestoElectrico: parseFloat(document.getElementById('calc-light-tax').value),
+          iva: parseFloat(document.getElementById('calc-light-vat').value)
+        };
+
+        const currentTariffMock = {
+          tipo_tarifa: '2.0TD',
+          potencia_p1: parseFloat(document.getElementById('calc-light-p1-pot-price').value || 0),
+          potencia_p2: parseFloat(document.getElementById('calc-light-p2-pot-price').value || 0),
+          energia_p1: parseFloat(document.getElementById('calc-light-p1-ene-price').value || 0),
+          energia_p2: parseFloat(document.getElementById('calc-light-p2-ene-price').value || 0),
+          energia_p3: parseFloat(document.getElementById('calc-light-p3-ene-price').value || 0)
+        };
+
+        const billDetail = calculateLightBill(lightInput, currentTariffMock);
+        currentLightAnnual = billDetail.annual.total;
+      }
     }
 
     // 2. Obtener y parsear inputs de Gas
@@ -122,6 +218,7 @@ function setupCalcFormSubmit() {
 
       // Tarifa actual de Gas mock
       const currentTariffMock = {
+        tipo_tarifa: document.getElementById('calc-gas-tariff-type').value,
         termino_fijo: parseFloat(document.getElementById('calc-gas-fixed-price').value || 0),
         termino_variable: parseFloat(document.getElementById('calc-gas-var-price').value || 0)
       };
@@ -151,7 +248,11 @@ function setupCalcFormSubmit() {
     let bestLightOption = null;
     if (energyType === 'LUZ' || energyType === 'DUAL') {
       document.getElementById('results-light-container').style.display = 'block';
-      const lightTariffs = await getTarifasLuz();
+      const is30td = document.getElementById('calc-light-tariff-type').value === '3.0TD';
+      const allLightTariffs = await getTarifasLuz();
+      
+      // Filtrar propuestas para comparar peras con peras (2.0TD vs 2.0TD o 3.0TD vs 3.0TD)
+      const lightTariffs = allLightTariffs.filter(t => (t.tipo_tarifa || '2.0TD') === (is30td ? '3.0TD' : '2.0TD'));
       const lightResults = [];
 
       lightTariffs.forEach(tariff => {
@@ -176,7 +277,7 @@ function setupCalcFormSubmit() {
         lastComparisonData.bestLightTariff = bestLightOption;
         renderResultsList('results-light-list', lightResults, 'LUZ');
       } else {
-        document.getElementById('results-light-list').innerHTML = '<p class="text-muted">No hay tarifas de luz registradas en la base de datos.</p>';
+        document.getElementById('results-light-list').innerHTML = '<p class="text-muted">No hay tarifas de luz de este tipo registradas en la base de datos.</p>';
       }
     }
 
@@ -184,7 +285,9 @@ function setupCalcFormSubmit() {
     let bestGasOption = null;
     if (energyType === 'GAS' || energyType === 'DUAL') {
       document.getElementById('results-gas-container').style.display = 'block';
-      const gasTariffs = await getTarifasGas();
+      const gasTariffType = document.getElementById('calc-gas-tariff-type').value;
+      const allGasTariffs = await getTarifasGas();
+      const gasTariffs = allGasTariffs.filter(t => (t.tipo_tarifa || 'RL.1') === gasTariffType);
       const gasResults = [];
 
       gasTariffs.forEach(tariff => {
@@ -264,11 +367,20 @@ function renderResultsList(containerId, results, type) {
             <strong style="font-size: 16px; color: var(--color-on-surface);">${escapeHtml(item.tariff.comercializadora_nombre)}</strong>
             ${chipHtml}
           </div>
-          <h4 style="font-size: 15px; margin-top: 6px; font-weight: 500;">Tarifa: ${escapeHtml(item.tariff.nombre)}</h4>
+          <h4 style="font-size: 15px; margin-top: 6px; font-weight: 500;">
+            Tarifa: ${escapeHtml(item.tariff.nombre)}
+            <span class="m3-chip" style="font-size: 9px; height: 18px; padding: 0 6px; vertical-align: middle; margin-left: 6px;">
+              ${type === 'LUZ' ? (item.tariff.tipo_tarifa || '2.0TD') : (item.tariff.tipo_tarifa || 'RL.1')}
+            </span>
+          </h4>
           <p class="text-muted" style="font-size: 12px; margin-top: 4px;">
             ${type === 'LUZ' 
-              ? `Precios Pot: P1 ${item.tariff.potencia_p1.toFixed(6)} €/kW/año, P2 ${item.tariff.potencia_p2.toFixed(6)} €/kW/año<br>
-                 Precios Ene: P1 ${item.tariff.energia_p1.toFixed(6)}, P2 ${item.tariff.energia_p2.toFixed(6)}, P3 ${item.tariff.energia_p3.toFixed(6)} €/kWh`
+              ? (item.tariff.tipo_tarifa === '3.0TD'
+                ? `Precios Pot: P1 ${item.tariff.potencia_p1.toFixed(6)}, P2 ${item.tariff.potencia_p2.toFixed(6)}, P3 ${item.tariff.potencia_p3.toFixed(6)}, P4 ${item.tariff.potencia_p4.toFixed(6)}, P5 ${item.tariff.potencia_p5.toFixed(6)}, P6 ${item.tariff.potencia_p6.toFixed(6)} €/kW/año<br>
+                   Precios Ene: P1 ${item.tariff.energia_p1.toFixed(6)}, P2 ${item.tariff.energia_p2.toFixed(6)}, P3 ${item.tariff.energia_p3.toFixed(6)}, P4 ${item.tariff.energia_p4.toFixed(6)}, P5 ${item.tariff.energia_p5.toFixed(6)}, P6 ${item.tariff.energia_p6.toFixed(6)} €/kWh`
+                : `Precios Pot: P1 ${item.tariff.potencia_p1.toFixed(6)} €/kW/año, P2 ${item.tariff.potencia_p2.toFixed(6)} €/kW/año<br>
+                   Precios Ene: P1 ${item.tariff.energia_p1.toFixed(6)}, P2 ${item.tariff.energia_p2.toFixed(6)}, P3 ${item.tariff.energia_p3.toFixed(6)} €/kWh`
+                )
               : `Término Fijo: ${item.tariff.termino_fijo.toFixed(6)} €/mes, Término Variable: ${item.tariff.termino_variable.toFixed(6)} €/kWh`
             }
           </p>
@@ -339,7 +451,9 @@ async function saveComparisonToDb(item, type, buttonEl) {
       lightInput: lastComparisonData.lightInput,
       gasInput: lastComparisonData.gasInput,
       currentLightCost: lastComparisonData.currentLightCost,
-      currentGasCost: lastComparisonData.currentGasCost
+      currentGasCost: lastComparisonData.currentGasCost,
+      proposedTariffSnapshot: item.tariff,
+      proposedCostDetail: item.costDetail
     };
 
     let tarifaLuzId = null;

@@ -89,13 +89,20 @@ fn import_backup(app_handle: tauri::AppHandle) -> Result<String, String> {
             let _ = std::fs::remove_file(&temp_db_path);
         }
 
-        // Reiniciar la aplicación de forma limpia en un hilo secundario
-        // para permitir que la función devuelva la respuesta con éxito al frontend.
-        std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(500));
-            app_handle.restart();
-        });
-        Ok("Copia de seguridad restaurada correctamente. Reiniciando la aplicación...".to_string())
+        #[cfg(dev)]
+        {
+            Ok("DEV_MODE".to_string())
+        }
+        #[cfg(not(dev))]
+        {
+            // Reiniciar la aplicación de forma limpia en un hilo secundario
+            // para permitir que la función devuelva la respuesta con éxito al frontend.
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                app_handle.restart();
+            });
+            Ok("Copia de seguridad restaurada correctamente. Reiniciando la aplicación...".to_string())
+        }
     } else {
         Err("Cancelado por el usuario".to_string())
     }
