@@ -21,6 +21,37 @@ export function initCalculatorView() {
   setupEnergyTypeToggle();
   setupLightTariffTypeToggle();
   setupCalcFormSubmit();
+
+  // Toggles de Autoconsumo
+  const hasExcedenteCheckbox = document.getElementById('calc-light-has-excedente');
+  const excedenteGroup = document.getElementById('calc-light-excedente-group');
+  if (hasExcedenteCheckbox && excedenteGroup) {
+    hasExcedenteCheckbox.addEventListener('change', () => {
+      excedenteGroup.style.display = hasExcedenteCheckbox.checked ? 'flex' : 'none';
+      const excConsInput = document.getElementById('calc-light-excedente-cons');
+      const excPriceInput = document.getElementById('calc-light-excedente-price');
+      if (hasExcedenteCheckbox.checked) {
+        excConsInput.setAttribute('required', 'required');
+        excPriceInput.setAttribute('required', 'required');
+      } else {
+        excConsInput.removeAttribute('required');
+        excPriceInput.removeAttribute('required');
+        excConsInput.value = '';
+        excPriceInput.value = '';
+      }
+    });
+  }
+
+  // Toggle de modificar datos del formulario
+  const modifyBtn = document.getElementById('calc-modify-btn');
+  const formContainer = document.getElementById('calc-form-container');
+  if (modifyBtn && formContainer) {
+    modifyBtn.addEventListener('click', () => {
+      formContainer.style.display = 'block';
+      modifyBtn.style.display = 'none';
+      formContainer.scrollIntoView({ behavior: 'smooth' });
+    });
+  }
 }
 
 // --- Control del Tipo de Suministro ---
@@ -134,9 +165,17 @@ function setupCalcFormSubmit() {
     document.getElementById('results-light-container').style.display = 'none';
     document.getElementById('results-gas-container').style.display = 'none';
 
+    // Obtener campos comunes de luz
+    const hasExcedente = document.getElementById('calc-light-has-excedente').checked;
+    const excedenteCons = hasExcedente ? parseFloat(document.getElementById('calc-light-excedente-cons').value || 0) : 0;
+    const excedentePrice = hasExcedente ? parseFloat(document.getElementById('calc-light-excedente-price').value || 0) : 0;
+    const bonoSocialPct = parseFloat(document.getElementById('calc-light-bono-social').value || 0);
+
     // 1. Obtener y parsear inputs de Luz
     let lightInput = null;
     let currentLightAnnual = 0;
+    let clientLightConsumoAnual = 0;
+
     if (energyType === 'LUZ' || energyType === 'DUAL') {
       const is30td = document.getElementById('calc-light-tariff-type').value === '3.0TD';
       if (is30td) {
@@ -156,27 +195,34 @@ function setupCalcFormSubmit() {
           p6Cons: parseFloat(document.getElementById('calc-light-p6-cons').value || 0),
           alquiler: parseFloat(document.getElementById('calc-light-meter').value || 0),
           impuestoElectrico: parseFloat(document.getElementById('calc-light-tax').value),
-          iva: parseFloat(document.getElementById('calc-light-vat').value)
+          iva: parseFloat(document.getElementById('calc-light-vat').value),
+          excedenteCons,
+          excedentePrice,
+          bonoSocialPct
         };
 
         const currentTariffMock = {
           tipo_tarifa: '3.0TD',
-          potencia_p1: parseFloat(document.getElementById('calc-light-p1-pot-price').value || 0),
-          potencia_p2: parseFloat(document.getElementById('calc-light-p2-pot-price').value || 0),
-          potencia_p3: parseFloat(document.getElementById('calc-light-p3-pot-price').value || 0),
-          potencia_p4: parseFloat(document.getElementById('calc-light-p4-pot-price').value || 0),
-          potencia_p5: parseFloat(document.getElementById('calc-light-p5-pot-price').value || 0),
-          potencia_p6: parseFloat(document.getElementById('calc-light-p6-pot-price').value || 0),
+          potencia_p1: parseFloat(document.getElementById('calc-light-p1-pot-price').value || 0) * 365,
+          potencia_p2: parseFloat(document.getElementById('calc-light-p2-pot-price').value || 0) * 365,
+          potencia_p3: parseFloat(document.getElementById('calc-light-p3-pot-price').value || 0) * 365,
+          potencia_p4: parseFloat(document.getElementById('calc-light-p4-pot-price').value || 0) * 365,
+          potencia_p5: parseFloat(document.getElementById('calc-light-p5-pot-price').value || 0) * 365,
+          potencia_p6: parseFloat(document.getElementById('calc-light-p6-pot-price').value || 0) * 365,
           energia_p1: parseFloat(document.getElementById('calc-light-p1-ene-price').value || 0),
           energia_p2: parseFloat(document.getElementById('calc-light-p2-ene-price').value || 0),
           energia_p3: parseFloat(document.getElementById('calc-light-p3-ene-price').value || 0),
           energia_p4: parseFloat(document.getElementById('calc-light-p4-ene-price').value || 0),
           energia_p5: parseFloat(document.getElementById('calc-light-p5-ene-price').value || 0),
-          energia_p6: parseFloat(document.getElementById('calc-light-p6-ene-price').value || 0)
+          energia_p6: parseFloat(document.getElementById('calc-light-p6-ene-price').value || 0),
+          excedente: excedentePrice
         };
 
         const billDetail = calculateLightBill(lightInput, currentTariffMock);
         currentLightAnnual = billDetail.annual.total;
+
+        const totalCons = lightInput.p1Cons + lightInput.p2Cons + lightInput.p3Cons + lightInput.p4Cons + lightInput.p5Cons + lightInput.p6Cons;
+        clientLightConsumoAnual = totalCons * (365 / lightInput.dias);
       } else {
         lightInput = {
           dias: parseInt(document.getElementById('calc-light-days').value),
@@ -187,26 +233,35 @@ function setupCalcFormSubmit() {
           p3Cons: parseFloat(document.getElementById('calc-light-p3-cons').value),
           alquiler: parseFloat(document.getElementById('calc-light-meter').value || 0),
           impuestoElectrico: parseFloat(document.getElementById('calc-light-tax').value),
-          iva: parseFloat(document.getElementById('calc-light-vat').value)
+          iva: parseFloat(document.getElementById('calc-light-vat').value),
+          excedenteCons,
+          excedentePrice,
+          bonoSocialPct
         };
 
         const currentTariffMock = {
           tipo_tarifa: '2.0TD',
-          potencia_p1: parseFloat(document.getElementById('calc-light-p1-pot-price').value || 0),
-          potencia_p2: parseFloat(document.getElementById('calc-light-p2-pot-price').value || 0),
+          potencia_p1: parseFloat(document.getElementById('calc-light-p1-pot-price').value || 0) * 365,
+          potencia_p2: parseFloat(document.getElementById('calc-light-p2-pot-price').value || 0) * 365,
           energia_p1: parseFloat(document.getElementById('calc-light-p1-ene-price').value || 0),
           energia_p2: parseFloat(document.getElementById('calc-light-p2-ene-price').value || 0),
-          energia_p3: parseFloat(document.getElementById('calc-light-p3-ene-price').value || 0)
+          energia_p3: parseFloat(document.getElementById('calc-light-p3-ene-price').value || 0),
+          excedente: excedentePrice
         };
 
         const billDetail = calculateLightBill(lightInput, currentTariffMock);
         currentLightAnnual = billDetail.annual.total;
+
+        const totalCons = lightInput.p1Cons + lightInput.p2Cons + lightInput.p3Cons;
+        clientLightConsumoAnual = totalCons * (365 / lightInput.dias);
       }
     }
 
     // 2. Obtener y parsear inputs de Gas
     let gasInput = null;
     let currentGasAnnual = 0;
+    let clientGasConsumoAnual = 0;
+
     if (energyType === 'GAS' || energyType === 'DUAL') {
       gasInput = {
         dias: parseInt(document.getElementById('calc-gas-days').value),
@@ -225,6 +280,8 @@ function setupCalcFormSubmit() {
 
       const billDetail = calculateGasBill(gasInput, currentTariffMock);
       currentGasAnnual = billDetail.annual.total;
+
+      clientGasConsumoAnual = gasInput.consumo * (365 / gasInput.dias);
     }
 
     // Actualizar resumen de gasto actual en pantalla
@@ -251,12 +308,15 @@ function setupCalcFormSubmit() {
       const is30td = document.getElementById('calc-light-tariff-type').value === '3.0TD';
       const allLightTariffs = await getTarifasLuz();
       
-      // Filtrar propuestas para comparar peras con peras (2.0TD vs 2.0TD o 3.0TD vs 3.0TD)
+      // Filtrar propuestas
       const lightTariffs = allLightTariffs.filter(t => (t.tipo_tarifa || '2.0TD') === (is30td ? '3.0TD' : '2.0TD'));
       const lightResults = [];
 
       lightTariffs.forEach(tariff => {
         const costDetail = calculateLightBill(lightInput, tariff);
+        const resolvedCom = resolveCommission(tariff, clientLightConsumoAnual);
+        tariff.resolvedComision = resolvedCom;
+
         const ahorro = currentLightAnnual - costDetail.annual.total;
         lightResults.push({
           tariff,
@@ -292,6 +352,9 @@ function setupCalcFormSubmit() {
 
       gasTariffs.forEach(tariff => {
         const costDetail = calculateGasBill(gasInput, tariff);
+        const resolvedCom = resolveCommission(tariff, clientGasConsumoAnual);
+        tariff.resolvedComision = resolvedCom;
+
         const ahorro = currentGasAnnual - costDetail.annual.total;
         gasResults.push({
           tariff,
@@ -318,6 +381,15 @@ function setupCalcFormSubmit() {
 
     // Mostrar sección de resultados
     document.getElementById('calc-results-wrapper').style.display = 'block';
+    
+    // Contraer formulario de entrada de datos
+    const modifyBtn = document.getElementById('calc-modify-btn');
+    const formContainer = document.getElementById('calc-form-container');
+    if (modifyBtn && formContainer) {
+      formContainer.style.display = 'none';
+      modifyBtn.style.display = 'flex';
+    }
+
     // Scroll suave a los resultados
     document.getElementById('calc-results-wrapper').scrollIntoView({ behavior: 'smooth' });
   });
@@ -376,12 +448,12 @@ function renderResultsList(containerId, results, type) {
           <p class="text-muted" style="font-size: 12px; margin-top: 4px;">
             ${type === 'LUZ' 
               ? (item.tariff.tipo_tarifa === '3.0TD'
-                ? `Precios Pot: P1 ${item.tariff.potencia_p1.toFixed(6)}, P2 ${item.tariff.potencia_p2.toFixed(6)}, P3 ${item.tariff.potencia_p3.toFixed(6)}, P4 ${item.tariff.potencia_p4.toFixed(6)}, P5 ${item.tariff.potencia_p5.toFixed(6)}, P6 ${item.tariff.potencia_p6.toFixed(6)} €/kW/año<br>
-                   Precios Ene: P1 ${item.tariff.energia_p1.toFixed(6)}, P2 ${item.tariff.energia_p2.toFixed(6)}, P3 ${item.tariff.energia_p3.toFixed(6)}, P4 ${item.tariff.energia_p4.toFixed(6)}, P5 ${item.tariff.energia_p5.toFixed(6)}, P6 ${item.tariff.energia_p6.toFixed(6)} €/kWh`
-                : `Precios Pot: P1 ${item.tariff.potencia_p1.toFixed(6)} €/kW/año, P2 ${item.tariff.potencia_p2.toFixed(6)} €/kW/año<br>
-                   Precios Ene: P1 ${item.tariff.energia_p1.toFixed(6)}, P2 ${item.tariff.energia_p2.toFixed(6)}, P3 ${item.tariff.energia_p3.toFixed(6)} €/kWh`
+                ? `Precios Pot: P1 ${(item.tariff.potencia_p1/365).toFixed(7)}, P2 ${(item.tariff.potencia_p2/365).toFixed(7)}, P3 ${(item.tariff.potencia_p3/365).toFixed(7)}, P4 ${(item.tariff.potencia_p4/365).toFixed(7)}, P5 ${(item.tariff.potencia_p5/365).toFixed(7)}, P6 ${(item.tariff.potencia_p6/365).toFixed(7)} €/kW/día<br>
+                   Precios Ene: P1 ${item.tariff.energia_p1.toFixed(7)}, P2 ${item.tariff.energia_p2.toFixed(7)}, P3 ${item.tariff.energia_p3.toFixed(7)}, P4 ${item.tariff.energia_p4.toFixed(7)}, P5 ${item.tariff.energia_p5.toFixed(7)}, P6 ${item.tariff.energia_p6.toFixed(7)} €/kWh${item.tariff.excedente ? `<br><span class="text-success" style="font-weight: 500;">Excedente: ${item.tariff.excedente.toFixed(7)} €/kWh</span>` : ''}`
+                : `Precios Pot: P1 ${(item.tariff.potencia_p1/365).toFixed(7)} €/kW/día, P2 ${(item.tariff.potencia_p2/365).toFixed(7)} €/kW/día<br>
+                   Precios Ene: P1 ${item.tariff.energia_p1.toFixed(7)}, P2 ${item.tariff.energia_p2.toFixed(7)}, P3 ${item.tariff.energia_p3.toFixed(7)} €/kWh${item.tariff.excedente ? `<br><span class="text-success" style="font-weight: 500;">Excedente: ${item.tariff.excedente.toFixed(7)} €/kWh</span>` : ''}`
                 )
-              : `Término Fijo: ${item.tariff.termino_fijo.toFixed(6)} €/mes, Término Variable: ${item.tariff.termino_variable.toFixed(6)} €/kWh`
+              : `Término Fijo: ${item.tariff.termino_fijo.toFixed(7)} €/mes, Término Variable: ${item.tariff.termino_variable.toFixed(7)} €/kWh`
             }
           </p>
         </div>
@@ -392,7 +464,7 @@ function renderResultsList(containerId, results, type) {
           <div class="text-muted" style="font-size: 12px; margin-top: 2px;">~ ${isLoss ? '+' : ''}${displayValueMensual.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / mes</div>
           
           <div class="margin-top-md" style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
-            <div style="font-size: 12px;" class="private-value">Comisión: <strong>${item.tariff.comision.toFixed(2)} €</strong></div>
+            <div style="font-size: 12px;" class="private-value">Comisión: <strong>${(item.tariff.resolvedComision !== undefined ? item.tariff.resolvedComision : item.tariff.comision).toFixed(2)} €</strong></div>
           </div>
         </div>
       </div>
@@ -465,11 +537,11 @@ async function saveComparisonToDb(item, type, buttonEl) {
     if (type === 'LUZ') {
       tarifaLuzId = item.tariff.id;
       ahorroLuz = item.ahorro;
-      comisionTotal = item.tariff.comision;
+      comisionTotal = item.tariff.resolvedComision !== undefined ? item.tariff.resolvedComision : item.tariff.comision;
     } else if (type === 'GAS') {
       tarifaGasId = item.tariff.id;
       ahorroGas = item.ahorro;
-      comisionTotal = item.tariff.comision;
+      comisionTotal = item.tariff.resolvedComision !== undefined ? item.tariff.resolvedComision : item.tariff.comision;
     }
 
     await addComparativa(
@@ -532,4 +604,23 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function resolveCommission(tariff, consumoAnual) {
+  if (tariff.comision_tramos) {
+    try {
+      const tramos = JSON.parse(tariff.comision_tramos);
+      if (Array.isArray(tramos) && tramos.length > 0) {
+        for (const tr of tramos) {
+          if (consumoAnual <= tr.hasta) {
+            return tr.comision;
+          }
+        }
+        return tramos[tramos.length - 1].comision;
+      }
+    } catch (e) {
+      console.error("Error parsing comision_tramos:", e);
+    }
+  }
+  return tariff.comision || 0;
 }

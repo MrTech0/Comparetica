@@ -385,10 +385,76 @@ input[type="checkbox"]:checked + .m3-switch::after {
   box-shadow: var(--shadow-4);
   transform: translateY(30px);
   transition: transform var(--transition-medium);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.m3-dialog form {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.dialog-form-content {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding-right: 8px;
+  margin-bottom: 16px;
 }
 
 .m3-dialog-overlay.active .m3-dialog {
   transform: translateY(0);
+}
+
+/* Estilos para Constructor de Tramos de Comisión */
+.comision-tramos-container {
+  margin-top: 8px;
+  border: 1px dashed var(--color-outline-variant);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background-color: var(--color-surface-container-low);
+}
+
+.comision-tramo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.comision-tramo-row:last-child {
+  margin-bottom: 0;
+}
+
+.comision-tramo-row .m3-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.comision-tramo-remove-btn {
+  color: var(--color-error);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-short);
+}
+
+.comision-tramo-remove-btn:hover {
+  background-color: var(--color-error-container);
+}
+
+.comision-tramo-add-btn {
+  margin-top: 8px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .m3-dialog-title {
@@ -677,6 +743,7 @@ body.private-mode-active .private-value::after {
 .filter-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 16px;
   background-color: var(--color-surface-variant);
   border: 1px solid var(--color-outline-variant);

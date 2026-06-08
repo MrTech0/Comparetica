@@ -64,7 +64,9 @@ async function initSchema(db) {
         energia_p4 REAL DEFAULT 0.0,
         energia_p5 REAL DEFAULT 0.0,
         energia_p6 REAL DEFAULT 0.0,
+        excedente REAL DEFAULT 0.0,
         comision REAL NOT NULL DEFAULT 0.0,
+        comision_tramos TEXT,
         notas TEXT,
         activo INTEGER DEFAULT 1,
         creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -93,6 +95,16 @@ async function initSchema(db) {
       await db.execute("ALTER TABLE tarifas_luz ADD COLUMN creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP;");
       console.log("Migración creado_en en tarifas_luz completada.");
     }
+    const hasExcedente = columns.some(c => c.name === 'excedente');
+    if (!hasExcedente) {
+      await db.execute("ALTER TABLE tarifas_luz ADD COLUMN excedente REAL DEFAULT 0.0;");
+      console.log("Migración excedente en tarifas_luz completada.");
+    }
+    const hasComisionTramos = columns.some(c => c.name === 'comision_tramos');
+    if (!hasComisionTramos) {
+      await db.execute("ALTER TABLE tarifas_luz ADD COLUMN comision_tramos TEXT;");
+      console.log("Migración comision_tramos en tarifas_luz completada.");
+    }
   } catch (err) {
     console.error("Error al migrar la tabla tarifas_luz:", err);
   }
@@ -108,6 +120,7 @@ async function initSchema(db) {
         termino_fijo REAL NOT NULL,
         termino_variable REAL NOT NULL,
         comision REAL NOT NULL DEFAULT 0.0,
+        comision_tramos TEXT,
         notas TEXT,
         activo INTEGER DEFAULT 1,
         creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -128,6 +141,11 @@ async function initSchema(db) {
     if (!hasCreadoEnGas) {
       await db.execute("ALTER TABLE tarifas_gas ADD COLUMN creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP;");
       console.log("Migración creado_en en tarifas_gas completada.");
+    }
+    const hasComisionTramosGas = columns.some(c => c.name === 'comision_tramos');
+    if (!hasComisionTramosGas) {
+      await db.execute("ALTER TABLE tarifas_gas ADD COLUMN comision_tramos TEXT;");
+      console.log("Migración comision_tramos en tarifas_gas completada.");
     }
   } catch (err) {
     console.error("Error al migrar la tabla tarifas_gas:", err);
@@ -210,8 +228,10 @@ function createMockDb() {
           energia_p4: params[12],
           energia_p5: params[13],
           energia_p6: params[14],
-          comision: params[15],
-          notes: params[16],
+          excedente: params[15],
+          comision: params[16],
+          comision_tramos: params[17],
+          notas: params[18],
           activo: 1,
           creado_en: new Date().toISOString().replace('T', ' ').substring(0, 19)
         });
@@ -219,7 +239,7 @@ function createMockDb() {
         return { lastInsertId: id, rowsAffected: 1 };
       }
       if (query.includes("UPDATE tarifas_luz")) {
-        const id = params[16];
+        const id = params[18];
         const index = mockStorage.tarifas_luz.findIndex(item => item.id === id);
         if (index !== -1) {
           mockStorage.tarifas_luz[index] = {
@@ -238,8 +258,10 @@ function createMockDb() {
             energia_p4: params[11],
             energia_p5: params[12],
             energia_p6: params[13],
-            comision: params[14],
-            notas: params[15]
+            excedente: params[14],
+            comision: params[15],
+            comision_tramos: params[16],
+            notas: params[17]
           };
           save();
         }
@@ -260,7 +282,8 @@ function createMockDb() {
           termino_fijo: params[3],
           termino_variable: params[4],
           comision: params[5],
-          notas: params[6],
+          comision_tramos: params[6],
+          notas: params[7],
           activo: 1,
           creado_en: new Date().toISOString().replace('T', ' ').substring(0, 19)
         });
@@ -268,7 +291,7 @@ function createMockDb() {
         return { lastInsertId: id, rowsAffected: 1 };
       }
       if (query.includes("UPDATE tarifas_gas")) {
-        const id = params[6];
+        const id = params[7];
         const index = mockStorage.tarifas_gas.findIndex(item => item.id === id);
         if (index !== -1) {
           mockStorage.tarifas_gas[index] = {
@@ -278,7 +301,8 @@ function createMockDb() {
             termino_fijo: params[2],
             termino_variable: params[3],
             comision: params[4],
-            notas: params[5]
+            comision_tramos: params[5],
+            notas: params[6]
           };
           save();
         }
@@ -379,7 +403,7 @@ export async function addTarifaLuz(
   comercializadoraId, nombre, tipoTarifa,
   potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
   energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-  comision, notas
+  excedente, comision, comisionTramos, notas
 ) {
   const db = await getDb();
   return await db.execute(
@@ -387,13 +411,13 @@ export async function addTarifaLuz(
       comercializadora_id, nombre, tipo_tarifa, 
       potencia_p1, potencia_p2, potencia_p3, potencia_p4, potencia_p5, potencia_p6, 
       energia_p1, energia_p2, energia_p3, energia_p4, energia_p5, energia_p6, 
-      comision, notas
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17);`,
+      excedente, comision, comision_tramos, notas
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19);`,
     [
       comercializadoraId, nombre, tipoTarifa,
       potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
       energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-      comision, notas
+      excedente, comision, comisionTramos, notas
     ]
   );
 }
@@ -402,7 +426,7 @@ export async function updateTarifaLuz(
   id, nombre, tipoTarifa,
   potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
   energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-  comision, notas
+  excedente, comision, comisionTramos, notas
 ) {
   const db = await getDb();
   return await db.execute(
@@ -410,13 +434,13 @@ export async function updateTarifaLuz(
       nombre = $1, tipo_tarifa = $2, 
       potencia_p1 = $3, potencia_p2 = $4, potencia_p3 = $5, potencia_p4 = $6, potencia_p5 = $7, potencia_p6 = $8, 
       energia_p1 = $9, energia_p2 = $10, energia_p3 = $11, energia_p4 = $12, energia_p5 = $13, energia_p6 = $14, 
-      comision = $15, notas = $16 
-     WHERE id = $17;`,
+      excedente = $15, comision = $16, comision_tramos = $17, notas = $18 
+     WHERE id = $19;`,
     [
       nombre, tipoTarifa,
       potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
       energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-      comision, notas, id
+      excedente, comision, comisionTramos, notas, id
     ]
   );
 }
@@ -441,21 +465,21 @@ export async function getTarifasGas(comercializadoraId = null) {
   );
 }
 
-export async function addTarifaGas(comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, notas) {
+export async function addTarifaGas(comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas) {
   const db = await getDb();
   return await db.execute(
-    `INSERT INTO tarifas_gas (comercializadora_id, nombre, tipo_tarifa, termino_fijo, termino_variable, comision, notas) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7);`,
-    [comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, notas]
+    `INSERT INTO tarifas_gas (comercializadora_id, nombre, tipo_tarifa, termino_fijo, termino_variable, comision, comision_tramos, notas) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
+    [comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas]
   );
 }
 
-export async function updateTarifaGas(id, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, notas) {
+export async function updateTarifaGas(id, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas) {
   const db = await getDb();
   return await db.execute(
-    `UPDATE tarifas_gas SET nombre = $1, tipo_tarifa = $2, termino_fijo = $3, termino_variable = $4, comision = $5, notas = $6 
-     WHERE id = $7;`,
-    [nombre, tipoTarifa, terminoFijo, terminoVariable, comision, notas, id]
+    `UPDATE tarifas_gas SET nombre = $1, tipo_tarifa = $2, termino_fijo = $3, termino_variable = $4, comision = $5, comision_tramos = $6, notas = $7 
+     WHERE id = $8;`,
+    [nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas, id]
   );
 }
 

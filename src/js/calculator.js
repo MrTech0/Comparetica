@@ -50,11 +50,24 @@ export function calculateLightBill(input, tariff) {
   const costEneP3 = p3Cons * tariff.energia_p3;
   const totalEne = costEneP1 + costEneP2 + costEneP3;
 
+  // Excedentes
+  const excedenteCons = input.excedenteCons || 0;
+  const activeExcedentePrice = (tariff && tariff.excedente !== undefined) ? (tariff.excedente || 0) : (input.excedentePrice || 0);
+  const excedenteDiscount = excedenteCons * activeExcedentePrice;
+  const energiaTermAfterSurplus = Math.max(0, totalEne - excedenteDiscount);
+  const actualExcedenteDiscount = totalEne - energiaTermAfterSurplus;
+
+  // Bono Social
+  const bonoSocialPct = input.bonoSocialPct || 0;
+  const baseTerminos = totalPot + energiaTermAfterSurplus;
+  const bonoSocialDiscountAmount = baseTerminos * (bonoSocialPct / 100);
+  const baseTerminosDescontados = baseTerminos - bonoSocialDiscountAmount;
+
   // 3. Impuesto sobre la Electricidad (IEE)
-  const ieeBase = totalPot + totalEne;
+  const ieeBase = baseTerminosDescontados;
   const ieeCost = ieeBase * (impuestoElectrico / 100);
 
-  // 4. Bono Social
+  // 4. Bono Social (cargo diario)
   const bonoSocialCost = BONO_SOCIAL_DAILY_RATE * dias;
 
   // 5. Base Imponible
@@ -78,6 +91,8 @@ export function calculateLightBill(input, tariff) {
       energiaP2: costEneP2,
       energiaP3: costEneP3,
       energiaTotal: totalEne,
+      excedenteDiscount: actualExcedenteDiscount,
+      bonoSocialDiscount: bonoSocialDiscountAmount,
       iee: ieeCost,
       bonoSocial: bonoSocialCost,
       alquiler: alquiler,
@@ -88,6 +103,8 @@ export function calculateLightBill(input, tariff) {
     annual: {
       potenciaTotal: totalPot * scale,
       energiaTotal: totalEne * scale,
+      excedenteDiscount: actualExcedenteDiscount * scale,
+      bonoSocialDiscount: bonoSocialDiscountAmount * scale,
       iee: ieeCost * scale,
       bonoSocial: bonoSocialCost * scale,
       alquiler: alquiler * scale,
@@ -194,11 +211,24 @@ export function calculateLightBill30TD(input, tariff) {
   const costEneP6 = p6Cons * (tariff.energia_p6 || 0);
   const totalEne = costEneP1 + costEneP2 + costEneP3 + costEneP4 + costEneP5 + costEneP6;
 
+  // Excedentes
+  const excedenteCons = input.excedenteCons || 0;
+  const activeExcedentePrice = (tariff && tariff.excedente !== undefined) ? (tariff.excedente || 0) : (input.excedentePrice || 0);
+  const excedenteDiscount = excedenteCons * activeExcedentePrice;
+  const energiaTermAfterSurplus = Math.max(0, totalEne - excedenteDiscount);
+  const actualExcedenteDiscount = totalEne - energiaTermAfterSurplus;
+
+  // Bono Social
+  const bonoSocialPct = input.bonoSocialPct || 0;
+  const baseTerminos = totalPot + energiaTermAfterSurplus;
+  const bonoSocialDiscountAmount = baseTerminos * (bonoSocialPct / 100);
+  const baseTerminosDescontados = baseTerminos - bonoSocialDiscountAmount;
+
   // 3. Impuesto sobre la Electricidad (IEE)
-  const ieeBase = totalPot + totalEne;
+  const ieeBase = baseTerminosDescontados;
   const ieeCost = ieeBase * (impuestoElectrico / 100);
 
-  // 4. Bono Social
+  // 4. Bono Social (cargo diario)
   const bonoSocialCost = BONO_SOCIAL_DAILY_RATE * dias;
 
   // 5. Base Imponible
@@ -229,6 +259,8 @@ export function calculateLightBill30TD(input, tariff) {
       energiaP5: costEneP5,
       energiaP6: costEneP6,
       energiaTotal: totalEne,
+      excedenteDiscount: actualExcedenteDiscount,
+      bonoSocialDiscount: bonoSocialDiscountAmount,
       iee: ieeCost,
       bonoSocial: bonoSocialCost,
       alquiler: alquiler,
@@ -239,6 +271,8 @@ export function calculateLightBill30TD(input, tariff) {
     annual: {
       potenciaTotal: totalPot * scale,
       energiaTotal: totalEne * scale,
+      excedenteDiscount: actualExcedenteDiscount * scale,
+      bonoSocialDiscount: bonoSocialDiscountAmount * scale,
       iee: ieeCost * scale,
       bonoSocial: bonoSocialCost * scale,
       alquiler: alquiler * scale,

@@ -199,29 +199,39 @@ export async function generatePDFReport(data, previewMode = false) {
     const rows = [
       { name: is30TD ? 'Término de Potencia (P1-P6)' : 'Término de Potencia (Capacidad)', cur: data.currentCost * 0.28, prop: details.potenciaTotal },
       { name: is30TD ? 'Término de Energía (P1-P6)' : 'Término de Energía (Consumos P1/P2/P3)', cur: data.currentCost * 0.52, prop: details.energiaTotal },
-      { name: 'Impuesto de Electricidad (IEE)', cur: data.currentCost * 0.045, prop: details.iee },
-      { name: 'Alquiler de Medida y Bono Social', cur: data.currentCost * 0.015, prop: details.alquiler + details.bonoSocial },
-      { name: 'IVA / IGIC aplicable', cur: data.currentCost * 0.14, prop: details.impuestos },
     ];
 
+    if (details.excedenteDiscount && details.excedenteDiscount > 0) {
+      rows.push({ name: 'Compensación de Excedentes', cur: 0, prop: -details.excedenteDiscount });
+    }
+    if (details.bonoSocialDiscount && details.bonoSocialDiscount > 0) {
+      rows.push({ name: 'Descuento Bono Social', cur: 0, prop: -details.bonoSocialDiscount });
+    }
+
+    rows.push(
+      { name: 'Impuesto de Electricidad (IEE)', cur: data.currentCost * 0.045, prop: details.iee },
+      { name: 'Alquiler de Medida y Bono Social', cur: data.currentCost * 0.015, prop: details.alquiler + details.bonoSocial },
+      { name: 'IVA / IGIC aplicable', cur: data.currentCost * 0.14, prop: details.impuestos }
+    );
+
     rows.forEach(r => {
-      currentY += 8;
+      currentY += 7;
       doc.setFillColor(248, 249, 250);
-      doc.rect(15, currentY - 5, 180, 8, 'F');
+      doc.rect(15, currentY - 4.5, 180, 7, 'F');
 
       const diff = r.cur - r.prop;
 
       doc.setTextColor(30, 30, 30);
       doc.text(r.name, 18, currentY);
-      doc.text(`${r.cur.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €`, 80, currentY);
-      doc.text(`${r.prop.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €`, 120, currentY);
+      doc.text(`${r.cur.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`, 80, currentY);
+      doc.text(`${r.prop.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`, 120, currentY);
       
       if (diff > 0) {
         doc.setTextColor(successColor[0], successColor[1], successColor[2]);
-        doc.text(`${diff.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €`, 160, currentY);
+        doc.text(`${diff.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`, 160, currentY);
       } else {
         doc.setTextColor(100, 100, 100);
-        doc.text(`${diff.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €`, 160, currentY);
+        doc.text(`${diff.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`, 160, currentY);
       }
     });
 
@@ -237,62 +247,78 @@ export async function generatePDFReport(data, previewMode = false) {
     ];
 
     rows.forEach(r => {
-      currentY += 8;
+      currentY += 7;
       doc.setFillColor(248, 249, 250);
-      doc.rect(15, currentY - 5, 180, 8, 'F');
+      doc.rect(15, currentY - 4.5, 180, 7, 'F');
 
       const diff = r.cur - r.prop;
 
       doc.setTextColor(30, 30, 30);
       doc.text(r.name, 18, currentY);
-      doc.text(`${r.cur.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €`, 80, currentY);
-      doc.text(`${r.prop.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €`, 120, currentY);
+      doc.text(`${r.cur.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`, 80, currentY);
+      doc.text(`${r.prop.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`, 120, currentY);
       
       if (diff > 0) {
         doc.setTextColor(successColor[0], successColor[1], successColor[2]);
-        doc.text(`${diff.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €`, 160, currentY);
+        doc.text(`${diff.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`, 160, currentY);
       } else {
         doc.setTextColor(100, 100, 100);
-        doc.text(`${diff.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €`, 160, currentY);
+        doc.text(`${diff.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`, 160, currentY);
       }
     });
   }
 
   // --- PRECIOS DE LA TARIFA PROPUESTA ---
+  currentY += 10;
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('PRECIOS UNITARIOS DE LA TARIFA PROPUESTA', 15, 194);
+  doc.text('PRECIOS UNITARIOS DE LA TARIFA PROPUESTA', 15, currentY);
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(30, 30, 30);
   if (data.energyType === 'LUZ') {
     if (is30TD) {
-      const potStr = `Potencia (€/kW/año): P1: ${data.tariffDetails.potencia_p1.toFixed(6)} | P2: ${data.tariffDetails.potencia_p2.toFixed(6)} | P3: ${data.tariffDetails.potencia_p3.toFixed(6)} | P4: ${data.tariffDetails.potencia_p4.toFixed(6)} | P5: ${data.tariffDetails.potencia_p5.toFixed(6)} | P6: ${data.tariffDetails.potencia_p6.toFixed(6)}`;
-      const eneStr = `Energía (€/kWh):     P1: ${data.tariffDetails.energia_p1.toFixed(6)} | P2: ${data.tariffDetails.energia_p2.toFixed(6)} | P3: ${data.tariffDetails.energia_p3.toFixed(6)} | P4: ${data.tariffDetails.energia_p4.toFixed(6)} | P5: ${data.tariffDetails.energia_p5.toFixed(6)} | P6: ${data.tariffDetails.energia_p6.toFixed(6)}`;
-      doc.text(potStr, 15, 200);
-      doc.text(eneStr, 15, 204.5);
+      const potStr = `Potencia (€/kW/día): P1: ${(data.tariffDetails.potencia_p1 / 365).toFixed(7)} | P2: ${(data.tariffDetails.potencia_p2 / 365).toFixed(7)} | P3: ${(data.tariffDetails.potencia_p3 / 365).toFixed(7)} | P4: ${(data.tariffDetails.potencia_p4 / 365).toFixed(7)} | P5: ${(data.tariffDetails.potencia_p5 / 365).toFixed(7)} | P6: ${(data.tariffDetails.potencia_p6 / 365).toFixed(7)}`;
+      let eneStr = `Energía (€/kWh):     P1: ${data.tariffDetails.energia_p1.toFixed(7)} | P2: ${data.tariffDetails.energia_p2.toFixed(7)} | P3: ${data.tariffDetails.energia_p3.toFixed(7)} | P4: ${data.tariffDetails.energia_p4.toFixed(7)} | P5: ${data.tariffDetails.energia_p5.toFixed(7)} | P6: ${data.tariffDetails.energia_p6.toFixed(7)}`;
+      if (data.tariffDetails.excedente !== undefined && data.tariffDetails.excedente > 0) {
+        eneStr += ` | Excedente: ${data.tariffDetails.excedente.toFixed(7)}`;
+      }
+      currentY += 5;
+      doc.text(potStr, 15, currentY);
+      currentY += 4.5;
+      doc.text(eneStr, 15, currentY);
     } else {
-      const potStr = `Potencia (€/kW/año): P1: ${data.tariffDetails.potencia_p1.toFixed(6)} | P2: ${data.tariffDetails.potencia_p2.toFixed(6)}`;
-      const eneStr = `Energía (€/kWh):     P1: ${data.tariffDetails.energia_p1.toFixed(6)} | P2: ${data.tariffDetails.energia_p2.toFixed(6)} | P3: ${data.tariffDetails.energia_p3.toFixed(6)}`;
-      doc.text(potStr, 15, 200);
-      doc.text(eneStr, 15, 204.5);
+      const potStr = `Potencia (€/kW/día): P1: ${(data.tariffDetails.potencia_p1 / 365).toFixed(7)} | P2: ${(data.tariffDetails.potencia_p2 / 365).toFixed(7)}`;
+      let eneStr = `Energía (€/kWh):     P1: ${data.tariffDetails.energia_p1.toFixed(7)} | P2: ${data.tariffDetails.energia_p2.toFixed(7)} | P3: ${data.tariffDetails.energia_p3.toFixed(7)}`;
+      if (data.tariffDetails.excedente !== undefined && data.tariffDetails.excedente > 0) {
+        eneStr += ` | Excedente: ${data.tariffDetails.excedente.toFixed(7)}`;
+      }
+      currentY += 5;
+      doc.text(potStr, 15, currentY);
+      currentY += 4.5;
+      doc.text(eneStr, 15, currentY);
     }
   } else {
     const gasType = data.tariffDetails.tipo_tarifa || 'RL.1';
-    const gasStr = `Peaje: ${gasType} | Término Fijo: ${data.tariffDetails.termino_fijo.toFixed(6)} €/mes | Término Variable: ${data.tariffDetails.termino_variable.toFixed(6)} €/kWh`;
-    doc.text(gasStr, 15, 200);
+    const gasStr = `Peaje: ${gasType} | Término Fijo: ${data.tariffDetails.termino_fijo.toFixed(7)} €/mes | Término Variable: ${data.tariffDetails.termino_variable.toFixed(7)} €/kWh`;
+    currentY += 5;
+    doc.text(gasStr, 15, currentY);
   }
 
   // --- NOTAS LEGALES Y PRIVACIDAD ---
+  currentY += 10;
   doc.setFontSize(8);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   doc.setFont('helvetica', 'normal');
-  doc.text('Nota informativa:', 15, 220);
-  doc.text('1. El presente documento es una estimación económica y comercial. No constituye un contrato vinculante.', 15, 225);
-  doc.text('2. Las tarifas simuladas corresponden a precios vigentes facilitados por las comercializadoras en la fecha del reporte.', 15, 229);
-  doc.text('3. Los consumos han sido anualizados de forma lineal, por lo que podrían variar ligeramente según los hábitos reales del cliente.', 15, 233);
+  doc.text('Nota informativa:', 15, currentY);
+  currentY += 4.5;
+  doc.text('1. El presente documento es una estimación económica y comercial. No constituye un contrato vinculante.', 15, currentY);
+  currentY += 4;
+  doc.text('2. Las tarifas simuladas corresponden a precios vigentes facilitados por las comercializadoras en la fecha del reporte.', 15, currentY);
+  currentY += 4;
+  doc.text('3. Los consumos han sido anualizados de forma lineal, por lo que podrían variar ligeramente según los hábitos reales del cliente.', 15, currentY);
 
   // --- FIRMA Y FOOTER ---
   doc.line(15, 250, 195, 250);

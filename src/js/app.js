@@ -162,8 +162,9 @@ function initNavigation() {
 function initPrivateMode() {
   const checkbox = document.getElementById('private-mode-checkbox');
 
-  // Cargar estado inicial (por defecto inactivo)
-  checkbox.checked = false;
+  // Cargar estado inicial (por defecto activo)
+  checkbox.checked = true;
+  document.body.classList.add('private-mode-active');
 
   checkbox.addEventListener('change', (e) => {
     if (e.target.checked) {

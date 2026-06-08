@@ -26,6 +26,10 @@ export async function initTariffsView() {
   setupTarifasLuz();
   setupTarifasGas();
 
+  // Inicializar constructores de tramos
+  setupComisionTramosBuilder('light');
+  setupComisionTramosBuilder('gas');
+
   // Cargar datos iniciales
   await loadComercializadoras();
   await loadTarifasLuz();
@@ -176,6 +180,13 @@ function setupTarifasLuz() {
       typeSelect.value = '2.0TD';
       typeSelect.dispatchEvent(new Event('change'));
     }
+    const comTipo = document.getElementById('dialog-light-comision-tipo');
+    if (comTipo) {
+      comTipo.value = 'fija';
+      comTipo.dispatchEvent(new Event('change'));
+    }
+    const tramosContainer = document.getElementById('dialog-light-tramos-container');
+    if (tramosContainer) tramosContainer.innerHTML = '';
     dialog.classList.add('active');
   });
 
@@ -199,12 +210,13 @@ function setupTarifasLuz() {
     const nombre = document.getElementById('dialog-light-name').value.trim();
     const tipoTarifa = typeSelect ? typeSelect.value : '2.0TD';
 
-    const potenciaP1 = parseFloat(document.getElementById('dialog-light-p1-pot').value);
-    const potenciaP2 = parseFloat(document.getElementById('dialog-light-p2-pot').value);
-    const potenciaP3 = parseFloat(document.getElementById('dialog-light-p3-pot').value || 0);
-    const potenciaP4 = parseFloat(document.getElementById('dialog-light-p4-pot').value || 0);
-    const potenciaP5 = parseFloat(document.getElementById('dialog-light-p5-pot').value || 0);
-    const potenciaP6 = parseFloat(document.getElementById('dialog-light-p6-pot').value || 0);
+    // UI potencies are daily (€/kW/day). Multiply by 365 for annual database storage.
+    const potenciaP1 = parseFloat(document.getElementById('dialog-light-p1-pot').value) * 365;
+    const potenciaP2 = parseFloat(document.getElementById('dialog-light-p2-pot').value) * 365;
+    const potenciaP3 = parseFloat(document.getElementById('dialog-light-p3-pot').value || 0) * 365;
+    const potenciaP4 = parseFloat(document.getElementById('dialog-light-p4-pot').value || 0) * 365;
+    const potenciaP5 = parseFloat(document.getElementById('dialog-light-p5-pot').value || 0) * 365;
+    const potenciaP6 = parseFloat(document.getElementById('dialog-light-p6-pot').value || 0) * 365;
 
     const energiaP1 = parseFloat(document.getElementById('dialog-light-p1-ene').value);
     const energiaP2 = parseFloat(document.getElementById('dialog-light-p2-ene').value);
@@ -213,7 +225,27 @@ function setupTarifasLuz() {
     const energiaP5 = parseFloat(document.getElementById('dialog-light-p5-ene').value || 0);
     const energiaP6 = parseFloat(document.getElementById('dialog-light-p6-ene').value || 0);
 
-    const comision = parseFloat(document.getElementById('dialog-light-commission').value);
+    const excedente = parseFloat(document.getElementById('dialog-light-excedente').value || 0);
+
+    let comision = 0;
+    let comisionTramos = null;
+    const comisionTipo = document.getElementById('dialog-light-comision-tipo').value;
+    if (comisionTipo === 'fija') {
+      comision = parseFloat(document.getElementById('dialog-light-commission').value || 0);
+    } else {
+      const rows = document.querySelectorAll('#dialog-light-tramos-container .comision-tramo-row');
+      const tramos = [];
+      rows.forEach(row => {
+        const hasta = parseFloat(row.querySelector('.tramo-hasta').value);
+        const valCom = parseFloat(row.querySelector('.tramo-comision').value);
+        if (!isNaN(hasta) && !isNaN(valCom)) {
+          tramos.push({ hasta, comision: valCom });
+        }
+      });
+      tramos.sort((a, b) => a.hasta - b.hasta);
+      comisionTramos = JSON.stringify(tramos);
+    }
+
     const notas = document.getElementById('dialog-light-notes').value.trim();
 
     try {
@@ -222,14 +254,14 @@ function setupTarifasLuz() {
           parseInt(id), nombre, tipoTarifa,
           potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
           energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-          comision, notas
+          excedente, comision, comisionTramos, notas
         );
       } else {
         await addTarifaLuz(
           comercializadoraId, nombre, tipoTarifa,
           potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
           energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-          comision, notas
+          excedente, comision, comisionTramos, notas
         );
       }
       dialog.classList.remove('active');
@@ -290,14 +322,39 @@ async function loadTarifasLuz() {
     filteredList.forEach(t => {
       const tr = document.createElement('tr');
 
-      let potHtml = `P1: ${t.potencia_p1.toFixed(6)}<br>P2: ${t.potencia_p2.toFixed(6)}`;
+      const dailyP1 = t.potencia_p1 / 365;
+      const dailyP2 = t.potencia_p2 / 365;
+      let potHtml = `P1: ${dailyP1.toFixed(7)} &euro;/d&iacute;a (${t.potencia_p1.toFixed(7)} &euro;/a&ntilde;o)<br>P2: ${dailyP2.toFixed(7)} &euro;/d&iacute;a (${t.potencia_p2.toFixed(7)} &euro;/a&ntilde;o)`;
       if (t.tipo_tarifa === '3.0TD') {
-        potHtml += `<br>P3: ${t.potencia_p3.toFixed(6)}<br>P4: ${t.potencia_p4.toFixed(6)}<br>P5: ${t.potencia_p5.toFixed(6)}<br>P6: ${t.potencia_p6.toFixed(6)}`;
+        const dailyP3 = (t.potencia_p3 || 0) / 365;
+        const dailyP4 = (t.potencia_p4 || 0) / 365;
+        const dailyP5 = (t.potencia_p5 || 0) / 365;
+        const dailyP6 = (t.potencia_p6 || 0) / 365;
+        potHtml += `<br>P3: ${dailyP3.toFixed(7)} &euro;/d&iacute;a (${(t.potencia_p3 || 0).toFixed(7)} &euro;/a&ntilde;o)<br>P4: ${dailyP4.toFixed(7)} &euro;/d&iacute;a (${(t.potencia_p4 || 0).toFixed(7)} &euro;/a&ntilde;o)<br>P5: ${dailyP5.toFixed(7)} &euro;/d&iacute;a (${(t.potencia_p5 || 0).toFixed(7)} &euro;/a&ntilde;o)<br>P6: ${dailyP6.toFixed(7)} &euro;/d&iacute;a (${(t.potencia_p6 || 0).toFixed(7)} &euro;/a&ntilde;o)`;
       }
 
-      let eneHtml = `P1: ${t.energia_p1.toFixed(6)}<br>P2: ${t.energia_p2.toFixed(6)}<br>P3: ${t.energia_p3.toFixed(6)}`;
+      let eneHtml = `P1: ${t.energia_p1.toFixed(7)} &euro;/kWh<br>P2: ${t.energia_p2.toFixed(7)} &euro;/kWh<br>P3: ${t.energia_p3.toFixed(7)} &euro;/kWh`;
       if (t.tipo_tarifa === '3.0TD') {
-        eneHtml += `<br>P4: ${t.energia_p4.toFixed(6)}<br>P5: ${t.energia_p5.toFixed(6)}<br>P6: ${t.energia_p6.toFixed(6)}`;
+        eneHtml += `<br>P4: ${(t.energia_p4 || 0).toFixed(7)} &euro;/kWh<br>P5: ${(t.energia_p5 || 0).toFixed(7)} &euro;/kWh<br>P6: ${(t.energia_p6 || 0).toFixed(7)} &euro;/kWh`;
+      }
+      if (t.excedente) {
+        eneHtml += `<br><span class="text-success" style="font-weight: 500;">Exc: ${t.excedente.toFixed(7)} &euro;/kWh</span>`;
+      }
+
+      let comisionHtml = '';
+      if (t.comision_tramos) {
+        try {
+          const tramos = JSON.parse(t.comision_tramos);
+          if (Array.isArray(tramos) && tramos.length > 0) {
+            comisionHtml = tramos.map(tr => `&le; ${tr.hasta} kWh: ${tr.comision.toFixed(2)} &euro;`).join('<br>');
+          } else {
+            comisionHtml = `${t.comision.toFixed(2)} &euro;`;
+          }
+        } catch (e) {
+          comisionHtml = `${t.comision.toFixed(2)} &euro;`;
+        }
+      } else {
+        comisionHtml = `${t.comision.toFixed(2)} &euro;`;
       }
 
       tr.innerHTML = `
@@ -306,7 +363,7 @@ async function loadTarifasLuz() {
         <td><span class="m3-chip" style="font-size: 9px; height: 18px; padding: 0 6px;">${t.tipo_tarifa || '2.0TD'}</span></td>
         <td>${potHtml}</td>
         <td>${eneHtml}</td>
-        <td class="private-value">${t.comision.toFixed(2)} €</td>
+        <td class="private-value">${comisionHtml}</td>
         <td><small class="text-muted">${escapeHtml(t.notas || t.notes || '-')}</small></td>
         <td style="text-align: right; white-space: nowrap;">
           <button class="m3-btn-icon btn-edit" data-id="${t.id}" title="Editar tarifa">
@@ -337,23 +394,45 @@ async function loadTarifasLuz() {
           typeSelect.dispatchEvent(new Event('change'));
         }
 
-        document.getElementById('dialog-light-p1-pot').value = t.potencia_p1;
-        document.getElementById('dialog-light-p2-pot').value = t.potencia_p2;
-        document.getElementById('dialog-light-p3-pot').value = t.potencia_p3 || 0;
-        document.getElementById('dialog-light-p4-pot').value = t.potencia_p4 || 0;
-        document.getElementById('dialog-light-p5-pot').value = t.potencia_p5 || 0;
-        document.getElementById('dialog-light-p6-pot').value = t.potencia_p6 || 0;
+        document.getElementById('dialog-light-p1-pot').value = (t.potencia_p1 / 365).toFixed(7);
+        document.getElementById('dialog-light-p2-pot').value = (t.potencia_p2 / 365).toFixed(7);
+        document.getElementById('dialog-light-p3-pot').value = t.potencia_p3 ? (t.potencia_p3 / 365).toFixed(7) : '0.0000000';
+        document.getElementById('dialog-light-p4-pot').value = t.potencia_p4 ? (t.potencia_p4 / 365).toFixed(7) : '0.0000000';
+        document.getElementById('dialog-light-p5-pot').value = t.potencia_p5 ? (t.potencia_p5 / 365).toFixed(7) : '0.0000000';
+        document.getElementById('dialog-light-p6-pot').value = t.potencia_p6 ? (t.potencia_p6 / 365).toFixed(7) : '0.0000000';
 
-        document.getElementById('dialog-light-p1-ene').value = t.energia_p1;
-        document.getElementById('dialog-light-p2-ene').value = t.energia_p2;
-        document.getElementById('dialog-light-p3-ene').value = t.energia_p3;
-        document.getElementById('dialog-light-p4-ene').value = t.energia_p4 || 0;
-        document.getElementById('dialog-light-p5-ene').value = t.energia_p5 || 0;
-        document.getElementById('dialog-light-p6-ene').value = t.energia_p6 || 0;
+        document.getElementById('dialog-light-p1-ene').value = t.energia_p1.toFixed(7);
+        document.getElementById('dialog-light-p2-ene').value = t.energia_p2.toFixed(7);
+        document.getElementById('dialog-light-p3-ene').value = t.energia_p3.toFixed(7);
+        document.getElementById('dialog-light-p4-ene').value = t.energia_p4 ? t.energia_p4.toFixed(7) : '0.0000000';
+        document.getElementById('dialog-light-p5-ene').value = t.energia_p5 ? t.energia_p5.toFixed(7) : '0.0000000';
+        document.getElementById('dialog-light-p6-ene').value = t.energia_p6 ? t.energia_p6.toFixed(7) : '0.0000000';
 
-        document.getElementById('dialog-light-commission').value = t.comision;
+        document.getElementById('dialog-light-excedente').value = t.excedente ? t.excedente.toFixed(7) : '0.0000000';
+
+        const comTipo = document.getElementById('dialog-light-comision-tipo');
+        const tramosContainer = document.getElementById('dialog-light-tramos-container');
+        tramosContainer.innerHTML = '';
+        if (t.comision_tramos) {
+          comTipo.value = 'tramos';
+          comTipo.dispatchEvent(new Event('change'));
+          try {
+            const tramos = JSON.parse(t.comision_tramos);
+            if (Array.isArray(tramos)) {
+              tramos.forEach(tr => {
+                addTramoRow('light', tr.hasta, tr.comision);
+              });
+            }
+          } catch(e) {
+            console.error(e);
+          }
+        } else {
+          comTipo.value = 'fija';
+          comTipo.dispatchEvent(new Event('change'));
+          document.getElementById('dialog-light-commission').value = t.comision;
+        }
+
         document.getElementById('dialog-light-notes').value = t.notas || t.notes || "";
-
         document.getElementById('dialog-light').classList.add('active');
       });
     });
@@ -388,6 +467,13 @@ function setupTarifasGas() {
     document.getElementById('dialog-gas-title').innerText = "Registrar Tarifa Gas";
     document.getElementById('dialog-gas-id').value = "";
     form.reset();
+    const comTipo = document.getElementById('dialog-gas-comision-tipo');
+    if (comTipo) {
+      comTipo.value = 'fija';
+      comTipo.dispatchEvent(new Event('change'));
+    }
+    const tramosContainer = document.getElementById('dialog-gas-tramos-container');
+    if (tramosContainer) tramosContainer.innerHTML = '';
     dialog.classList.add('active');
   });
 
@@ -412,14 +498,33 @@ function setupTarifasGas() {
     const tipoTarifa = document.getElementById('dialog-gas-tariff-type').value;
     const terminoFijo = parseFloat(document.getElementById('dialog-gas-fixed').value);
     const terminoVariable = parseFloat(document.getElementById('dialog-gas-var').value);
-    const comision = parseFloat(document.getElementById('dialog-gas-commission').value);
+
+    let comision = 0;
+    let comisionTramos = null;
+    const comisionTipo = document.getElementById('dialog-gas-comision-tipo').value;
+    if (comisionTipo === 'fija') {
+      comision = parseFloat(document.getElementById('dialog-gas-commission').value || 0);
+    } else {
+      const rows = document.querySelectorAll('#dialog-gas-tramos-container .comision-tramo-row');
+      const tramos = [];
+      rows.forEach(row => {
+        const hasta = parseFloat(row.querySelector('.tramo-hasta').value);
+        const valCom = parseFloat(row.querySelector('.tramo-comision').value);
+        if (!isNaN(hasta) && !isNaN(valCom)) {
+          tramos.push({ hasta, comision: valCom });
+        }
+      });
+      tramos.sort((a, b) => a.hasta - b.hasta);
+      comisionTramos = JSON.stringify(tramos);
+    }
+
     const notas = document.getElementById('dialog-gas-notes').value.trim();
 
     try {
       if (id) {
-        await updateTarifaGas(parseInt(id), nombre, tipoTarifa, terminoFijo, terminoVariable, comision, notas);
+        await updateTarifaGas(parseInt(id), nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas);
       } else {
-        await addTarifaGas(comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, notas);
+        await addTarifaGas(comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas);
       }
       dialog.classList.remove('active');
       await loadTarifasGas();
@@ -478,13 +583,30 @@ async function loadTarifasGas() {
 
     filteredList.forEach(t => {
       const tr = document.createElement('tr');
+      
+      let comisionHtml = '';
+      if (t.comision_tramos) {
+        try {
+          const tramos = JSON.parse(t.comision_tramos);
+          if (Array.isArray(tramos) && tramos.length > 0) {
+            comisionHtml = tramos.map(tr => `&le; ${tr.hasta} kWh: ${tr.comision.toFixed(2)} &euro;`).join('<br>');
+          } else {
+            comisionHtml = `${t.comision.toFixed(2)} &euro;`;
+          }
+        } catch (e) {
+          comisionHtml = `${t.comision.toFixed(2)} &euro;`;
+        }
+      } else {
+        comisionHtml = `${t.comision.toFixed(2)} &euro;`;
+      }
+
       tr.innerHTML = `
         <td><strong>${escapeHtml(t.comercializadora_nombre)}</strong></td>
         <td>${escapeHtml(t.nombre)}</td>
         <td><span class="m3-chip" style="font-size: 9px; height: 18px; padding: 0 6px;">${t.tipo_tarifa || 'RL.1'}</span></td>
-        <td>${t.termino_fijo.toFixed(6)} €/mes</td>
-        <td>${t.termino_variable.toFixed(6)} €/kWh</td>
-        <td class="private-value">${t.comision.toFixed(2)} €</td>
+        <td>${t.termino_fijo.toFixed(7)} €/mes</td>
+        <td>${t.termino_variable.toFixed(7)} €/kWh</td>
+        <td class="private-value">${comisionHtml}</td>
         <td><small class="text-muted">${escapeHtml(t.notes || t.notas || '-')}</small></td>
         <td style="text-align: right; white-space: nowrap;">
           <button class="m3-btn-icon btn-edit" data-id="${t.id}" title="Editar tarifa">
@@ -508,11 +630,32 @@ async function loadTarifasGas() {
         document.getElementById('dialog-gas-com').value = t.comercializadora_id;
         document.getElementById('dialog-gas-name').value = t.nombre;
         document.getElementById('dialog-gas-tariff-type').value = t.tipo_tarifa || "RL.1";
-        document.getElementById('dialog-gas-fixed').value = t.termino_fijo;
-        document.getElementById('dialog-gas-var').value = t.termino_variable;
-        document.getElementById('dialog-gas-commission').value = t.comision;
-        document.getElementById('dialog-gas-notes').value = t.notes || t.notas || "";
+        document.getElementById('dialog-gas-fixed').value = t.termino_fijo.toFixed(7);
+        document.getElementById('dialog-gas-var').value = t.termino_variable.toFixed(7);
 
+        const comTipo = document.getElementById('dialog-gas-comision-tipo');
+        const tramosContainer = document.getElementById('dialog-gas-tramos-container');
+        tramosContainer.innerHTML = '';
+        if (t.comision_tramos) {
+          comTipo.value = 'tramos';
+          comTipo.dispatchEvent(new Event('change'));
+          try {
+            const tramos = JSON.parse(t.comision_tramos);
+            if (Array.isArray(tramos)) {
+              tramos.forEach(tr => {
+                addTramoRow('gas', tr.hasta, tr.comision);
+              });
+            }
+          } catch(e) {
+            console.error(e);
+          }
+        } else {
+          comTipo.value = 'fija';
+          comTipo.dispatchEvent(new Event('change'));
+          document.getElementById('dialog-gas-commission').value = t.comision;
+        }
+
+        document.getElementById('dialog-gas-notes').value = t.notes || t.notas || "";
         document.getElementById('dialog-gas').classList.add('active');
       });
     });
@@ -562,4 +705,56 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function setupComisionTramosBuilder(prefix) {
+  const selectTipo = document.getElementById(`dialog-${prefix}-comision-tipo`);
+  const fijaGroup = document.getElementById(`dialog-${prefix}-comision-fija-group`);
+  const tramosGroup = document.getElementById(`dialog-${prefix}-comision-tramos-group`);
+  const tramosContainer = document.getElementById(`dialog-${prefix}-tramos-container`);
+  const addBtn = document.getElementById(`dialog-${prefix}-add-tramo-btn`);
+
+  if (!selectTipo) return;
+
+  selectTipo.addEventListener('change', () => {
+    if (selectTipo.value === 'tramos') {
+      fijaGroup.style.display = 'none';
+      tramosGroup.style.display = 'block';
+      if (tramosContainer.children.length === 0) {
+        addTramoRow(prefix, null, null);
+      }
+    } else {
+      fijaGroup.style.display = 'block';
+      tramosGroup.style.display = 'none';
+    }
+  });
+
+  addBtn.addEventListener('click', () => {
+    addTramoRow(prefix, null, null);
+  });
+}
+
+function addTramoRow(prefix, hasta, comision) {
+  const container = document.getElementById(`dialog-${prefix}-tramos-container`);
+  if (!container) return;
+
+  const row = document.createElement('div');
+  row.className = 'comision-tramo-row';
+  
+  const valHasta = hasta !== null ? hasta : '';
+  const valComision = comision !== null ? comision : '';
+
+  row.innerHTML = `
+    <input type="number" class="m3-input tramo-hasta" placeholder="Hasta kWh" value="${valHasta}" min="0" step="1" required />
+    <input type="number" class="m3-input tramo-comision" placeholder="Comisión €" value="${valComision}" min="0" step="0.01" required />
+    <button type="button" class="comision-tramo-remove-btn" title="Eliminar tramo">
+      <span class="material-symbols-outlined">delete</span>
+    </button>
+  `;
+
+  row.querySelector('.comision-tramo-remove-btn').addEventListener('click', () => {
+    row.remove();
+  });
+
+  container.appendChild(row);
 }
