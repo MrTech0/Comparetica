@@ -424,7 +424,7 @@
               <div class="flex-row-center-between" style="margin-bottom: 16px;">
                 <h2 class="m3-card-title" style="margin-bottom: 0;">Propuestas Comparativas Recomendadas</h2>
                 <button type="button" id="calc-modify-btn" class="m3-btn m3-btn-outlined" style="display: flex; align-items: center; gap: 8px;">
-                  <span class="material-symbols-outlined">edit</span> Modificar Datos
+                  <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor; margin-right: 6px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg> Modificar Datos
                 </button>
               </div>
               
@@ -693,6 +693,7 @@
             <div class="tabs-header">
               <button class="m3-tab-btn active" id="tab-btn-settings-appearance">Apariencia</button>
               <button class="m3-tab-btn" id="tab-btn-settings-company">Consultora</button>
+              <button class="m3-tab-btn" id="tab-btn-settings-updates">Actualizaciones</button>
               <button class="m3-tab-btn" id="tab-btn-settings-cleanup">Limpieza</button>
             </div>
 
@@ -794,6 +795,57 @@
                     <button type="button" id="settings-company-logo-clear-btn" class="m3-btn m3-btn-text" style="color: var(--color-error); border-color: transparent;">Borrar Logotipo Personalizado</button>
                   </div>
                 </form>
+              </div>
+            </div>
+
+            <!-- PANEL: ACTUALIZACIONES -->
+            <div id="panel-settings-updates" class="tab-panel" style="display:none;">
+              <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Actualizaciones de la Aplicación</h3>
+                <p class="text-muted" style="margin-bottom: 20px; font-size: 13px;">
+                  Administra las actualizaciones del sistema. Comparetica puede buscar nuevas versiones publicadas de forma automática o manual.
+                </p>
+
+                <div class="m3-card m3-card-outlined" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; padding: 16px; border-left: 5px solid var(--color-primary); flex-wrap: wrap; gap: 16px;">
+                  <div>
+                    <h4 style="font-weight: 600; font-size: 14px;">Versión Actual Instalada</h4>
+                    <p class="text-muted" style="font-size: 12.5px; margin-top: 4px;">Comparetica v<span id="update-current-version">0.1.5</span></p>
+                  </div>
+                  <button id="settings-check-update-btn" class="m3-btn" style="display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;"><path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L5.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/></svg>
+                    Buscar Actualizaciones
+                  </button>
+                </div>
+
+                <!-- Estado de la búsqueda/actualización -->
+                <div id="settings-update-status-card" class="m3-card m3-card-outlined" style="display: none; padding: 16px; margin-top: 16px;">
+                  <h4 id="settings-update-status-title" style="font-weight: 600; font-size: 14px;">Buscando actualizaciones...</h4>
+                  <p id="settings-update-status-desc" class="text-muted" style="font-size: 13px; margin-top: 4px; line-height: 1.5; white-space: pre-wrap;"></p>
+                  
+                  <!-- Barra de progreso para descargas -->
+                  <div id="settings-update-progress-container" style="display: none; margin-top: 12px; width: 100%; height: 8px; background-color: var(--color-surface-variant); border-radius: 4px; overflow: hidden;">
+                    <div id="settings-update-progress-bar" style="width: 0%; height: 100%; background-color: var(--color-primary); transition: width 0.2s;"></div>
+                  </div>
+
+                  <div id="settings-update-actions" style="margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end;">
+                    <!-- Botones inyectados dinámicamente -->
+                  </div>
+                </div>
+
+                <!-- Configuración Automática -->
+                <div class="m3-card m3-card-outlined" style="margin-top: 20px; padding: 16px;">
+                  <h4 style="font-weight: 600; font-size: 14px; margin-bottom: 12px;">Preferencia de Actualización Automática</h4>
+                  <div class="flex-row-center-between" style="gap: 16px; flex-wrap: wrap;">
+                    <div>
+                      <p class="text-muted" style="font-size: 13px;">Comprobar automáticamente si hay actualizaciones al iniciar la aplicación.</p>
+                    </div>
+                    <label class="m3-switch-container">
+                      <input type="checkbox" id="settings-auto-update-checkbox" checked />
+                      <span class="m3-switch"></span>
+                    </label>
+                  </div>
+                </div>
+
               </div>
             </div>
 
@@ -932,7 +984,7 @@
                   <!-- Filas dinámicas aquí -->
                 </div>
                 <button type="button" id="dialog-light-add-tramo-btn" class="m3-btn m3-btn-text comision-tramo-add-btn">
-                  <span class="material-symbols-outlined">add</span> Añadir Tramo
+                  <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor; margin-right: 6px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Añadir Tramo
                 </button>
               </div>
   
@@ -1011,7 +1063,7 @@
                   <!-- Filas dinámicas aquí -->
                 </div>
                 <button type="button" id="dialog-gas-add-tramo-btn" class="m3-btn m3-btn-text comision-tramo-add-btn">
-                  <span class="material-symbols-outlined">add</span> Añadir Tramo
+                  <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor; margin-right: 6px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Añadir Tramo
                 </button>
               </div>
   
@@ -1189,6 +1241,35 @@
           <div class="m3-dialog-actions">
             <button type="button" id="dialog-confirm-cancel" class="m3-btn m3-btn-text">Cancelar</button>
             <button type="button" id="dialog-confirm-accept" class="m3-btn">Aceptar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: ADVERTENCIA SIN TARIFAS -->
+      <div id="dialog-no-tariffs" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="border-left: 6px solid var(--color-warning); max-width: 500px;">
+          <h3 class="m3-dialog-title">Sin Tarifas Registradas</h3>
+          <div class="m3-dialog-body">
+            <p id="dialog-no-tariffs-message" style="white-space: pre-wrap; margin: 0; font-size: 14px; line-height: 1.5; color: var(--color-on-surface);"></p>
+          </div>
+          <div class="m3-dialog-actions">
+            <button type="button" id="dialog-no-tariffs-omit" class="m3-btn m3-btn-text">Omitir Alerta</button>
+            <button type="button" id="dialog-no-tariffs-redirect" class="m3-btn">Ir a Gestión de Tarifas</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: NOTIFICACIÓN DE ACTUALIZACIÓN -->
+      <div id="dialog-update-alert" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="border-left: 6px solid var(--color-primary); max-width: 520px;">
+          <h3 class="m3-dialog-title">Actualización Disponible</h3>
+          <div class="m3-dialog-body">
+            <p id="dialog-update-alert-message" style="white-space: pre-wrap; margin: 0; font-size: 14px; line-height: 1.5; color: var(--color-on-surface);"></p>
+          </div>
+          <div class="m3-dialog-actions" style="flex-wrap: wrap; gap: 8px; justify-content: flex-end;">
+            <button type="button" id="dialog-update-alert-close" class="m3-btn m3-btn-text">Cerrar</button>
+            <button type="button" id="dialog-update-alert-postpone" class="m3-btn m3-btn-outlined">Posponer 1 Día</button>
+            <button type="button" id="dialog-update-alert-accept" class="m3-btn">Actualizar Ahora</button>
           </div>
         </div>
       </div>

@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Inicializar desplegables personalizados
   initCustomSelects();
+
+  // Comprobar actualizaciones en segundo plano al iniciar
+  initStartupUpdateCheck();
 });
 
 // --- PREVISUALIZACIÓN DE PDF GLOBAL ---
@@ -240,6 +243,7 @@ window.showConfirm = function(mensaje, titulo = "Confirmación") {
 
 // --- MATERIAL 3 CUSTOM STYLED SELECT DROPDOWNS ---
 export function initCustomSelects() {
+  window.initCustomSelects = initCustomSelects;
   const originalValueProp = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
   if (originalValueProp && !HTMLSelectElement.prototype._customValueHooked) {
     Object.defineProperty(HTMLSelectElement.prototype, 'value', {
@@ -386,7 +390,94 @@ function initSidebarCollapse() {
 
     const currentlyCollapsed = appContainer.classList.toggle('collapsed-sidebar');
     localStorage.setItem('sidebar_collapsed', currentlyCollapsed);
-    logoToggle.title = currentlyCollapsed ? "Expandir Menú" : "Contraer Menú";
   });
+}
+
+// --- COMPROBACIÓN DE ACTUALIZACIONES AL INICIAR ---
+async function initStartupUpdateCheck() {
+  if (!window.__TAURI__ || !window.__TAURI__.updater) {
+    return; // Solo funciona dentro de Tauri
+  }
+
+  // 1. Verificar si la comprobación automática está activa
+  const isAutoEnabled = localStorage.getItem('auto_update_enabled') !== 'false';
+  if (!isAutoEnabled) return;
+
+  // 2. Verificar si está pospuesta hoy
+  const postponedUntil = localStorage.getItem('update_postponed_until');
+  if (postponedUntil) {
+    const now = Date.now();
+    if (now < parseInt(postponedUntil)) {
+      console.log("Comprobación de actualización pospuesta para hoy.");
+      return;
+    }
+  }
+
+  try {
+    const updater = window.__TAURI__.updater;
+    const update = await updater.check();
+
+    if (update) {
+      // Mostrar el diálogo de notificación de actualización
+      const overlay = document.getElementById('dialog-update-alert');
+      const msgEl = document.getElementById('dialog-update-alert-message');
+      const btnClose = document.getElementById('dialog-update-alert-close');
+      const btnPostpone = document.getElementById('dialog-update-alert-postpone');
+      const btnAccept = document.getElementById('dialog-update-alert-accept');
+
+      if (!overlay || !msgEl || !btnClose || !btnPostpone || !btnAccept) return;
+
+      msgEl.innerText = `Hay una nueva versión disponible de Comparetica: v${update.version}\nPublicada el: ${new Date(update.date).toLocaleDateString('es-ES')}\n\nNotas de versión:\n${update.body || 'Sin detalles.'}\n\n¿Desea descargar e instalar la actualización ahora?\n(La aplicación se actualizará y reiniciará automáticamente).`;
+
+      overlay.classList.add('active');
+
+      // Limpiar listeners viejos clonando los botones
+      const closeClone = btnClose.cloneNode(true);
+      const postponeClone = btnPostpone.cloneNode(true);
+      const acceptClone = btnAccept.cloneNode(true);
+      btnClose.replaceWith(closeClone);
+      btnPostpone.replaceWith(postponeClone);
+      btnAccept.replaceWith(acceptClone);
+
+      closeClone.addEventListener('click', () => {
+        overlay.classList.remove('active');
+      });
+
+      postponeClone.addEventListener('click', () => {
+        // Posponer por 1 día natural (24 horas)
+        const oneDayMs = 24 * 60 * 60 * 1000;
+        const postponedTime = Date.now() + oneDayMs;
+        localStorage.setItem('update_postponed_until', postponedTime.toString());
+        window.showToast("Actualización pospuesta durante 24 horas.", "info");
+        overlay.classList.remove('active');
+      });
+
+      acceptClone.addEventListener('click', async () => {
+        acceptClone.disabled = true;
+        acceptClone.textContent = 'Descargando...';
+        postponeClone.style.display = 'none';
+        closeClone.style.display = 'none';
+
+        try {
+          await update.downloadAndInstall();
+          window.showToast("Actualización instalada con éxito. Reiniciando...", "success");
+          setTimeout(async () => {
+            if (window.__TAURI__ && window.__TAURI__.core) {
+              await window.__TAURI__.core.invoke('restart_app');
+            }
+          }, 1500);
+        } catch (err) {
+          console.error(err);
+          window.showToast("Error al descargar e instalar la actualización.", "error");
+          acceptClone.disabled = false;
+          acceptClone.textContent = 'Reintentar';
+          postponeClone.style.display = 'block';
+          closeClone.style.display = 'block';
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Error al comprobar actualizaciones al iniciar:", error);
+  }
 }
 

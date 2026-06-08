@@ -381,7 +381,7 @@ input[type="checkbox"]:checked + .m3-switch::after {
   border-radius: var(--radius-xl);
   padding: 24px;
   width: 100%;
-  max-width: 500px;
+  max-width: 720px;
   box-shadow: var(--shadow-4);
   transform: translateY(30px);
   transition: transform var(--transition-medium);
@@ -431,21 +431,63 @@ input[type="checkbox"]:checked + .m3-switch::after {
 .comision-tramo-row .m3-input {
   flex: 1;
   min-width: 0;
+  height: 36px !important;
+  padding: 6px 8px !important;
+  font-size: 13.5px !important;
+}
+
+.comision-tramo-row .m3-custom-select {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.comision-tramo-row .m3-custom-select-trigger {
+  padding: 6px 8px !important;
+  height: 36px !important;
+  font-size: 13.5px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.comision-tramo-row .m3-custom-select-trigger span {
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+  margin-right: 4px !important;
+  flex-grow: 1;
+}
+
+.comision-tramo-row .m3-custom-select-options {
+  font-size: 13.5px !important;
 }
 
 .comision-tramo-remove-btn {
-  color: var(--color-error);
+  color: var(--color-error) !important;
   cursor: pointer;
-  padding: 8px;
-  border-radius: 50%;
-  display: flex;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background-color: transparent !important;
+  border: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color var(--transition-short);
+  transition: background-color var(--transition-short), color var(--transition-short);
 }
 
 .comision-tramo-remove-btn:hover {
-  background-color: var(--color-error-container);
+  background-color: var(--color-error-container) !important;
+  color: var(--color-error) !important;
+}
+
+.comision-tramo-remove-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
 
 .comision-tramo-add-btn {

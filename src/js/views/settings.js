@@ -7,6 +7,7 @@ export function initSettingsView() {
   setupAppearance();
   setupCompanySettings();
   setupCleanup();
+  setupUpdates();
 }
 
 // --- Pestañas de Configuración ---
@@ -14,6 +15,7 @@ function setupTabs() {
   const tabs = [
     { btn: 'tab-btn-settings-appearance', panel: 'panel-settings-appearance' },
     { btn: 'tab-btn-settings-company', panel: 'panel-settings-company' },
+    { btn: 'tab-btn-settings-updates', panel: 'panel-settings-updates' },
     { btn: 'tab-btn-settings-cleanup', panel: 'panel-settings-cleanup' }
   ];
 
@@ -358,4 +360,140 @@ function fileToBase64(file) {
     };
     reader.onerror = error => reject(error);
   });
+}
+
+// --- Control de Actualizaciones ---
+function setupUpdates() {
+  const versionSpan = document.getElementById('update-current-version');
+  const autoUpdateCheckbox = document.getElementById('settings-auto-update-checkbox');
+  const checkBtn = document.getElementById('settings-check-update-btn');
+
+  const statusCard = document.getElementById('settings-update-status-card');
+  const statusTitle = document.getElementById('settings-update-status-title');
+  const statusDesc = document.getElementById('settings-update-status-desc');
+  const progressContainer = document.getElementById('settings-update-progress-container');
+  const progressBar = document.getElementById('settings-update-progress-bar');
+  const actionsContainer = document.getElementById('settings-update-actions');
+
+  if (versionSpan) {
+    if (window.__TAURI__ && window.__TAURI__.app) {
+      window.__TAURI__.app.getVersion().then(v => {
+        versionSpan.textContent = v;
+      }).catch(e => {
+        console.error(e);
+        versionSpan.textContent = '0.1.5';
+      });
+    } else {
+      versionSpan.textContent = '0.1.5';
+    }
+  }
+
+  if (autoUpdateCheckbox) {
+    const isAuto = localStorage.getItem('auto_update_enabled') !== 'false';
+    autoUpdateCheckbox.checked = isAuto;
+    autoUpdateCheckbox.addEventListener('change', (e) => {
+      localStorage.setItem('auto_update_enabled', e.target.checked.toString());
+    });
+  }
+
+  if (checkBtn) {
+    checkBtn.addEventListener('click', () => {
+      runCheckUpdate(true);
+    });
+  }
+
+  async function runCheckUpdate(manual = false) {
+    if (!window.__TAURI__ || !window.__TAURI__.updater) {
+      if (manual) {
+        window.showToast("El servicio de actualizaciones solo está disponible dentro de la aplicación instalada.", "info");
+      }
+      return;
+    }
+
+    if (statusCard) {
+      statusCard.style.display = 'block';
+      statusTitle.textContent = "Buscando actualizaciones...";
+      statusDesc.textContent = "Conectando con el servidor de actualizaciones en GitHub...";
+      progressContainer.style.display = 'none';
+      actionsContainer.innerHTML = '';
+    }
+
+    try {
+      const updater = window.__TAURI__.updater;
+      const update = await updater.check();
+
+      if (update) {
+        // Nueva versión encontrada
+        statusTitle.textContent = "¡Actualización Disponible!";
+        statusTitle.style.color = "var(--color-primary)";
+        statusDesc.textContent = `Versión: v${update.version}\nPublicada el: ${new Date(update.date).toLocaleDateString('es-ES')}\n\nNotas de versión:\n${update.body || 'Sin notas de versión.'}`;
+        
+        actionsContainer.innerHTML = '';
+        const installBtn = document.createElement('button');
+        installBtn.className = 'm3-btn';
+        installBtn.textContent = 'Descargar e Instalar';
+        
+        installBtn.addEventListener('click', async () => {
+          installBtn.disabled = true;
+          installBtn.textContent = 'Descargando...';
+          progressContainer.style.display = 'block';
+          progressBar.style.width = '0%';
+
+          try {
+            let downloaded = 0;
+            let contentLength = 0;
+
+            await update.downloadAndInstall((event) => {
+              switch (event.event) {
+                case 'Started':
+                  contentLength = event.data.contentLength || 0;
+                  break;
+                case 'Progress':
+                  downloaded += event.data.chunkLength;
+                  if (contentLength > 0) {
+                    const percent = Math.round((downloaded / contentLength) * 100);
+                    progressBar.style.width = `${percent}%`;
+                  }
+                  break;
+                case 'Finished':
+                  progressBar.style.width = '100%';
+                  break;
+              }
+            });
+
+            window.showToast("Instalación completada. Reiniciando...", "success");
+            setTimeout(async () => {
+              if (window.__TAURI__ && window.__TAURI__.core) {
+                await window.__TAURI__.core.invoke('restart_app');
+              }
+            }, 1500);
+
+          } catch (err) {
+            console.error(err);
+            window.showToast("Error al instalar la actualización.", "error");
+            statusTitle.textContent = "Error de Instalación";
+            statusTitle.style.color = "var(--color-error)";
+            statusDesc.textContent = err.toString();
+            installBtn.disabled = false;
+            installBtn.textContent = 'Reintentar Descarga';
+          }
+        });
+
+        actionsContainer.appendChild(installBtn);
+
+      } else {
+        // Ya está actualizado
+        statusTitle.textContent = "Aplicación al Día";
+        statusTitle.style.color = "var(--color-tertiary)";
+        statusDesc.textContent = "Ya tienes instalada la última versión disponible de Comparetica.";
+        actionsContainer.innerHTML = '';
+      }
+    } catch (error) {
+      console.error(error);
+      statusTitle.textContent = "Error de Conexión";
+      statusTitle.style.color = "var(--color-error)";
+      statusDesc.textContent = "No se pudo conectar con el servidor de actualizaciones. Por favor, compruebe su conexión a internet.";
+      actionsContainer.innerHTML = '';
+    }
+  }
 }

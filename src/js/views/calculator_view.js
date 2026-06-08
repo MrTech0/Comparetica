@@ -17,10 +17,13 @@ let lastComparisonData = {
   currentGasCost: 0
 };
 
+let bypassTariffCheck = false;
+
 export function initCalculatorView() {
   setupEnergyTypeToggle();
   setupLightTariffTypeToggle();
   setupCalcFormSubmit();
+  setupCalcFormReset();
 
   // Toggles de Autoconsumo
   const hasExcedenteCheckbox = document.getElementById('calc-light-has-excedente');
@@ -155,9 +158,47 @@ function setupCalcFormSubmit() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    const energyType = document.getElementById('calc-energy-type').value;
+
+    if (!bypassTariffCheck) {
+      const lightTariffs = (energyType === 'LUZ' || energyType === 'DUAL') ? await getTarifasLuz() : [];
+      const gasTariffs = (energyType === 'GAS' || energyType === 'DUAL') ? await getTarifasGas() : [];
+
+      const missingLuz = (energyType === 'LUZ' || energyType === 'DUAL') && lightTariffs.length === 0;
+      const missingGas = (energyType === 'GAS' || energyType === 'DUAL') && gasTariffs.length === 0;
+
+      if (missingLuz || missingGas) {
+        let msg = "";
+        if (missingLuz && missingGas) {
+          msg = "No tiene dada de alta ninguna tarifa de Luz ni de Gas en la base de datos para poder realizar la comparativa.";
+        } else if (missingLuz) {
+          msg = "No tiene dada de alta ninguna tarifa de Luz en la base de datos para poder realizar la comparativa.";
+        } else if (missingGas) {
+          msg = "No tiene dada de alta ninguna tarifa de Gas en la base de datos para poder realizar la comparativa.";
+        }
+        msg += "\n\n¿Desea omitir esta alerta y continuar para calcular únicamente el gasto actual del cliente, o ir a registrarlas en la pestaña de 'Tarifas Luz'?";
+
+        const choice = await showNoTariffsAlert(msg);
+        if (choice === 'redirect') {
+          const navTariffs = document.getElementById('nav-tariffs');
+          const tabBtnLuz = document.getElementById('tab-btn-luz');
+          if (navTariffs) navTariffs.click();
+          if (tabBtnLuz) tabBtnLuz.click();
+          return;
+        } else if (choice === 'omit') {
+          bypassTariffCheck = true;
+          form.requestSubmit();
+          return;
+        } else {
+          return;
+        }
+      }
+    }
+
+    bypassTariffCheck = false;
+
     const clientName = document.getElementById('calc-client-name').value.trim();
     const clientCups = document.getElementById('calc-client-cups').value.trim();
-    const energyType = document.getElementById('calc-energy-type').value;
 
     // Resetear contenedores de resultados
     document.getElementById('results-light-list').innerHTML = '';
@@ -395,6 +436,79 @@ function setupCalcFormSubmit() {
   });
 }
 
+function setupCalcFormReset() {
+  const form = document.getElementById('calc-form');
+  if (!form) return;
+
+  form.addEventListener('reset', () => {
+    // 1. Ocultar el contenedor de resultados
+    const resultsWrapper = document.getElementById('calc-results-wrapper');
+    if (resultsWrapper) {
+      resultsWrapper.style.display = 'none';
+    }
+
+    // 2. Limpiar y ocultar las listas de propuestas
+    const resultsLightList = document.getElementById('results-light-list');
+    if (resultsLightList) resultsLightList.innerHTML = '';
+
+    const resultsGasList = document.getElementById('results-gas-list');
+    if (resultsGasList) resultsGasList.innerHTML = '';
+
+    const resultsLightContainer = document.getElementById('results-light-container');
+    if (resultsLightContainer) resultsLightContainer.style.display = 'none';
+
+    const resultsGasContainer = document.getElementById('results-gas-container');
+    if (resultsGasContainer) resultsGasContainer.style.display = 'none';
+
+    // 3. Resetear el Gasto Anualizado Actual Estimado en pantalla
+    const currentAnnualCost = document.getElementById('calc-current-annual-cost');
+    if (currentAnnualCost) {
+      currentAnnualCost.innerText = '0,00 €';
+    }
+
+    // 4. Limpiar los datos temporales del último cálculo
+    lastComparisonData = {
+      clientName: '',
+      clientCups: '',
+      energyType: '',
+      lightInput: null,
+      gasInput: null,
+      bestLightTariff: null,
+      bestGasTariff: null,
+      currentLightCost: 0,
+      currentGasCost: 0
+    };
+
+    bypassTariffCheck = false;
+
+    // 5. Mostrar el formulario y ocultar el botón de modificar
+    const formContainer = document.getElementById('calc-form-container');
+    if (formContainer) {
+      formContainer.style.display = 'block';
+    }
+    const modifyBtn = document.getElementById('calc-modify-btn');
+    if (modifyBtn) {
+      modifyBtn.style.display = 'none';
+    }
+
+    // 6. Disparar eventos de cambio para sincronizar la visibilidad de bloques y selectores customizados
+    setTimeout(() => {
+      const energyTypeSelect = document.getElementById('calc-energy-type');
+      if (energyTypeSelect) {
+        energyTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      const lightTariffTypeSelect = document.getElementById('calc-light-tariff-type');
+      if (lightTariffTypeSelect) {
+        lightTariffTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      const hasExcedenteCheckbox = document.getElementById('calc-light-has-excedente');
+      if (hasExcedenteCheckbox) {
+        hasExcedenteCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }, 0);
+  });
+}
+
 // --- Renderizar Tarjetas de Resultados ---
 function renderResultsList(containerId, results, type) {
   const container = document.getElementById(containerId);
@@ -612,8 +726,18 @@ function resolveCommission(tariff, consumoAnual) {
       const tramos = JSON.parse(tariff.comision_tramos);
       if (Array.isArray(tramos) && tramos.length > 0) {
         for (const tr of tramos) {
-          if (consumoAnual <= tr.hasta) {
-            return tr.comision;
+          if (tr.tipo === 'hasta' || !tr.tipo) {
+            if (consumoAnual <= tr.hasta) {
+              return tr.comision;
+            }
+          } else if (tr.tipo === 'rango') {
+            if (consumoAnual > tr.desde && consumoAnual <= tr.hasta) {
+              return tr.comision;
+            }
+          } else if (tr.tipo === 'desde') {
+            if (consumoAnual > tr.desde) {
+              return tr.comision;
+            }
           }
         }
         return tramos[tramos.length - 1].comision;
@@ -623,4 +747,38 @@ function resolveCommission(tariff, consumoAnual) {
     }
   }
   return tariff.comision || 0;
+}
+
+function showNoTariffsAlert(mensaje) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('dialog-no-tariffs');
+    const msgEl = document.getElementById('dialog-no-tariffs-message');
+    const btnOmit = document.getElementById('dialog-no-tariffs-omit');
+    const btnRedirect = document.getElementById('dialog-no-tariffs-redirect');
+
+    if (!overlay || !msgEl || !btnOmit || !btnRedirect) {
+      resolve('omit');
+      return;
+    }
+
+    msgEl.innerText = mensaje;
+
+    // Clonar botones para limpiar event listeners previos
+    const omitClone = btnOmit.cloneNode(true);
+    const redirectClone = btnRedirect.cloneNode(true);
+    btnOmit.replaceWith(omitClone);
+    btnRedirect.replaceWith(redirectClone);
+
+    omitClone.addEventListener('click', () => {
+      overlay.classList.remove('active');
+      resolve('omit');
+    });
+
+    redirectClone.addEventListener('click', () => {
+      overlay.classList.remove('active');
+      resolve('redirect');
+    });
+
+    overlay.classList.add('active');
+  });
 }

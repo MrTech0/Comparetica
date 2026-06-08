@@ -113,6 +113,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 use tauri::Manager;
@@ -135,7 +136,8 @@ pub fn run() {
             get_company_config,
             save_company_config,
             delete_company_logo,
-            factory_reset
+            factory_reset,
+            restart_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -476,4 +478,9 @@ fn factory_reset(app_handle: tauri::AppHandle) -> Result<String, String> {
     // El frontend se encarga de vaciar las tablas con DELETE queries y recargar la página.
 
     Ok("Configuración y logotipos eliminados con éxito.".to_string())
+}
+
+#[tauri::command]
+fn restart_app(app_handle: tauri::AppHandle) {
+    app_handle.restart();
 }

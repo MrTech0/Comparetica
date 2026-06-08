@@ -172,7 +172,12 @@ function setupTarifasLuz() {
     });
   }
 
-  openBtn.addEventListener('click', () => {
+  openBtn.addEventListener('click', async () => {
+    const coms = await getComercializadoras();
+    if (!coms || coms.length === 0) {
+      window.showToast("No se puede registrar una tarifa porque no hay ninguna comercializadora creada. Por favor, cree una comercializadora primero.", "warning");
+      return;
+    }
     document.getElementById('dialog-light-title').innerText = "Registrar Tarifa Luz";
     document.getElementById('dialog-light-id').value = "";
     form.reset();
@@ -207,6 +212,10 @@ function setupTarifasLuz() {
     e.preventDefault();
     const id = document.getElementById('dialog-light-id').value;
     const comercializadoraId = parseInt(document.getElementById('dialog-light-com').value);
+    if (isNaN(comercializadoraId) || !comercializadoraId) {
+      window.showToast("No se puede guardar la tarifa porque no hay ninguna comercializadora seleccionada.", "error");
+      return;
+    }
     const nombre = document.getElementById('dialog-light-name').value.trim();
     const tipoTarifa = typeSelect ? typeSelect.value : '2.0TD';
 
@@ -235,14 +244,34 @@ function setupTarifasLuz() {
     } else {
       const rows = document.querySelectorAll('#dialog-light-tramos-container .comision-tramo-row');
       const tramos = [];
-      rows.forEach(row => {
-        const hasta = parseFloat(row.querySelector('.tramo-hasta').value);
-        const valCom = parseFloat(row.querySelector('.tramo-comision').value);
-        if (!isNaN(hasta) && !isNaN(valCom)) {
-          tramos.push({ hasta, comision: valCom });
+      rows.forEach(r => {
+        const tipo = r.querySelector('.tramo-tipo').value;
+        const valCom = parseFloat(r.querySelector('.tramo-comision').value);
+        if (isNaN(valCom)) return;
+
+        if (tipo === 'hasta') {
+          const hasta = parseInt(r.querySelector('.tramo-hasta').value);
+          if (!isNaN(hasta)) {
+            tramos.push({ tipo, hasta, comision: valCom });
+          }
+        } else if (tipo === 'rango') {
+          const desde = parseInt(r.querySelector('.tramo-desde').value);
+          const hasta = parseInt(r.querySelector('.tramo-hasta').value);
+          if (!isNaN(desde) && !isNaN(hasta)) {
+            tramos.push({ tipo, desde, hasta, comision: valCom });
+          }
+        } else if (tipo === 'desde') {
+          const desde = parseInt(r.querySelector('.tramo-desde').value);
+          if (!isNaN(desde)) {
+            tramos.push({ tipo, desde, comision: valCom });
+          }
         }
       });
-      tramos.sort((a, b) => a.hasta - b.hasta);
+      tramos.sort((a, b) => {
+        const minA = a.tipo === 'hasta' ? 0 : a.desde;
+        const minB = b.tipo === 'hasta' ? 0 : b.desde;
+        return minA - minB;
+      });
       comisionTramos = JSON.stringify(tramos);
     }
 
@@ -346,7 +375,16 @@ async function loadTarifasLuz() {
         try {
           const tramos = JSON.parse(t.comision_tramos);
           if (Array.isArray(tramos) && tramos.length > 0) {
-            comisionHtml = tramos.map(tr => `&le; ${tr.hasta} kWh: ${tr.comision.toFixed(2)} &euro;`).join('<br>');
+            comisionHtml = tramos.map(tr => {
+              if (tr.tipo === 'hasta' || !tr.tipo) {
+                return `&le; ${tr.hasta} kWh: ${tr.comision.toFixed(2)} &euro;`;
+              } else if (tr.tipo === 'rango') {
+                return `${tr.desde} - ${tr.hasta} kWh: ${tr.comision.toFixed(2)} &euro;`;
+              } else if (tr.tipo === 'desde') {
+                return `&gt; ${tr.desde} kWh: ${tr.comision.toFixed(2)} &euro;`;
+              }
+              return `${tr.comision.toFixed(2)} &euro;`;
+            }).join('<br>');
           } else {
             comisionHtml = `${t.comision.toFixed(2)} &euro;`;
           }
@@ -420,7 +458,7 @@ async function loadTarifasLuz() {
             const tramos = JSON.parse(t.comision_tramos);
             if (Array.isArray(tramos)) {
               tramos.forEach(tr => {
-                addTramoRow('light', tr.hasta, tr.comision);
+                addTramoRow('light', tr);
               });
             }
           } catch(e) {
@@ -463,7 +501,12 @@ function setupTarifasGas() {
   const closeBtn = document.getElementById('dialog-gas-close');
   const form = document.getElementById('dialog-gas-form');
 
-  openBtn.addEventListener('click', () => {
+  openBtn.addEventListener('click', async () => {
+    const coms = await getComercializadoras();
+    if (!coms || coms.length === 0) {
+      window.showToast("No se puede registrar una tarifa porque no hay ninguna comercializadora creada. Por favor, cree una comercializadora primero.", "warning");
+      return;
+    }
     document.getElementById('dialog-gas-title').innerText = "Registrar Tarifa Gas";
     document.getElementById('dialog-gas-id').value = "";
     form.reset();
@@ -494,6 +537,10 @@ function setupTarifasGas() {
     e.preventDefault();
     const id = document.getElementById('dialog-gas-id').value;
     const comercializadoraId = parseInt(document.getElementById('dialog-gas-com').value);
+    if (isNaN(comercializadoraId) || !comercializadoraId) {
+      window.showToast("No se puede guardar la tarifa porque no hay ninguna comercializadora seleccionada.", "error");
+      return;
+    }
     const nombre = document.getElementById('dialog-gas-name').value.trim();
     const tipoTarifa = document.getElementById('dialog-gas-tariff-type').value;
     const terminoFijo = parseFloat(document.getElementById('dialog-gas-fixed').value);
@@ -507,14 +554,34 @@ function setupTarifasGas() {
     } else {
       const rows = document.querySelectorAll('#dialog-gas-tramos-container .comision-tramo-row');
       const tramos = [];
-      rows.forEach(row => {
-        const hasta = parseFloat(row.querySelector('.tramo-hasta').value);
-        const valCom = parseFloat(row.querySelector('.tramo-comision').value);
-        if (!isNaN(hasta) && !isNaN(valCom)) {
-          tramos.push({ hasta, comision: valCom });
+      rows.forEach(r => {
+        const tipo = r.querySelector('.tramo-tipo').value;
+        const valCom = parseFloat(r.querySelector('.tramo-comision').value);
+        if (isNaN(valCom)) return;
+
+        if (tipo === 'hasta') {
+          const hasta = parseInt(r.querySelector('.tramo-hasta').value);
+          if (!isNaN(hasta)) {
+            tramos.push({ tipo, hasta, comision: valCom });
+          }
+        } else if (tipo === 'rango') {
+          const desde = parseInt(r.querySelector('.tramo-desde').value);
+          const hasta = parseInt(r.querySelector('.tramo-hasta').value);
+          if (!isNaN(desde) && !isNaN(hasta)) {
+            tramos.push({ tipo, desde, hasta, comision: valCom });
+          }
+        } else if (tipo === 'desde') {
+          const desde = parseInt(r.querySelector('.tramo-desde').value);
+          if (!isNaN(desde)) {
+            tramos.push({ tipo, desde, comision: valCom });
+          }
         }
       });
-      tramos.sort((a, b) => a.hasta - b.hasta);
+      tramos.sort((a, b) => {
+        const minA = a.tipo === 'hasta' ? 0 : a.desde;
+        const minB = b.tipo === 'hasta' ? 0 : b.desde;
+        return minA - minB;
+      });
       comisionTramos = JSON.stringify(tramos);
     }
 
@@ -589,7 +656,16 @@ async function loadTarifasGas() {
         try {
           const tramos = JSON.parse(t.comision_tramos);
           if (Array.isArray(tramos) && tramos.length > 0) {
-            comisionHtml = tramos.map(tr => `&le; ${tr.hasta} kWh: ${tr.comision.toFixed(2)} &euro;`).join('<br>');
+            comisionHtml = tramos.map(tr => {
+              if (tr.tipo === 'hasta' || !tr.tipo) {
+                return `&le; ${tr.hasta} kWh: ${tr.comision.toFixed(2)} &euro;`;
+              } else if (tr.tipo === 'rango') {
+                return `${tr.desde} - ${tr.hasta} kWh: ${tr.comision.toFixed(2)} &euro;`;
+              } else if (tr.tipo === 'desde') {
+                return `&gt; ${tr.desde} kWh: ${tr.comision.toFixed(2)} &euro;`;
+              }
+              return `${tr.comision.toFixed(2)} &euro;`;
+            }).join('<br>');
           } else {
             comisionHtml = `${t.comision.toFixed(2)} &euro;`;
           }
@@ -643,7 +719,7 @@ async function loadTarifasGas() {
             const tramos = JSON.parse(t.comision_tramos);
             if (Array.isArray(tramos)) {
               tramos.forEach(tr => {
-                addTramoRow('gas', tr.hasta, tr.comision);
+                addTramoRow('gas', tr);
               });
             }
           } catch(e) {
@@ -721,7 +797,7 @@ function setupComisionTramosBuilder(prefix) {
       fijaGroup.style.display = 'none';
       tramosGroup.style.display = 'block';
       if (tramosContainer.children.length === 0) {
-        addTramoRow(prefix, null, null);
+        addTramoRow(prefix, null);
       }
     } else {
       fijaGroup.style.display = 'block';
@@ -730,31 +806,84 @@ function setupComisionTramosBuilder(prefix) {
   });
 
   addBtn.addEventListener('click', () => {
-    addTramoRow(prefix, null, null);
+    addTramoRow(prefix, null);
   });
 }
 
-function addTramoRow(prefix, hasta, comision) {
+function addTramoRow(prefix, tr = null) {
   const container = document.getElementById(`dialog-${prefix}-tramos-container`);
   if (!container) return;
 
   const row = document.createElement('div');
   row.className = 'comision-tramo-row';
   
-  const valHasta = hasta !== null ? hasta : '';
-  const valComision = comision !== null ? comision : '';
+  const tipo = tr && tr.tipo ? tr.tipo : 'hasta';
+  const unidad = tr && tr.unidad ? tr.unidad : 'kW';
+  const valDesde = tr && tr.desde !== undefined && tr.desde !== null ? tr.desde : '';
+  const valHasta = tr && tr.hasta !== undefined && tr.hasta !== null ? tr.hasta : '';
+  const valComision = tr && tr.comision !== undefined && tr.comision !== null ? tr.comision : '';
 
   row.innerHTML = `
-    <input type="number" class="m3-input tramo-hasta" placeholder="Hasta kWh" value="${valHasta}" min="0" step="1" required />
-    <input type="number" class="m3-input tramo-comision" placeholder="Comisión €" value="${valComision}" min="0" step="0.01" required />
-    <button type="button" class="comision-tramo-remove-btn" title="Eliminar tramo">
-      <span class="material-symbols-outlined">delete</span>
+    <div style="width: 95px; flex-shrink: 0;">
+      <select class="m3-select tramo-tipo m3-select-sm">
+        <option value="hasta" ${tipo === 'hasta' ? 'selected' : ''}>Hasta</option>
+        <option value="rango" ${tipo === 'rango' ? 'selected' : ''}>Rango</option>
+        <option value="desde" ${tipo === 'desde' ? 'selected' : ''}>Desde</option>
+      </select>
+    </div>
+    <div class="tramo-inputs-wrapper" style="display: flex; align-items: center; gap: 4px; flex: 1.5; min-width: 90px;">
+      <!-- Rellenado dinámicamente -->
+    </div>
+    <div style="width: 70px; flex-shrink: 0;">
+      <select class="m3-select tramo-unidad m3-select-sm">
+        <option value="kW" ${unidad === 'kW' ? 'selected' : ''}>kW</option>
+        <option value="mW" ${unidad === 'mW' ? 'selected' : ''}>mW</option>
+        <option value="gW" ${unidad === 'gW' ? 'selected' : ''}>gW</option>
+      </select>
+    </div>
+    <div style="flex: 1; min-width: 90px;">
+      <input type="number" class="m3-input tramo-comision" placeholder="Comisión" value="${valComision}" min="0" step="0.01" style="width: 100%;" required />
+    </div>
+    <button type="button" class="m3-btn-icon comision-tramo-remove-btn" title="Eliminar tramo" style="flex-shrink: 0; width: 36px; height: 36px;">
+      <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
     </button>
   `;
+
+  const tipoSelect = row.querySelector('.tramo-tipo');
+  const wrapper = row.querySelector('.tramo-inputs-wrapper');
+
+  const updateInputs = () => {
+    const currentTipo = tipoSelect.value;
+    if (currentTipo === 'hasta') {
+      wrapper.innerHTML = `<input type="number" class="m3-input tramo-hasta" placeholder="Hasta" value="${tipoSelect.dataset.lastHasta || valHasta}" min="0" step="1" style="width: 100%; min-width: 0;" required />`;
+    } else if (currentTipo === 'rango') {
+      wrapper.innerHTML = `
+        <input type="number" class="m3-input tramo-desde" placeholder="Desde" value="${tipoSelect.dataset.lastDesde || valDesde}" min="0" step="1" style="width: 50%; min-width: 0;" required />
+        <span style="flex-shrink: 0; color: var(--color-on-surface-variant); font-size: 11px;">-</span>
+        <input type="number" class="m3-input tramo-hasta" placeholder="Hasta" value="${tipoSelect.dataset.lastHasta || valHasta}" min="0" step="1" style="width: 50%; min-width: 0;" required />
+      `;
+    } else if (currentTipo === 'desde') {
+      wrapper.innerHTML = `<input type="number" class="m3-input tramo-desde" placeholder="Desde" value="${tipoSelect.dataset.lastDesde || valDesde}" min="0" step="1" style="width: 100%; min-width: 0;" required />`;
+    }
+  };
+
+  tipoSelect.addEventListener('change', () => {
+    const hastaInput = row.querySelector('.tramo-hasta');
+    const desdeInput = row.querySelector('.tramo-desde');
+    if (hastaInput) tipoSelect.dataset.lastHasta = hastaInput.value;
+    if (desdeInput) tipoSelect.dataset.lastDesde = desdeInput.value;
+    updateInputs();
+  });
+
+  updateInputs();
 
   row.querySelector('.comision-tramo-remove-btn').addEventListener('click', () => {
     row.remove();
   });
 
   container.appendChild(row);
+
+  if (window.initCustomSelects) {
+    window.initCustomSelects();
+  }
 }
