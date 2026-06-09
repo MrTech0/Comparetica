@@ -43,15 +43,44 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build and Publish Tauri App
+      - name: Read Release Notes
+        id: read_notes
+        shell: bash
+        run: |
+          if [ -f ./RELEASE_NOTES.md ]; then
+            echo "BODY<<EOF" >> $GITHUB_OUTPUT
+            cat ./RELEASE_NOTES.md >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "BODY=Release auto-generada y firmada criptográficamente por el pipeline de GitHub Actions." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: 'Comparetica v__VERSION__'
-          releaseBody: 'Release auto-generada y firmada criptográficamente por el pipeline de GitHub Actions.'
-          releaseDraft: false
+          includeRelease: false
+
+      - name: Rename Installer and Signature (Remove _en-US)
+        shell: bash
+        run: |
+          cd src-tauri/target/release/bundle/msi/
+          for f in *en-US*; do
+            mv "$f" "${f//_en-US/}"
+          done
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Comparetica ${{ github.ref_name }}
+          body: ${{ steps.read_notes.outputs.BODY }}
+          draft: false
           prerelease: false
+          files: |
+            src-tauri/target/release/bundle/msi/Comparetica_*_x64.msi
+            src-tauri/target/release/bundle/msi/Comparetica_*_x64.msi.sig
+
