@@ -71,14 +71,13 @@ jobs:
           done
 
       - name: Create Release and Upload Assets
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Comparetica ${{ github.ref_name }}
-          body: ${{ steps.read_notes.outputs.BODY }}
-          draft: false
-          prerelease: false
-          files: |
-            src-tauri/target/release/bundle/msi/Comparetica_*_x64.msi
-            src-tauri/target/release/bundle/msi/Comparetica_*_x64.msi.sig
+        shell: bash
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            src-tauri/target/release/bundle/msi/Comparetica_*_x64.msi \
+            src-tauri/target/release/bundle/msi/Comparetica_*_x64.msi.sig \
+            --title "Comparetica ${{ github.ref_name }}" \
+            --notes "${{ steps.read_notes.outputs.BODY }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
