@@ -53,5 +53,5 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'Comparetica v__VERSION__'
           releaseBody: 'Release auto-generada y firmada criptográficamente por el pipeline de GitHub Actions.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
