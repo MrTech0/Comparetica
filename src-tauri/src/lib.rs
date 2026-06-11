@@ -137,7 +137,8 @@ pub fn run() {
             save_company_config,
             delete_company_logo,
             factory_reset,
-            restart_app
+            restart_app,
+            log_frontend_error
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -483,4 +484,9 @@ fn factory_reset(app_handle: tauri::AppHandle) -> Result<String, String> {
 #[tauri::command]
 fn restart_app(app_handle: tauri::AppHandle) {
     app_handle.restart();
+}
+
+#[tauri::command]
+fn log_frontend_error(error: String) {
+    println!("FRONTEND ERROR: {}", error);
 }

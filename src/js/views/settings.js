@@ -490,9 +490,12 @@ function setupUpdates() {
       }
     } catch (error) {
       console.error(error);
+      if (window.__TAURI__ && window.__TAURI__.core) {
+        window.__TAURI__.core.invoke('log_frontend_error', { error: `Manual check error: ${error.message || error.toString()}` }).catch(err => console.error(err));
+      }
       statusTitle.textContent = "Error de Conexión";
       statusTitle.style.color = "var(--color-error)";
-      statusDesc.textContent = "No se pudo conectar con el servidor de actualizaciones. Por favor, compruebe su conexión a internet.";
+      statusDesc.textContent = `No se pudo conectar con el servidor de actualizaciones: ${error.message || error.toString() || 'Error desconocido'}\n\nPor favor, compruebe su conexión a internet.`;
       actionsContainer.innerHTML = '';
     }
   }

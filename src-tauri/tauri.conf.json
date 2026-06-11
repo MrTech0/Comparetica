@@ -35,7 +35,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://raw.githubusercontent.com/MrTech0/Comparetica/main/updates/{{current_version}}.json"
+        "https://raw.githubusercontent.com/MrTech0/Comparetica/main/updates/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE4M0YwOTY5QUVERTM5RTIKUldUaU9kNnVhUWsvR0Zpa2JxUTRKd1kzZVJvZWdkRTJTR3N3VW96ZnVUWFBwTDJhbHU1Mi83NXoK"
     }

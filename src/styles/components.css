@@ -286,6 +286,8 @@
   opacity: 0;
   width: 0;
   height: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .m3-switch-label {
@@ -334,6 +336,8 @@ input[type="checkbox"]:checked + .m3-switch::after {
   opacity: 0;
   width: 0;
   height: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* ==========================================================================
