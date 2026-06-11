@@ -281,6 +281,13 @@
   user-select: none;
 }
 
+.m3-switch-container input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
 .m3-switch-label {
   font-size: 14px;
   font-weight: 500;
