@@ -1,11 +1,11 @@
 {
-  "version": "0.1.6",
-  "notes": "Implementación del actualizador de software automático, pestaña de Actualizaciones en Configuración, y correcciones de estilo.",
-  "pub_date": "2026-06-09T00:34:37Z",
+  "version": "0.1.7",
+  "notes": "Corrección de estilo en checkbox duplicado de actualizaciones y mejoras en el detalle de errores de conexión y logging.",
+  "pub_date": "2026-06-11T15:22:33Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR1A0d1ZqbXBYd2hxTzlQeWhGQzZVQTdJQzN3NnZTdk1aL09ONzVwVWg0RTRKTC9UUnRRYVdCVTNzWGhEbW9sVlpLU1Z0d3Nyd0JIOHRUcWt5TmNDRkFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwOTY1Mjc0CWZpbGU6Q29tcGFyZXRpY2FfMC4xLjZfeDY0X2VuLVVTLm1zaQpDUXJhaHJ6bC90Z3ZGRVdBNDRLaWdyU0svMmJYcFZYZnVDMlJMbFBGamV6NzJ2UGxuU0tKN3ZaM2Y2c09ScmFBSHFlV2JRbUE1Y0hCRUFQeThOYWNBdz09Cg==",
-      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.1.6/Comparetica_0.1.6_x64.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0pHRzdZVnorVDU2TE52TmN2elNQU3dzTU43T2Y2OGlFZUlQYlBVdTVHQjhBUi8wT0d1UE0zb01NVmpGL0lvRDdFZ296UFBmMlJvejJmcjBVRE9EZVFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMTkxMzQzCWZpbGU6Q29tcGFyZXRpY2FfMC4xLjdfeDY0X2VuLVVTLm1zaQowZm4zZmQyeWx6UTd0ZXJjVzBkcUxQLzlmbWNVTHdVd3hZSWpkOFJ5QTlyUnNkZzUrdk5mdU9sOEpPdlBNNlZOVlFWdGpQMng5ejlMRlFUL2g5TFhEdz09Cg==",
+      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.1.7/Comparetica_0.1.7_x64.msi"
     }
   }
 }

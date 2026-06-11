@@ -1,0 +1,11 @@
+{
+  "version": "0.1.7",
+  "notes": "Ya estás utilizando la última versión de Comparetica.",
+  "pub_date": "2026-06-11T15:22:33Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0JHRzdZVnorVDU2TE52TmN2elNQU3dzTU43T2Y2OGlFZUlQYlBVdTVHQjhBUi8wT0d1UE0zb01NVmpGL0lvRDdFZ296UFBmMlJvejJmcjBVRE9EZVFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMTkxMzQzCWZpbGU6Q29tcGFyZXRpY2FfMC4xLjdfeDY0X2VuLVVTLm1zaQowZm4zZmQyeWx6UTd0ZXJjVzBkcUxQLzlmbWNVTHdVd3hZSWpkOFJ5QTlyUnNkZzUrdk5mdU9sOEpPdlBNNlZOVlFWdGpQMng5ejlMRlFUL2g5TFhEdz09Cg==",
+      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.1.7/Comparetica_0.1.7_x64.msi"
+    }
+  }
+}
