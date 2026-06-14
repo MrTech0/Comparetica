@@ -1,6 +1,15 @@
 /* src/js/components/date_range_picker.js */
 
+/**
+ * Componente de calendario interactivo para seleccionar rangos de fechas (inicio - fin)
+ * con estética adaptada a Material Design 3.
+ */
 export class M3DateRangePicker {
+  /**
+   * Crea una instancia del selector de rango de fechas.
+   * @param {string} containerId - ID del elemento HTML contenedor.
+   * @param {function(Date|null, Date|null): void} onChangeCallback - Callback que recibe la fecha de inicio y de fin al cambiar el rango.
+   */
   constructor(containerId, onChangeCallback) {
     this.container = document.getElementById(containerId);
     if (!this.container) return;
@@ -8,7 +17,9 @@ export class M3DateRangePicker {
     this.input = this.container.querySelector('input');
     this.onChangeCallback = onChangeCallback;
 
+    /** @type {Date|null} Fecha de inicio seleccionada */
     this.startDate = null;
+    /** @type {Date|null} Fecha de fin seleccionada */
     this.endDate = null;
 
     const today = new Date();
@@ -25,6 +36,10 @@ export class M3DateRangePicker {
     this.render();
   }
 
+  /**
+   * Inicializa la estructura del menú desplegable del calendario en el DOM.
+   * @private
+   */
   initDOM() {
     // Create dropdown element
     this.dropdown = document.createElement('div');
@@ -83,6 +98,10 @@ export class M3DateRangePicker {
     this.applyBtn = this.dropdown.querySelector('.btn-apply');
   }
 
+  /**
+   * Vincula los controladores de eventos para las interacciones del calendario.
+   * @private
+   */
   bindEvents() {
     // Toggle dropdown
     this.input.addEventListener('click', (e) => {
@@ -140,6 +159,9 @@ export class M3DateRangePicker {
     });
   }
 
+  /**
+   * Muestra u oculta el calendario desplegable.
+   */
   toggleDropdown() {
     if (this.isOpen) {
       this.closeDropdown();
@@ -157,6 +179,9 @@ export class M3DateRangePicker {
     }
   }
 
+  /**
+   * Cierra el calendario desplegable y oculta los menús de selección de mes/año.
+   */
   closeDropdown() {
     this.dropdown.style.display = 'none';
     this.isOpen = false;
@@ -164,6 +189,10 @@ export class M3DateRangePicker {
     this.yearSelectContainer.classList.remove('open');
   }
 
+  /**
+   * Cambia el mes actual visualizado en el calendario.
+   * @param {number} direction - Dirección del cambio: `1` para el mes siguiente, `-1` para el anterior.
+   */
   changeMonth(direction) {
     this.currentMonth += direction;
     if (this.currentMonth < 0) {
@@ -176,6 +205,9 @@ export class M3DateRangePicker {
     this.render();
   }
 
+  /**
+   * Limpia el rango de fechas seleccionado, borra el input y cierra el desplegable.
+   */
   clear() {
     this.startDate = null;
     this.endDate = null;
@@ -187,6 +219,10 @@ export class M3DateRangePicker {
     }
   }
 
+  /**
+   * Confirma la selección del rango de fechas. Si solo se seleccionó una fecha,
+   * se asume como rango de un solo día.
+   */
   apply() {
     if (this.startDate && !this.endDate) {
       this.endDate = new Date(this.startDate);
@@ -198,6 +234,10 @@ export class M3DateRangePicker {
     }
   }
 
+  /**
+   * Actualiza el valor del input de texto de acuerdo con las fechas seleccionadas.
+   * @private
+   */
   updateInputText() {
     if (this.startDate && this.endDate) {
       const format = (d) => {
@@ -212,6 +252,9 @@ export class M3DateRangePicker {
     }
   }
 
+  /**
+   * Renderiza dinámicamente los días, meses y años en el calendario.
+   */
   render() {
     // Render month custom options list
     this.monthOptions.innerHTML = '';
@@ -316,6 +359,11 @@ export class M3DateRangePicker {
     }
   }
 
+  /**
+   * Gestiona la selección interactiva de fechas al hacer clic.
+   * @param {Date} date - Objeto de fecha seleccionado.
+   * @private
+   */
   selectDate(date) {
     if (!this.startDate || (this.startDate && this.endDate)) {
       this.startDate = date;

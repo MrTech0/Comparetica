@@ -369,16 +369,30 @@ function createMockDb() {
 
 // --- Comercializadoras ---
 
+/**
+ * Obtiene la lista completa de comercializadoras ordenadas alfabéticamente.
+ * @returns {Promise<Array<Object>>} Lista de comercializadoras.
+ */
 export async function getComercializadoras() {
   const db = await getDb();
   return await db.select("SELECT * FROM comercializadoras ORDER BY nombre ASC;");
 }
 
+/**
+ * Registra una nueva comercializadora en la base de datos.
+ * @param {string} nombre - Nombre de la comercializadora.
+ * @returns {Promise<Object>} Resultado de la ejecución de la consulta.
+ */
 export async function addComercializadora(nombre) {
   const db = await getDb();
   return await db.execute("INSERT INTO comercializadoras (nombre) VALUES ($1);", [nombre]);
 }
 
+/**
+ * Elimina una comercializadora por su identificador.
+ * @param {number} id - Identificador de la comercializadora.
+ * @returns {Promise<Object>} Resultado de la ejecución de la consulta.
+ */
 export async function deleteComercializadora(id) {
   const db = await getDb();
   return await db.execute("DELETE FROM comercializadoras WHERE id = $1;", [id]);
@@ -386,6 +400,11 @@ export async function deleteComercializadora(id) {
 
 // --- Tarifas de Luz ---
 
+/**
+ * Obtiene la lista de tarifas de luz de una comercializadora específica o todas.
+ * @param {number|null} [comercializadoraId=null] - ID de la comercializadora a filtrar (opcional).
+ * @returns {Promise<Array<Object>>} Lista de tarifas de luz.
+ */
 export async function getTarifasLuz(comercializadoraId = null) {
   const db = await getDb();
   if (comercializadoraId) {
@@ -399,6 +418,29 @@ export async function getTarifasLuz(comercializadoraId = null) {
   );
 }
 
+/**
+ * Registra una nueva tarifa de luz con sus 6 periodos correspondientes.
+ * @param {number} comercializadoraId - ID de la comercializadora asociada.
+ * @param {string} nombre - Nombre descriptivo de la tarifa.
+ * @param {string} tipoTarifa - Tipo de tarifa ('2.0TD' o '3.0TD').
+ * @param {number} potenciaP1 - Precio potencia P1 (€/kW/año).
+ * @param {number} potenciaP2 - Precio potencia P2 (€/kW/año).
+ * @param {number} potenciaP3 - Precio potencia P3 (€/kW/año).
+ * @param {number} potenciaP4 - Precio potencia P4 (€/kW/año).
+ * @param {number} potenciaP5 - Precio potencia P5 (€/kW/año).
+ * @param {number} potenciaP6 - Precio potencia P6 (€/kW/año).
+ * @param {number} energiaP1 - Precio energía P1 (€/kWh).
+ * @param {number} energiaP2 - Precio energía P2 (€/kWh).
+ * @param {number} energiaP3 - Precio energía P3 (€/kWh).
+ * @param {number} energiaP4 - Precio energía P4 (€/kWh).
+ * @param {number} energiaP5 - Precio energía P5 (€/kWh).
+ * @param {number} energiaP6 - Precio energía P6 (€/kWh).
+ * @param {number} excedente - Precio compensación excedente (€/kWh).
+ * @param {number} comision - Comisión base (€).
+ * @param {string} comisionTramos - Cadena JSON con tramos de comisión según consumo.
+ * @param {string} notas - Comentarios o notas aclaratorias.
+ * @returns {Promise<Object>} Resultado de la inserción.
+ */
 export async function addTarifaLuz(
   comercializadoraId, nombre, tipoTarifa,
   potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
@@ -422,6 +464,29 @@ export async function addTarifaLuz(
   );
 }
 
+/**
+ * Actualiza una tarifa de luz existente.
+ * @param {number} id - ID de la tarifa a modificar.
+ * @param {string} nombre - Nombre descriptivo de la tarifa.
+ * @param {string} tipoTarifa - Tipo de tarifa ('2.0TD' o '3.0TD').
+ * @param {number} potenciaP1 - Precio potencia P1 (€/kW/año).
+ * @param {number} potenciaP2 - Precio potencia P2 (€/kW/año).
+ * @param {number} potenciaP3 - Precio potencia P3 (€/kW/año).
+ * @param {number} potenciaP4 - Precio potencia P4 (€/kW/año).
+ * @param {number} potenciaP5 - Precio potencia P5 (€/kW/año).
+ * @param {number} potenciaP6 - Precio potencia P6 (€/kW/año).
+ * @param {number} energiaP1 - Precio energía P1 (€/kWh).
+ * @param {number} energiaP2 - Precio energía P2 (€/kWh).
+ * @param {number} energiaP3 - Precio energía P3 (€/kWh).
+ * @param {number} energiaP4 - Precio energía P4 (€/kWh).
+ * @param {number} energiaP5 - Precio energía P5 (€/kWh).
+ * @param {number} energiaP6 - Precio energía P6 (€/kWh).
+ * @param {number} excedente - Precio compensación excedente (€/kWh).
+ * @param {number} comision - Comisión base (€).
+ * @param {string} comisionTramos - Cadena JSON con tramos de comisión.
+ * @param {string} notas - Comentarios o notas.
+ * @returns {Promise<Object>} Resultado de la actualización.
+ */
 export async function updateTarifaLuz(
   id, nombre, tipoTarifa,
   potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
@@ -445,6 +510,11 @@ export async function updateTarifaLuz(
   );
 }
 
+/**
+ * Elimina una tarifa de luz por su ID.
+ * @param {number} id - ID de la tarifa a eliminar.
+ * @returns {Promise<Object>} Resultado de la eliminación.
+ */
 export async function deleteTarifaLuz(id) {
   const db = await getDb();
   return await db.execute("DELETE FROM tarifas_luz WHERE id = $1;", [id]);
@@ -452,6 +522,11 @@ export async function deleteTarifaLuz(id) {
 
 // --- Tarifas de Gas ---
 
+/**
+ * Obtiene la lista de tarifas de gas de una comercializadora o todas.
+ * @param {number|null} [comercializadoraId=null] - ID de la comercializadora a filtrar (opcional).
+ * @returns {Promise<Array<Object>>} Lista de tarifas de gas.
+ */
 export async function getTarifasGas(comercializadoraId = null) {
   const db = await getDb();
   if (comercializadoraId) {
@@ -465,6 +540,18 @@ export async function getTarifasGas(comercializadoraId = null) {
   );
 }
 
+/**
+ * Registra una nueva tarifa de gas (RL.1 a RL.6).
+ * @param {number} comercializadoraId - ID de la comercializadora asociada.
+ * @param {string} nombre - Nombre de la tarifa.
+ * @param {string} tipoTarifa - Peaje de gas ('RL.1' a 'RL.6').
+ * @param {number} terminoFijo - Término fijo mensual (€/mes).
+ * @param {number} terminoVariable - Término variable (€/kWh).
+ * @param {number} comision - Comisión base (€).
+ * @param {string} comisionTramos - Cadena JSON con los tramos de comisión.
+ * @param {string} notas - Notas o aclaraciones.
+ * @returns {Promise<Object>} Resultado de la inserción.
+ */
 export async function addTarifaGas(comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas) {
   const db = await getDb();
   return await db.execute(
@@ -474,6 +561,18 @@ export async function addTarifaGas(comercializadoraId, nombre, tipoTarifa, termi
   );
 }
 
+/**
+ * Actualiza una tarifa de gas existente.
+ * @param {number} id - ID de la tarifa a actualizar.
+ * @param {string} nombre - Nombre de la tarifa.
+ * @param {string} tipoTarifa - Peaje de gas ('RL.1' a 'RL.6').
+ * @param {number} terminoFijo - Término fijo mensual (€/mes).
+ * @param {number} terminoVariable - Término variable (€/kWh).
+ * @param {number} comision - Comisión base (€).
+ * @param {string} comisionTramos - Cadena JSON con los tramos.
+ * @param {string} notas - Notas.
+ * @returns {Promise<Object>} Resultado de la actualización.
+ */
 export async function updateTarifaGas(id, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas) {
   const db = await getDb();
   return await db.execute(
@@ -483,6 +582,11 @@ export async function updateTarifaGas(id, nombre, tipoTarifa, terminoFijo, termi
   );
 }
 
+/**
+ * Elimina una tarifa de gas por su ID.
+ * @param {number} id - ID de la tarifa a eliminar.
+ * @returns {Promise<Object>} Resultado de la eliminación.
+ */
 export async function deleteTarifaGas(id) {
   const db = await getDb();
   return await db.execute("DELETE FROM tarifas_gas WHERE id = $1;", [id]);
@@ -490,6 +594,19 @@ export async function deleteTarifaGas(id) {
 
 // --- Historial de Comparativas ---
 
+/**
+ * Registra una nueva comparación en el historial de clientes.
+ * @param {string} clienteNombre - Nombre completo del cliente.
+ * @param {string} clienteCups - Código CUPS de suministro (opcional).
+ * @param {string} tipoEnergia - Suministro ('LUZ', 'GAS' o 'DUAL').
+ * @param {Object} datosClienteJson - Objeto completo con los inputs introducidos.
+ * @param {number|null} tarifaLuzPropuestaId - ID de la tarifa de luz recomendada.
+ * @param {number} ahorroLuzAnual - Ahorro estimado anual en luz (€).
+ * @param {number|null} tarifaGasPropuestaId - ID de la tarifa de gas recomendada.
+ * @param {number} ahorroGasAnual - Ahorro estimado anual en gas (€).
+ * @param {number} comisionTotal - Comisión total ganada por el consultor (€).
+ * @returns {Promise<Object>} Resultado del registro de la comparativa.
+ */
 export async function addComparativa(clienteNombre, clienteCups, tipoEnergia, datosClienteJson, tarifaLuzPropuestaId, ahorroLuzAnual, tarifaGasPropuestaId, ahorroGasAnual, comisionTotal) {
   const db = await getDb();
   return await db.execute(
@@ -508,6 +625,10 @@ export async function addComparativa(clienteNombre, clienteCups, tipoEnergia, da
   );
 }
 
+/**
+ * Obtiene el listado del historial de comparativas con nombres de comercializadoras y tarifas.
+ * @returns {Promise<Array<Object>>} Listado del historial ordenado por fecha descendente.
+ */
 export async function getComparativas() {
   const db = await getDb();
   return await db.select(`
@@ -523,6 +644,11 @@ export async function getComparativas() {
   `);
 }
 
+/**
+ * Elimina un registro del historial de comparativas por su ID.
+ * @param {number} id - ID del registro del historial.
+ * @returns {Promise<Object>} Resultado de la eliminación.
+ */
 export async function deleteComparativa(id) {
   const db = await getDb();
   return await db.execute("DELETE FROM comparativas WHERE id = $1;", [id]);
