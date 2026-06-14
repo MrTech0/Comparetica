@@ -4,6 +4,9 @@
 
 # Comparetica
 
+> [!NOTE]
+> **Estado del proyecto**: Este proyecto se encuentra en **pleno desarrollo** y es una **versión beta**. Algunas características y funcionalidades podrían cambiar o refinarse en futuras actualizaciones.
+
 **Comparetica** es una aplicación de escritorio B2B diseñada para consultores y asesores energéticos en España. Permite realizar estudios comparativos detallados de facturas de luz (tarifa 2.0TD) y gas (tarifa RL.1) de manera offline y local, identificando oportunidades de ahorro y gestionando las comisiones del asesor de forma profesional y discreta.
 
 ---
@@ -29,7 +32,7 @@
 
 ### Requisitos del Sistema
 Para compilar y ejecutar el proyecto desde el código fuente, necesitas:
-- **Node.js** (versión 16 o superior) y **pnpm** (versión 11 o superior).
+- **Node.js** (versiones LTS actualmente soportadas) y **pnpm** (versión 11 o superior).
 - **Rust** (entorno de compilación cargo) y herramientas de compilación de C++ (requerido por Tauri).
 
 ### Instalación de Dependencias
