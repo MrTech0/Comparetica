@@ -319,6 +319,8 @@ export async function generatePDFReport(data, previewMode = false) {
   doc.text('2. Las tarifas simuladas corresponden a precios vigentes facilitados por las comercializadoras en la fecha del reporte.', 15, currentY);
   currentY += 4;
   doc.text('3. Los consumos han sido anualizados de forma lineal, por lo que podrían variar ligeramente según los hábitos reales del cliente.', 15, currentY);
+  currentY += 4;
+  doc.text('4. El emisor y el software declinan toda responsabilidad por discrepancias. Valide precios finales con la comercializadora antes de contratar.', 15, currentY);
 
   // --- FIRMA Y FOOTER ---
   doc.line(15, 250, 195, 250);

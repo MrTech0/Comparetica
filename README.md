@@ -77,3 +77,14 @@ pnpm tauri build
 - `/src/js/pdf.js`: Diseñador del reporte ejecutivo en PDF y previsualizador dinámico.
 - `/src/js/views/`: Controladores de vistas específicas (Inicio, Historial, Comparador, Tarifas, Backups).
 - `/src-tauri/`: Código nativo de integración con Windows escrito en Rust (comandos de backup, gestión de diálogos de guardado de PDF y eventos de cierre de aplicación).
+
+---
+
+## ⚖️ Descargo de Responsabilidad (Disclaimer)
+
+Esta aplicación es una herramienta de simulación y estimación de ofertas energéticas para consultores profesionales. Al utilizar este software, aceptas las siguientes condiciones:
+
+1. **Sin Garantías**: El software se proporciona "tal cual" (*as is*), sin garantías de ningún tipo, explícitas o implícitas, sobre la precisión, exhaustividad, vigencia o ausencia de errores en las fórmulas de cálculo o tarifas cargadas.
+2. **Exención de Responsabilidad**: En ningún caso el autor del software (MrTech0) será responsable por reclamaciones, pérdidas de datos, perjuicios comerciales, pérdidas de clientes o cualquier otro daño directo, indirecto o accidental derivado del uso o de la imposibilidad de uso de esta herramienta.
+3. **Responsabilidad del Usuario**: Es responsabilidad exclusiva del usuario (consultor o asesor) verificar la validez, vigencia y exactitud de todas las tarifas y términos de facturación directamente con las comercializadoras antes de formalizar cualquier contrato o emitir ofertas comerciales definitivas a clientes externos.
+
