@@ -68,7 +68,8 @@ export function calculateLightBill(input, tariff) {
   const ieeCost = ieeBase * (impuestoElectrico / 100);
 
   // 4. Bono Social (cargo diario)
-  const bonoSocialCost = BONO_SOCIAL_DAILY_RATE * dias;
+  const dailyRate = input.bonoSocialFinanciacion !== undefined ? input.bonoSocialFinanciacion : BONO_SOCIAL_DAILY_RATE;
+  const bonoSocialCost = dailyRate * dias;
 
   // 5. Base Imponible
   const baseImponible = ieeBase + ieeCost + alquiler + bonoSocialCost;
@@ -229,7 +230,8 @@ export function calculateLightBill30TD(input, tariff) {
   const ieeCost = ieeBase * (impuestoElectrico / 100);
 
   // 4. Bono Social (cargo diario)
-  const bonoSocialCost = BONO_SOCIAL_DAILY_RATE * dias;
+  const dailyRate = input.bonoSocialFinanciacion !== undefined ? input.bonoSocialFinanciacion : BONO_SOCIAL_DAILY_RATE;
+  const bonoSocialCost = dailyRate * dias;
 
   // 5. Base Imponible
   const baseImponible = ieeBase + ieeCost + alquiler + bonoSocialCost;

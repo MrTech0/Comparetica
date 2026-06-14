@@ -1,6 +1,6 @@
 [package]
 name = "comparetica"
-version = "0.1.7"
+version = "0.1.8"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -26,5 +26,6 @@ tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
 tauri-plugin-updater = "2"
 rfd = "0.17.2"
 base64 = "0.22.1"
+chrono = "0.4"
 
 

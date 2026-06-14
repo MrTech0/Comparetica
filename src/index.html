@@ -184,7 +184,7 @@
                     </div>
                     <div class="m3-field">
                       <label class="m3-label" for="calc-light-tax">Impuesto Eléctrico (%) *</label>
-                      <input type="number" id="calc-light-tax" class="m3-input" value="5.11269" step="0.00001" min="0" required />
+                      <input type="number" id="calc-light-tax" class="m3-input" value="5.11269632" step="0.00000001" min="0" required />
                     </div>
                     <div class="m3-field">
                       <label class="m3-label" for="calc-light-vat">IVA / IGIC *</label>
@@ -323,10 +323,14 @@
                     </div>
                   </div>
 
-                  <div class="m3-field-row" style="margin-top: 12px;">
-                    <div class="m3-field" style="max-width: 200px;">
+                  <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px;">
+                    <div class="m3-field" id="calc-light-bono-social-group" style="width: 200px;">
                       <label class="m3-label" for="calc-light-bono-social">Bono Social (%)</label>
-                      <input type="number" id="calc-light-bono-social" class="m3-input" placeholder="0" min="0" max="100" value="0" />
+                      <input type="number" id="calc-light-bono-social" class="m3-input" placeholder="Ej. 0" min="0" max="100" step="0.01" />
+                    </div>
+                    <div class="m3-field" style="width: 280px;">
+                      <label class="m3-label" for="calc-light-bono-social-financiacion">Financiación Bono Social (€/día) *</label>
+                      <input type="number" id="calc-light-bono-social-financiacion" class="m3-input" placeholder="Ej. 0.038455" min="0" step="0.000001" required />
                     </div>
                   </div>
 

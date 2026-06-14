@@ -38,8 +38,12 @@ fn export_backup(app_handle: tauri::AppHandle) -> Result<String, String> {
         return Err("No se encontró el archivo de base de datos actual para respaldar. Por favor, asegúrate de haber guardado al menos algún dato primero.".to_string());
     }
 
+    let now = chrono::Local::now();
+    let timestamp = now.format("%d_%m_%H_%M_%S").to_string();
+    let default_filename = format!("comparetica_manual_backup_{}.db", timestamp);
+
     let save_path = rfd::FileDialog::new()
-        .set_file_name("comparetica_backup.db")
+        .set_file_name(&default_filename)
         .add_filter("Base de datos SQLite", &["db", "sqlite"])
         .save_file();
 
@@ -146,7 +150,6 @@ pub fn run() {
 
 fn perform_auto_backup(app_handle: &tauri::AppHandle) {
     use tauri::Manager;
-    use std::time::UNIX_EPOCH;
     let app_data_dir = match app_handle.path().app_data_dir() {
         Ok(dir) => dir,
         Err(_) => return,
@@ -183,12 +186,10 @@ fn perform_auto_backup(app_handle: &tauri::AppHandle) {
         }
     }
 
-    // Crear la nueva copia de seguridad con marca de tiempo Unix
-    if let Ok(duration) = std::time::SystemTime::now().duration_since(UNIX_EPOCH) {
-        let timestamp = duration.as_secs();
-        let backup_path = backup_dir.join(format!("comparetica_auto_backup_{}.db", timestamp));
-        let _ = std::fs::copy(&db_path, &backup_path);
-    }
+    let now = chrono::Local::now();
+    let timestamp = now.format("%d_%m_%H_%M_%S").to_string();
+    let backup_path = backup_dir.join(format!("comparetica_auto_backup_{}.db", timestamp));
+    let _ = std::fs::copy(&db_path, &backup_path);
 
     // Limpieza de copias automáticas antiguas
     if let Ok(entries) = std::fs::read_dir(&backup_dir) {
