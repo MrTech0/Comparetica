@@ -1,11 +1,11 @@
 {
-  "version": "0.1.7",
-  "notes": "Corrección de estilo en checkbox duplicado de actualizaciones y mejoras en el detalle de errores de conexión y logging.",
-  "pub_date": "2026-06-11T15:22:33Z",
+  "version": "0.1.8",
+  "notes": "Ajuste de precisión de decimales, copias de seguridad dinámicas y exclusión de Bono Social en tarifas 3.0TD.",
+  "pub_date": "2026-06-14T01:23:14Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0pHRzdZVnorVDU2TE52TmN2elNQU3dzTU43T2Y2OGlFZUlQYlBVdTVHQjhBUi8wT0d1UE0zb01NVmpGL0lvRDdFZ296UFBmMlJvejJmcjBVRE9EZVFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxMTkxMzQzCWZpbGU6Q29tcGFyZXRpY2FfMC4xLjdfeDY0X2VuLVVTLm1zaQowZm4zZmQyeWx6UTd0ZXJjVzBkcUxQLzlmbWNVTHdVd3hZSWpkOFJ5QTlyUnNkZzUrdk5mdU9sOEpPdlBNNlZOVlFWdGpQMng5ejlMRlFUL2g5TFhEdz09Cg==",
-      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.1.7/Comparetica_0.1.7_x64.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0FuR0VHaktNbEhlN3BuVTZkNFdFalNkbmlmVXgwQzhINjFldmZ5MHFiNFVDcTVVbXI3eXdETDh3cTBkZ3cvWFYyR2R3eGVYZjdGSDFaUHRCMG9JZHdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNDAwMTg5CWZpbGU6Q29tcGFyZXRpY2FfMC4xLjhfeDY0X2VuLVVTLm1zaQpvZnY4QUJMRHBadWR3V1FSdEQ5TEtYWDNxTEtad002L2hRRVNjMTJyWGw1ZW5iYk1vU1AyWHBlQTk4eE5mV2tObGcwdDRIZU1nbE50VHFnaHdsdzNDUT09Cg==",
+      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.1.8/Comparetica_0.1.8_x64.msi"
     }
   }
 }
