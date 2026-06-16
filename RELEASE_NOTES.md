@@ -1,13 +1,22 @@
-# Novedades en la versión v0.1.8
+# Novedades en la versión v0.2.0
 
-Esta actualización introduce mejoras en la precisión de los cálculos del comparador, reajustes visuales y estructuración dinámica en las copias de seguridad de la aplicación:
+Esta actualización introduce el nuevo régimen de retención legal obligatoria de datos y soluciona por completo el restablecimiento de fábrica limpio con reinicio de IDs a 1.
 
-- **Nombres Dinámicos de Copias de Seguridad**: Las copias de seguridad generadas automáticamente y de manera manual ahora incluyen marcas de tiempo legibles en sus nombres de archivo:
-  - Copia manual: `comparetica_manual_backup_DIA_MES_HORA_MINUTO_SEGUNDO.db`
-  - Copia automática al salir: `comparetica_auto_backup_DIA_MES_HORA_MINUTO_SEGUNDO.db`
-- **Alineación del Impuesto Eléctrico**: Se establece el valor por defecto en `5.11269632%` y se aumenta la precisión del campo a 8 decimales en el Comparador de Tarifas.
-- **Financiación del Bono Social configurable**: Añadido el campo regulado de "Financiación Bono Social (€/día)" sin valor por defecto (obligatorio) y con soporte para hasta 6 decimales de precisión.
-- **Bono Social (%) configurable**: El descuento del bono social se inicia vacío, y en caso de no rellenarse se interpreta como que el cliente no tiene bonificación (0% de descuento). Soporta hasta 2 decimales de precisión.
-- **Exclusión en Tarifas de Grandes Consumidores (3.0TD)**: Dado que el Bono Social (%) es una medida exclusiva para particulares, el campo de descuento (%) se oculta automáticamente si se selecciona una tarifa de tipo `3.0TD`, forzando además que su valor en el motor de cálculo sea `0`.
-- **Ajustes de Proximidad en la Interfaz**: Los campos de "Bono Social (%)" y "Financiación Bono Social (€/día)" ahora se disponen juntos mediante una estructura flexbox, evitando el distanciamiento excesivo y la desalineación visual en pantallas anchas.
-- **Correcciones y Depuración**: Eliminada la advertencia de compilación por importación obsoleta de `UNIX_EPOCH` en Rust.
+### 📋 Cambios Introducidos:
+
+* **⚖️ Retención Legal Fija de Datos (Cumplimiento LOPDGDD y Código de Comercio):**
+  * **Comparativas Aceptadas:** Se conservan obligatoriamente durante **6 años** (72 meses) para actuar como justificante mercantil. No se pueden eliminar manualmente del historial (botón de borrado bloqueado).
+  * **Comparativas Pendientes/Rechazadas:** Se conservan durante **12 meses** desde su creación.
+  * **Clientes Potenciales:** Se eliminan de forma automática si no tienen ninguna comparativa asociada activa tras **12 meses**.
+  * Se elimina la configuración manual de retención por parte del usuario para evitar incumplimientos legales. Quedan detalladas informativamente en *Configuración > Parámetros*.
+
+* **👥 Columna "Tipo Cliente" (Clientes Reales y Potenciales):**
+  * Se inyecta una nueva columna en el panel de Gestión de Clientes que clasifica visualmente al cliente como **Real** (tiene al menos una comparativa aprobada) o **Potencial** mediante chips de Material Design 3.
+
+* **⏱️ Periodo de Gracia de 1 Minuto para Cambio de Estado:**
+  * Para prevenir errores de clic al cambiar el estado de una comparativa a *Aceptada* o *Rechazada*, se concede un periodo de gracia de 60 segundos para corregir el estado. Tras este lapso, el selector se bloquea definitivamente.
+
+* **🔄 Restablecimiento de Fábrica Completo (IDs desde 1):**
+  * Se solventa el problema por el cual los IDs de las comercializadoras (y demás tablas) no empezaban desde 1 tras restablecer la aplicación.
+  * Implementada la eliminación física de los archivos de base de datos SQLite (`comparetica.db` y transacciones WAL) en el arranque nativo de la aplicación.
+  * En producción, la app realiza un reinicio de proceso nativo inmediato, logrando un estado 100% libre de residuos y con IDs correlativos correctos.
