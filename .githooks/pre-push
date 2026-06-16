@@ -1,0 +1,21 @@
+#!/bin/sh
+# Pre-push hook to automatically pull remote changes before pushing
+
+echo "Checking remote changes before pushing..."
+git fetch origin main -q
+
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/main 2>/dev/null)
+
+if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
+    BEHIND=$(git log HEAD..$REMOTE --oneline)
+    if [ -n "$BEHIND" ]; then
+        echo "⚠️  Your local branch is behind origin/main. Pulling remote changes..."
+        git pull --rebase origin main
+        if [ $? -ne 0 ]; then
+            echo "❌ Error: Could not automatically pull and rebase. Please resolve conflicts manually."
+            exit 1
+        fi
+        echo "✅ Successfully pulled and rebased remote changes. Proceeding to push..."
+    fi
+fi

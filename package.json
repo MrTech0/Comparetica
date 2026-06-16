@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "tauri": "tauri",
-    "build": "node scripts/build.js"
+    "build": "node scripts/build.js",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"
