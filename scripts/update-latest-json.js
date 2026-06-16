@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 
 try {
-  const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-  const version = pkg.version;
+  const tauriConfig = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+  const version = tauriConfig.version;
 
   const sigFile = `src-tauri/target/release/bundle/msi/Comparetica_${version}_x64.msi.sig`;
   if (!fs.existsSync(sigFile)) {
