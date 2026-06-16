@@ -32,6 +32,11 @@
               <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
               <span>Inicio</span>
             </button>
+            <button id="nav-clients" class="nav-item">
+              <!-- Icon: People -->
+              <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 1.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V20h6v-3.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+              <span>Clientes</span>
+            </button>
             <button id="nav-calculator" class="nav-item">
               <!-- Icon: Calculate / Dashboard -->
               <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-2.4-6.4l-2.6 2.6 2.6 2.6-1.4 1.4-2.6-2.6-2.6 2.6-1.4-1.4 2.6-2.6-2.6-2.6 1.4-1.4 2.6 2.6 2.6-2.6 1.4 1.4zM7 7h4v2H7V7zm0 4h4v2H7v-2zm7-4h3v2h-3V7zm0 4h3v2h-3v-2z"/></svg>
@@ -135,6 +140,43 @@
           </section>
 
           <!-- ==========================================
+               SECTION: CLIENTS
+               ========================================== -->
+          <section id="section-clients" class="view-section" style="display:none;">
+            <div class="m3-card margin-top-md">
+              <div class="flex-row-center-between" style="align-items: center; margin-bottom: 8px;">
+                <h2 class="m3-card-title" style="margin: 0;">Gestión de Clientes</h2>
+                <button id="open-client-dialog-btn" class="m3-btn">
+                  <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:currentColor;margin-right:8px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                  Nuevo Cliente
+                </button>
+              </div>
+              <p class="text-muted" style="font-size: 13px; line-height: 1.5; margin-bottom: 20px;">
+                Crea, edita o elimina los datos de tus clientes (particulares y empresas). Los campos <strong>Nombre de la Empresa / Particular</strong> y <strong>CIF/DNI</strong> son obligatorios para poder registrar un cliente y realizar estudios comparativos de ahorro.
+              </p>
+
+              <div class="table-container">
+                <table class="m3-table" id="table-clients">
+                  <thead>
+                    <tr>
+                      <th>Empresa / Particular</th>
+                      <th>CIF / DNI</th>
+                      <th>Representante</th>
+                      <th>CUPS</th>
+                      <th>Tipo Cliente</th>
+                      <th>Fecha Registro</th>
+                      <th style="text-align: right;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-clients-body">
+                    <!-- Inyectado dinámicamente -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- ==========================================
                SECTION: CALCULATOR
                ========================================== -->
           <section id="section-calculator" class="view-section">
@@ -147,7 +189,8 @@
                 <div class="m3-field-row">
                   <div class="m3-field">
                     <label class="m3-label" for="calc-client-name">Nombre del Cliente *</label>
-                    <input type="text" id="calc-client-name" class="m3-input" placeholder="Ej. Juan Pérez" required />
+                    <input type="text" id="calc-client-name" class="m3-input" placeholder="Buscar o escribir cliente..." autocomplete="off" required />
+                    <div id="clients-autocomplete-list" class="m3-autocomplete-list"></div>
                   </div>
                   <div class="m3-field">
                     <label class="m3-label" for="calc-client-cups">CUPS (Opcional)</label>
@@ -415,6 +458,18 @@
                   </div>
                 </div>
 
+                <!-- Sección RGPD/LOPD -->
+                <div style="border-top: 1px solid var(--color-outline-variant); margin-top: 24px; padding-top: 16px; margin-bottom: 24px;">
+                  <span style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-outline); margin-bottom: 8px;">RGPD / LOPD</span>
+                  <label class="m3-checkbox-container" for="calc-client-consent">
+                    <input type="checkbox" id="calc-client-consent" />
+                    <span class="m3-checkbox-control"></span>
+                    <span class="m3-checkbox-text" style="font-size: 14px; line-height: 1.5; color: var(--color-on-surface-variant);">
+                      Confirmo que he obtenido el consentimiento explícito del cliente para tratar y registrar localmente sus datos de suministro (CUPS y consumos) conforme al RGPD/LOPDGDD.
+                    </span>
+                  </label>
+                </div>
+
                 <div class="margin-top-lg" style="display: flex; gap: 12px; justify-content: flex-end;">
                   <button type="reset" class="m3-btn m3-btn-outlined">Limpiar Datos</button>
                   <button type="submit" class="m3-btn">Calcular Comparativa</button>
@@ -612,6 +667,7 @@
                     <th>CUPS</th>
                     <th>Tipo</th>
                     <th>Ahorro Anual</th>
+                    <th>Estado</th>
                     <th class="private-value">Comisión Asesor</th>
                     <th style="text-align: right;">Acciones</th>
                   </tr>
@@ -699,6 +755,8 @@
               <button class="m3-tab-btn" id="tab-btn-settings-company">Consultora</button>
               <button class="m3-tab-btn" id="tab-btn-settings-updates">Actualizaciones</button>
               <button class="m3-tab-btn" id="tab-btn-settings-cleanup">Limpieza</button>
+              <button class="m3-tab-btn" id="tab-btn-settings-params">Parámetros</button>
+              <button class="m3-tab-btn" id="tab-btn-settings-legal">Información Legal</button>
             </div>
 
             <!-- PANEL: APARIENCIA -->
@@ -864,6 +922,66 @@
                 <button id="factory-reset-btn" class="m3-btn" style="background-color: var(--color-error); color: var(--color-on-error); border-color: transparent;">
                   Restablecer de Fábrica...
                 </button>
+              </div>
+            </div>
+
+            <!-- PANEL: PARÁMETROS -->
+            <div id="panel-settings-params" class="tab-panel" style="display:none;">
+              <div class="m3-card margin-top-md">
+                <h3 style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-outline); margin-bottom: 12px;">Retención legal de los datos</h3>
+                <p class="text-muted" style="margin-bottom: 16px; font-size: 13px; line-height: 1.6;">
+                  De acuerdo con el Reglamento General de Protección de Datos (RGPD), la LOPDGDD y el Código de Comercio de España, la aplicación aplica plazos automáticos y fijos de retención de la información para garantizar el cumplimiento normativo. Los datos de comparativas e historial se depuran conforme a las siguientes reglas:
+                </p>
+                <div style="margin-bottom: 0; font-size: 12.5px; line-height: 1.6; color: var(--color-on-surface-variant); background-color: var(--color-surface-variant); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--color-outline-variant);">
+                  <ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px;">
+                    <li><strong>Comparativas Aceptadas (Aprobadas):</strong> Se conservan obligatoriamente durante <strong>6 años (72 meses)</strong> tras su aceptación. Actúan como justificación mercantil de la transacción comercial y la base de cálculo de las comisiones (según lo exigido por el Art. 30 del Código de Comercio).</li>
+                    <li><strong>Comparativas Pendientes de aceptación:</strong> Se conservan activas durante un período fijo de <strong>12 meses (365 días)</strong> al tratarse de propuestas y estimaciones comerciales precontractuales.</li>
+                    <li><strong>Comparativas Rechazadas (no aceptadas):</strong> Se conservan durante <strong>12 meses (365 días)</strong> tras haber sido descartadas para control comercial y auditoría de ofertas comerciales.</li>
+                    <li><strong>Datos de Clientes:</strong> 
+                      <ul>
+                        <li style="margin-top: 4px;"><strong>Cliente Real:</strong> Es aquel que cuenta con al menos una comparativa en estado <em>Aceptada</em> activa en el sistema. Se conservará durante 6 años.</li>
+                        <li style="margin-top: 4px;"><strong>Cliente Potencial:</strong> Es aquel que no tiene comparativas aceptadas (solo pendientes o rechazadas). Se purgará automáticamente de la base de datos tras 12 meses desde su registro.</li>
+                      </ul>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- PANEL: INFORMACIÓN LEGAL -->
+            <div id="panel-settings-legal" class="tab-panel" style="display:none;">
+              <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Términos de Uso y Descargo de Responsabilidad</h3>
+                <p class="text-muted" style="font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: justify;">
+                  Este software se proporciona "tal cual" (<em>as is</em>), sin garantías de ningún tipo respecto a la exactitud, actualización o ausencia de errores en sus cálculos o tarifas. El autor (MrTech0) no será responsable de reclamaciones, pérdidas financieras, perjuicios comerciales o cualquier otro daño directo o indirecto derivado del uso del programa. El usuario es el único responsable de verificar la veracidad de los precios y condiciones directamente con las comercializadoras antes de emitir propuestas comerciales.
+                </p>
+              </div>
+
+              <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Política de Privacidad y Flujo de Datos</h3>
+                <p class="text-muted" style="font-size: 13px; line-height: 1.6; margin-bottom: 12px; text-align: justify;">
+                  <strong>Funcionamiento Local y Offline:</strong> Comparetica funciona localmente en su ordenador. Toda la información introducida (clientes, CUPS, consumos, tarifas y logotipos) se almacena únicamente en su disco duro en una base de datos local y privada (SQLite). El desarrollador de la aplicación no recopila, almacena ni tiene acceso a ninguno de estos datos.
+                </p>
+                <p class="text-muted" style="font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: justify;">
+                  <strong>Conexiones Externas Requeridas:</strong> Para su correcto funcionamiento, la aplicación realiza las siguientes peticiones de red salientes desde su equipo, las cuales transmiten metadatos técnicos habituales (como la dirección IP del equipo, considerada dato de carácter personal según el RGPD):
+                </p>
+                <ul style="font-size: 13px; line-height: 1.6; color: var(--color-on-surface-variant); margin-top: 8px; margin-left: 20px;">
+                  <li><strong>Consulta de Precios del Mercado Diario (PVPC):</strong> Conexión a la API oficial de Red Eléctrica de España (REE) en <code>apidatos.ree.es</code>.</li>
+                  <li><strong>Actualizaciones de Software:</strong> Conexión a los servidores de GitHub en <code>raw.githubusercontent.com</code> para verificar si hay nuevas versiones de la aplicación disponibles y descargar sus respectivos instaladores.</li>
+                </ul>
+              </div>
+
+              <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Licencias de Software de Terceros</h3>
+                <p class="text-muted" style="font-size: 13px; line-height: 1.6; margin-bottom: 12px; text-align: justify;">
+                  Comparetica utiliza y agradece el uso de las siguientes tecnologías y librerías de código abierto bajo sus respectivas licencias:
+                </p>
+                <ul style="font-size: 13px; line-height: 1.6; color: var(--color-on-surface-variant); margin-left: 20px;">
+                  <li><strong>Tauri Framework:</strong> Licencia MIT / Apache 2.0. Utilizado para empaquetar y ejecutar la aplicación de escritorio.</li>
+                  <li><strong>jsPDF:</strong> Licencia MIT. Utilizado para la generación de reportes ejecutivos en PDF.</li>
+                  <li><strong>Sqlite / Tauri SQL Plugin:</strong> Licencia MIT / Apache 2.0. Motor de base de datos local de la aplicación.</li>
+                  <li><strong>Chrono & RFD (Rust Crates):</strong> Licencia MIT. Utilizados para el control de copias de seguridad nativas y ventanas de diálogo del sistema.</li>
+                </ul>
               </div>
             </div>
           </section>
@@ -1085,6 +1203,44 @@
         </div>
       </div>
 
+      <!-- DIÁLOGO: NUEVO/EDITAR CLIENTE -->
+      <div id="dialog-client" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 500px;">
+          <h3 class="m3-dialog-title" id="dialog-client-title">Registrar Cliente</h3>
+          
+          <form id="dialog-client-form">
+            <input type="hidden" id="dialog-client-id" value="" />
+            
+            <div class="dialog-form-content">
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-client-name">Nombre Empresa / Particular *</label>
+                <input type="text" id="dialog-client-name" class="m3-input" placeholder="Ej. Ahorro Energético S.L. o Juan Pérez" required />
+              </div>
+              
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-client-cif">DNI / CIF *</label>
+                <input type="text" id="dialog-client-cif" class="m3-input" placeholder="Ej. B12345678 o 12345678Z" required />
+              </div>
+              
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-client-rep">Representante (Nombre y Apellidos)</label>
+                <input type="text" id="dialog-client-rep" class="m3-input" placeholder="Ej. Carlos García" />
+              </div>
+              
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-client-cups">CUPS (Código de Suministro)</label>
+                <input type="text" id="dialog-client-cups" class="m3-input" placeholder="Ej. ES0021..." />
+              </div>
+            </div>
+            
+            <div class="m3-dialog-actions">
+              <button type="button" id="dialog-client-close" class="m3-btn m3-btn-outlined">Cancelar</button>
+              <button type="submit" class="m3-btn">Guardar Cliente</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <!-- DIÁLOGO: PREVISUALIZAR PDF -->
       <div id="dialog-pdf-preview" class="m3-dialog-overlay">
         <div class="m3-dialog" style="max-width: 90%; width: 900px; height: 90vh; display: flex; flex-direction: column; padding: 24px;">
@@ -1094,8 +1250,8 @@
               <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
             </button>
           </div>
-          <div style="flex-grow: 1; position: relative; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); overflow: hidden; background-color: #525659;">
-            <iframe id="pdf-preview-iframe" style="width: 100%; height: 100%; border: none;" src=""></iframe>
+          <div style="flex-grow: 1; position: relative; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); overflow-y: auto; background-color: #525659;" oncontextmenu="return false;">
+            <iframe id="pdf-preview-iframe" style="width: 100%; height: 1250px; border: none; pointer-events: none; display: block;" src=""></iframe>
           </div>
         </div>
       </div>
@@ -1133,9 +1289,19 @@
               </p>
             </div>
 
+            <div style="margin-bottom: 24px; text-align: left; padding: 0 4px;">
+              <label class="m3-checkbox-container" for="wizard-accept-eula">
+                <input type="checkbox" id="wizard-accept-eula" />
+                <span class="m3-checkbox-control"></span>
+                <span class="m3-checkbox-text" style="font-size: 12px; line-height: 1.4; color: var(--color-on-surface);">
+                  He leído y acepto los Términos de Uso, el Descargo de Responsabilidad y confirmo que utilizaré esta herramienta conforme a la normativa de protección de datos (RGPD/LOPDGDD).
+                </span>
+              </label>
+            </div>
+
             <div class="m3-dialog-actions" style="justify-content: space-between; align-items: center; width: 100%;">
               <button type="button" id="wizard-restore-btn" class="m3-btn m3-btn-text" style="font-size: 13px;">Restaurar Copia de Seguridad</button>
-              <button type="button" id="wizard-next-btn" class="m3-btn">Comenzar Configuración</button>
+              <button type="button" id="wizard-next-btn" class="m3-btn" disabled>Comenzar Configuración</button>
             </div>
           </div>
 
@@ -1269,6 +1435,20 @@
           </div>
         </div>
       </div>
+      <!-- DIÁLOGO: ADVERTENCIA CLIENTE NO REGISTRADO -->
+      <div id="dialog-no-client" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="border-left: 6px solid var(--color-warning); max-width: 500px;">
+          <h3 class="m3-dialog-title">Cliente No Registrado</h3>
+          <div class="m3-dialog-body">
+            <p style="white-space: pre-wrap; margin: 0; font-size: 14px; line-height: 1.5; color: var(--color-on-surface);">Antes de poder hacer una comparativa, se tiene que tener al cliente creado. Dirígete al botón del menú lateral llamado 'Clientes' o haz clic en el botón de 'Ir a Clientes'</p>
+          </div>
+          <div class="m3-dialog-actions">
+            <button type="button" id="dialog-no-client-omit" class="m3-btn m3-btn-text">Omitir</button>
+            <button type="button" id="dialog-no-client-redirect" class="m3-btn">Ir a Clientes</button>
+          </div>
+        </div>
+      </div>
+
 
       <!-- DIÁLOGO: NOTIFICACIÓN DE ACTUALIZACIÓN -->
       <div id="dialog-update-alert" class="m3-dialog-overlay">

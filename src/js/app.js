@@ -1,8 +1,9 @@
 /* src/js/app.js */
 
-import { getDb } from './db.js';
+import { getDb, purgeOldData } from './db.js';
 import { initHomeView } from './views/home.js';
 import { initCalculatorView } from './views/calculator_view.js';
+import { initClientsView } from './views/clients.js';
 import { initTariffsView, updateComercializadorasSelectors } from './views/tariffs.js';
 import { initHistoryView } from './views/history.js';
 import { initBackupView } from './views/backup.js';
@@ -14,6 +15,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     await getDb();
     console.log("Base de datos inicializada correctamente.");
+    
+    // Ejecutar purga de datos antiguos conforme a la política de retención legal
+    try {
+      await purgeOldData();
+    } catch (err) {
+      console.error("Error al ejecutar la purga automática:", err);
+    }
   } catch (error) {
     console.error("Error crítico al inicializar la base de datos:", error);
   }
@@ -29,6 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 5. Inicializar vistas hijas
   await initHomeView();
+  await initClientsView();
   initCalculatorView();
   await initTariffsView();
   await initHistoryView();
@@ -110,6 +119,7 @@ function initThemeSystem() {
 function initNavigation() {
   const navItems = [
     { btn: 'nav-home', section: 'section-home', title: 'Precio de la Energía (Hoy)' },
+    { btn: 'nav-clients', section: 'section-clients', title: 'Gestión de Clientes' },
     { btn: 'nav-calculator', section: 'section-calculator', title: 'Comparador de Tarifas' },
     { btn: 'nav-tariffs', section: 'section-tariffs', title: 'Gestión de Tarifas y Comisiones' },
     { btn: 'nav-history', section: 'section-history', title: 'Historial de Comparativas' },
@@ -147,7 +157,12 @@ function initNavigation() {
       if (viewTitle) viewTitle.innerText = item.title;
 
       // Acciones especiales al cambiar de pestaña
-      if (item.btn === 'nav-tariffs') {
+      if (item.btn === 'nav-clients') {
+        const clientsModule = await import('./views/clients.js');
+        if (clientsModule && clientsModule.loadClientsTable) {
+          await clientsModule.loadClientsTable();
+        }
+      } else if (item.btn === 'nav-tariffs') {
         // Recargar listas CRUD por si hubo cambios
         await updateComercializadorasSelectors();
       } else if (item.btn === 'nav-history') {
@@ -197,6 +212,40 @@ window.showToast = function(message, type = 'success') {
     });
   }, 4000);
 };
+
+window.showActionToast = function(message, actions = []) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = 'm3-toast action-toast';
+
+  const textSpan = document.createElement('span');
+  textSpan.className = 'toast-text';
+  textSpan.innerText = message;
+  toast.appendChild(textSpan);
+
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'toast-actions';
+
+  actions.forEach(action => {
+    const btn = document.createElement('button');
+    btn.className = action.class || '';
+    btn.innerText = action.text;
+    btn.addEventListener('click', () => {
+      if (action.callback) action.callback();
+      toast.classList.add('m3-toast-fadeout');
+      toast.addEventListener('animationend', () => {
+        toast.remove();
+      });
+    });
+    actionsDiv.appendChild(btn);
+  });
+
+  toast.appendChild(actionsDiv);
+  container.appendChild(toast);
+};
+
 
 /**
  * Muestra un diálogo de confirmación personalizado de Material Design 3.

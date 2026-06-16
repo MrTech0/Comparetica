@@ -61,9 +61,22 @@ export function initWizard() {
     });
   }
 
+  // Habilitar/deshabilitar botón Siguiente según aceptación de EULA
+  const acceptEulaCheckbox = document.getElementById('wizard-accept-eula');
+  if (acceptEulaCheckbox && nextBtn) {
+    nextBtn.disabled = !acceptEulaCheckbox.checked;
+    acceptEulaCheckbox.addEventListener('change', () => {
+      nextBtn.disabled = !acceptEulaCheckbox.checked;
+    });
+  }
+
   // Eventos de navegación entre pasos
   if (nextBtn && step1 && step2) {
     nextBtn.addEventListener('click', () => {
+      if (acceptEulaCheckbox && !acceptEulaCheckbox.checked) {
+        window.showToast("Debe aceptar los términos de uso y descargo de responsabilidad para continuar.", "warning");
+        return;
+      }
       step1.style.display = 'none';
       step2.style.display = 'block';
     });

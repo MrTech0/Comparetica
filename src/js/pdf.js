@@ -365,6 +365,13 @@ export async function generatePDFReport(data, previewMode = false) {
   doc.setFontSize(8);
   doc.text('Página 1 de 1', 180, 256);
 
+  // Cláusula Informativa de Privacidad (RGPD)
+  doc.setFontSize(6);
+  doc.setTextColor(110, 120, 130);
+  const privacyText = "Tratamiento de Datos (RGPD/LOPDGDD): Los datos personales de este estudio se tratan localmente por la consultora en calidad de Responsable del Tratamiento con la finalidad exclusiva de realizar esta propuesta. Puede ejercer sus derechos de acceso, rectificación, supresión y otros dirigiéndose a los datos de contacto del emisor indicados arriba.";
+  const splitPrivacy = doc.splitTextToSize(privacyText, 180);
+  doc.text(splitPrivacy, 15, 264);
+
   // Si está activo el modo previsualización, mostramos en modal
   if (previewMode) {
     try {
@@ -373,10 +380,10 @@ export async function generatePDFReport(data, previewMode = false) {
       const previewDialog = document.getElementById('dialog-pdf-preview');
       const iframe = document.getElementById('pdf-preview-iframe');
       if (previewDialog && iframe) {
-        iframe.src = blobUrl;
+        iframe.src = blobUrl + '#toolbar=0&navpanes=0';
         previewDialog.classList.add('active');
       } else {
-        window.open(blobUrl);
+        window.open(blobUrl + '#toolbar=0&navpanes=0');
       }
     } catch (e) {
       console.error("Error al previsualizar el PDF:", e);

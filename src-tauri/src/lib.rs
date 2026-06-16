@@ -115,6 +115,23 @@ fn import_backup(app_handle: tauri::AppHandle) -> Result<String, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            use tauri::Manager;
+            if let Ok(app_data_dir) = app.path().app_data_dir() {
+                let reset_flag = app_data_dir.join("reset_db.flag");
+                if reset_flag.exists() {
+                    let db_path = app_data_dir.join("comparetica.db");
+                    let db_shm = app_data_dir.join("comparetica.db-shm");
+                    let db_wal = app_data_dir.join("comparetica.db-wal");
+                    
+                    let _ = std::fs::remove_file(&db_path);
+                    let _ = std::fs::remove_file(&db_shm);
+                    let _ = std::fs::remove_file(&db_wal);
+                    let _ = std::fs::remove_file(&reset_flag);
+                }
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -474,12 +491,23 @@ fn factory_reset(app_handle: tauri::AppHandle) -> Result<String, String> {
     // Limpiar todos los logos posibles
     delete_all_logos(&app_data_dir);
 
-    // No eliminamos comparetica.db ni reiniciamos el proceso aquí
-    // para evitar bloqueos del sistema de archivos en Windows y desconexiones
-    // del servidor de desarrollo del WebView (puertos ocupados/refusales).
-    // El frontend se encarga de vaciar las tablas con DELETE queries y recargar la página.
+    // Crear el archivo flag para borrar la base de datos en el próximo arranque/reinicio
+    let reset_flag = app_data_dir.join("reset_db.flag");
+    let _ = fs::write(&reset_flag, "1");
 
-    Ok("Configuración y logotipos eliminados con éxito.".to_string())
+    #[cfg(dev)]
+    {
+        Ok("DEV_MODE".to_string())
+    }
+    #[cfg(not(dev))]
+    {
+        // En producción, reiniciamos la aplicación para liberar recursos y borrar la base de datos
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            app_handle.restart();
+        });
+        Ok("Aplicación restablecida con éxito. Reiniciando la aplicación...".to_string())
+    }
 }
 
 #[tauri::command]

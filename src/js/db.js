@@ -35,6 +35,18 @@ async function initSchema(db) {
   // Habilitar claves foráneas en SQLite
   await db.execute("PRAGMA foreign_keys = ON;");
 
+  // 0. Tabla de Clientes
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS clientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre_empresa TEXT NOT NULL,
+        cif TEXT NOT NULL UNIQUE,
+        representante TEXT,
+        cups TEXT,
+        creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // 1. Tabla de Comercializadoras
   await db.execute(`
     CREATE TABLE IF NOT EXISTS comercializadoras (
@@ -167,10 +179,28 @@ async function initSchema(db) {
         tarifa_gas_propuesta_id INTEGER,
         ahorro_gas_anual REAL DEFAULT 0.0,
         comision_total REAL DEFAULT 0.0,
+        estado TEXT NOT NULL DEFAULT 'Pendiente de aceptación',
         FOREIGN KEY (tarifa_luz_propuesta_id) REFERENCES tarifas_luz(id) ON DELETE SET NULL,
         FOREIGN KEY (tarifa_gas_propuesta_id) REFERENCES tarifas_gas(id) ON DELETE SET NULL
     );
   `);
+
+  // Migración dinámica para añadir columna 'estado' a la tabla 'comparativas' si no existe
+  try {
+    const columns = await db.select("PRAGMA table_info(comparativas);");
+    const hasEstado = columns.some(c => c.name === 'estado');
+    if (!hasEstado) {
+      await db.execute("ALTER TABLE comparativas ADD COLUMN estado TEXT NOT NULL DEFAULT 'Pendiente de aceptación';");
+      console.log("Migración completada: Columna 'estado' añadida a 'comparativas'.");
+    }
+    const hasEstadoCambiadoEn = columns.some(c => c.name === 'estado_cambiado_en');
+    if (!hasEstadoCambiadoEn) {
+      await db.execute("ALTER TABLE comparativas ADD COLUMN estado_cambiado_en TEXT;");
+      console.log("Migración completada: Columna 'estado_cambiado_en' añadida a 'comparativas'.");
+    }
+  } catch (e) {
+    console.error("Error al migrar la tabla comparativas:", e);
+  }
 }
 
 /**
@@ -182,7 +212,8 @@ function createMockDb() {
     comercializadoras: JSON.parse(localStorage.getItem('mock_comercializadoras') || '[]'),
     tarifas_luz: JSON.parse(localStorage.getItem('mock_tarifas_luz') || '[]'),
     tarifas_gas: JSON.parse(localStorage.getItem('mock_tarifas_gas') || '[]'),
-    comparativas: JSON.parse(localStorage.getItem('mock_comparativas') || '[]')
+    comparativas: JSON.parse(localStorage.getItem('mock_comparativas') || '[]'),
+    clientes: JSON.parse(localStorage.getItem('mock_clientes') || '[]')
   };
 
   const save = () => {
@@ -190,6 +221,7 @@ function createMockDb() {
     localStorage.setItem('mock_tarifas_luz', JSON.stringify(mockStorage.tarifas_luz));
     localStorage.setItem('mock_tarifas_gas', JSON.stringify(mockStorage.tarifas_gas));
     localStorage.setItem('mock_comparativas', JSON.stringify(mockStorage.comparativas));
+    localStorage.setItem('mock_clientes', JSON.stringify(mockStorage.clientes));
   };
 
   return {
@@ -320,13 +352,59 @@ function createMockDb() {
           fecha: new Date().toISOString(), datos_cliente_json: params[3],
           comercializadora_luz_propuesta_id: params[4], tarifa_luz_propuesta_id: params[5], ahorro_luz_anual: params[6],
           comercializadora_gas_propuesta_id: params[7], tarifa_gas_propuesta_id: params[8], ahorro_gas_anual: params[9],
-          comision_total: params[10]
+          comision_total: params[10],
+          estado: 'Pendiente de aceptación'
         });
         save();
         return { lastInsertId: id, rowsAffected: 1 };
       }
+      if (query.includes("UPDATE comparativas SET estado")) {
+        const nuevoEstado = params[0];
+        const estadoCambiadoEn = params[1];
+        const id = params[2];
+        const index = mockStorage.comparativas.findIndex(c => c.id === id);
+        if (index !== -1) {
+          mockStorage.comparativas[index].estado = nuevoEstado;
+          mockStorage.comparativas[index].estado_cambiado_en = estadoCambiadoEn;
+          save();
+        }
+        return { rowsAffected: 1 };
+      }
       if (query.includes("DELETE FROM comparativas")) {
         mockStorage.comparativas = mockStorage.comparativas.filter(c => c.id !== params[0]);
+        save();
+        return { rowsAffected: 1 };
+      }
+      if (query.includes("INSERT INTO clientes")) {
+        const id = mockStorage.clientes.length + 1;
+        mockStorage.clientes.push({
+          id,
+          nombre_empresa: params[0],
+          cif: params[1],
+          representante: params[2],
+          cups: params[3],
+          creado_en: new Date().toISOString()
+        });
+        save();
+        return { lastInsertId: id, rowsAffected: 1 };
+      }
+      if (query.includes("UPDATE clientes")) {
+        const id = params[4];
+        const index = mockStorage.clientes.findIndex(item => item.id === id);
+        if (index !== -1) {
+          mockStorage.clientes[index] = {
+            ...mockStorage.clientes[index],
+            nombre_empresa: params[0],
+            cif: params[1],
+            representante: params[2],
+            cups: params[3]
+          };
+          save();
+        }
+        return { rowsAffected: 1 };
+      }
+      if (query.includes("DELETE FROM clientes")) {
+        mockStorage.clientes = mockStorage.clientes.filter(c => c.id !== params[0]);
         save();
         return { rowsAffected: 1 };
       }
@@ -357,6 +435,9 @@ function createMockDb() {
       }
       if (query.includes("FROM comparativas")) {
         return mockStorage.comparativas;
+      }
+      if (query.includes("FROM clientes")) {
+        return mockStorage.clientes;
       }
       return [];
     }
@@ -662,9 +743,16 @@ export async function clearAllTables() {
   if (window.__TAURI__ && window.__TAURI__.sql) {
     try {
       await db.execute("DELETE FROM comparativas;");
+      await db.execute("DELETE FROM clientes;");
       await db.execute("DELETE FROM tarifas_luz;");
       await db.execute("DELETE FROM tarifas_gas;");
       await db.execute("DELETE FROM comercializadoras;");
+      // Restablecer los contadores de incremento automático (AUTOINCREMENT) en SQLite
+      try {
+        await db.execute("DELETE FROM sqlite_sequence;");
+      } catch (seqError) {
+        console.log("No se pudo limpiar sqlite_sequence, probablemente no existe aún:", seqError);
+      }
     } catch (e) {
       console.error("Error al vaciar tablas SQLite:", e);
       throw e;
@@ -675,5 +763,166 @@ export async function clearAllTables() {
     localStorage.removeItem('mock_tarifas_luz');
     localStorage.removeItem('mock_tarifas_gas');
     localStorage.removeItem('mock_comparativas');
+    localStorage.removeItem('mock_clientes');
+  }
+}
+
+// --- Gestión de Clientes ---
+
+/**
+ * Obtiene la lista completa de clientes ordenados alfabéticamente por nombre de empresa/particular.
+ * @returns {Promise<Array<Object>>} Lista de clientes.
+ */
+export async function getClientes() {
+  const db = await getDb();
+  if (window.__TAURI__ && window.__TAURI__.sql) {
+    return await db.select(`
+      SELECT c.*, 
+             EXISTS (
+               SELECT 1 FROM comparativas comp 
+               WHERE comp.cliente_nombre = c.nombre_empresa AND comp.estado = 'Aceptada'
+             ) AS tiene_aceptada
+      FROM clientes c
+      ORDER BY c.nombre_empresa ASC;
+    `);
+  } else {
+    // Modo mock
+    const mockClients = await db.select("SELECT * FROM clientes;");
+    const mockComps = await db.select("SELECT * FROM comparativas;");
+    return mockClients.map(c => {
+      const tieneAceptada = mockComps.some(comp => comp.cliente_nombre === c.nombre_empresa && comp.estado === 'Aceptada');
+      return {
+        ...c,
+        tiene_aceptada: tieneAceptada ? 1 : 0
+      };
+    }).sort((a, b) => a.nombre_empresa.localeCompare(b.nombre_empresa));
+  }
+}
+
+/**
+ * Registra un nuevo cliente en la base de datos.
+ * @param {string} nombre - Nombre comercial de la empresa o nombre del particular.
+ * @param {string} cif - DNI/CIF fiscal único.
+ * @param {string} representante - Nombre del representante o contacto (opcional).
+ * @param {string} cups - Código CUPS (opcional).
+ * @returns {Promise<Object>} Resultado de la inserción.
+ */
+export async function addCliente(nombre, cif, representante, cups) {
+  const db = await getDb();
+  return await db.execute(
+    "INSERT INTO clientes (nombre_empresa, cif, representante, cups) VALUES ($1, $2, $3, $4);",
+    [nombre, cif, representante, cups]
+  );
+}
+
+/**
+ * Actualiza los datos de un cliente existente.
+ * @param {number} id - Identificador único del cliente.
+ * @param {string} nombre - Nombre comercial o particular.
+ * @param {string} cif - DNI/CIF fiscal.
+ * @param {string} representante - Nombre del representante (opcional).
+ * @param {string} cups - Código CUPS (opcional).
+ * @returns {Promise<Object>} Resultado de la actualización.
+ */
+export async function updateCliente(id, nombre, cif, representante, cups) {
+  const db = await getDb();
+  return await db.execute(
+    "UPDATE clientes SET nombre_empresa = $1, cif = $2, representante = $3, cups = $4 WHERE id = $5;",
+    [nombre, cif, representante, cups, id]
+  );
+}
+
+/**
+ * Elimina un cliente por su ID de la base de datos.
+ * @param {number} id - ID del cliente a eliminar.
+ * @returns {Promise<Object>} Resultado de la eliminación.
+ */
+export async function deleteCliente(id) {
+  const db = await getDb();
+  return await db.execute("DELETE FROM clientes WHERE id = $1;", [id]);
+}
+
+/**
+ * Actualiza el estado de aceptación de una comparativa.
+ * @param {number} id - ID de la comparativa.
+ * @param {string} nuevoEstado - 'Pendiente de aceptación', 'Aceptada' o 'Rechazada'.
+ * @returns {Promise<Object>} Resultado de la actualización.
+ */
+export async function updateComparativaEstado(id, nuevoEstado) {
+  const db = await getDb();
+  const cambiadoEn = (nuevoEstado === 'Pendiente de aceptación') ? null : new Date().toISOString();
+  return await db.execute(
+    "UPDATE comparativas SET estado = $1, estado_cambiado_en = $2 WHERE id = $3;",
+    [nuevoEstado, cambiadoEn, id]
+  );
+}
+
+/**
+ * Ejecuta una autopurga de comparaciones y clientes antiguos conforme a la ley de retención.
+ * @param {number} days - Número máximo de días de conservación de los datos.
+ */
+export async function purgeOldData(days) {
+  const db = await getDb();
+  if (window.__TAURI__ && window.__TAURI__.sql) {
+    try {
+      // 1. Eliminar comparativas pendientes o rechazadas antiguas (más de 365 días)
+      await db.execute(`
+        DELETE FROM comparativas 
+        WHERE (estado = 'Pendiente de aceptación' OR estado = 'Rechazada' OR estado IS NULL) 
+          AND fecha < datetime('now', '-365 days');
+      `);
+      
+      // 2. Eliminar comparativas aceptadas antiguas (más de 6 años)
+      await db.execute(`
+        DELETE FROM comparativas 
+        WHERE estado = 'Aceptada' 
+          AND fecha < datetime('now', '-6 years');
+      `);
+      
+      // 3. Eliminar clientes antiguos (más de 365 días) que no posean ninguna comparativa en el sistema
+      await db.execute(`
+        DELETE FROM clientes 
+        WHERE creado_en < datetime('now', '-365 days') 
+          AND nombre_empresa NOT IN (SELECT DISTINCT cliente_nombre FROM comparativas);
+      `);
+      
+      console.log("Purga automática de datos completada (plazos legales fijos aplicados).");
+    } catch (e) {
+      console.error("Error al ejecutar purga automática SQLite:", e);
+    }
+  } else {
+    // Purga en modo mock
+    try {
+      const retentionCutoff = Date.now() - (365 * 24 * 60 * 60 * 1000); // 365 días
+      const legalAcceptedCutoff = Date.now() - (6 * 365 * 24 * 60 * 60 * 1000); // 6 años
+      
+      const mockComps = JSON.parse(localStorage.getItem('mock_comparativas') || '[]');
+      
+      // Filtrar comparativas por su estado y antigüedad correspondiente
+      const filteredComps = mockComps.filter(c => {
+        const estado = c.estado || 'Pendiente de aceptación';
+        const dateMs = new Date(c.fecha).getTime();
+        if (estado === 'Aceptada') {
+          return dateMs >= legalAcceptedCutoff;
+        } else {
+          return dateMs >= retentionCutoff;
+        }
+      });
+      localStorage.setItem('mock_comparativas', JSON.stringify(filteredComps));
+
+      const mockClients = JSON.parse(localStorage.getItem('mock_clientes') || '[]');
+      const filteredClients = mockClients.filter(c => {
+        const isOld = new Date(c.creado_en).getTime() < retentionCutoff;
+        if (isOld) {
+          const hasComps = filteredComps.some(comp => comp.cliente_nombre === c.nombre_empresa);
+          return hasComps;
+        }
+        return true;
+      });
+      localStorage.setItem('mock_clientes', JSON.stringify(filteredClients));
+      console.log("Purga automática en modo mock completada (plazos legales fijos aplicados).");
+    } catch (e) {
+      console.error("Error al ejecutar purga automática en mock:", e);
+    }
   }
 }

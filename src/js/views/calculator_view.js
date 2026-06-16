@@ -1,7 +1,7 @@
 /* src/js/views/calculator_view.js */
 
 import { calculateLightBill, calculateGasBill } from '../calculator.js';
-import { getTarifasLuz, getTarifasGas, addComparativa } from '../db.js';
+import { getTarifasLuz, getTarifasGas, addComparativa, getClientes } from '../db.js';
 import { generatePDFReport } from '../pdf.js';
 
 // Datos temporales de la última comparación realizada
@@ -54,6 +54,135 @@ export function initCalculatorView() {
       modifyBtn.style.display = 'none';
       formContainer.scrollIntoView({ behavior: 'smooth' });
     });
+  }
+
+  // Autocompletado y auto-inyección de CUPS personalizado (Material 3)
+  const calcClientNameInput = document.getElementById('calc-client-name');
+  const calcClientCupsInput = document.getElementById('calc-client-cups');
+  const autocompleteList = document.getElementById('clients-autocomplete-list');
+
+  if (calcClientNameInput && autocompleteList) {
+    let activeIndex = -1;
+    let currentFilteredClients = [];
+
+    const closeAutocomplete = () => {
+      autocompleteList.classList.remove('open');
+      autocompleteList.innerHTML = '';
+      activeIndex = -1;
+    };
+
+    const renderSuggestions = async () => {
+      const val = calcClientNameInput.value.trim();
+      if (val.length === 0) {
+        closeAutocomplete();
+        return;
+      }
+
+      try {
+        const allClients = await getClientes();
+        currentFilteredClients = allClients.filter(c => 
+          c.nombre_empresa.toLowerCase().includes(val.toLowerCase()) ||
+          c.cif.toLowerCase().includes(val.toLowerCase()) ||
+          (c.cups && c.cups.toLowerCase().includes(val.toLowerCase()))
+        );
+
+        if (currentFilteredClients.length === 0) {
+          closeAutocomplete();
+          return;
+        }
+
+        autocompleteList.innerHTML = '';
+        activeIndex = -1;
+
+        currentFilteredClients.forEach((client, idx) => {
+          const item = document.createElement('div');
+          item.className = 'm3-autocomplete-item';
+          item.setAttribute('data-index', idx);
+
+          const nameStrong = document.createElement('strong');
+          nameStrong.innerText = client.nombre_empresa;
+          item.appendChild(nameStrong);
+
+          item.addEventListener('click', () => {
+            selectClient(client);
+          });
+
+          autocompleteList.appendChild(item);
+        });
+
+        autocompleteList.classList.add('open');
+      } catch (err) {
+        console.error("Error al obtener sugerencias de clientes:", err);
+      }
+    };
+
+    const selectClient = (client) => {
+      calcClientNameInput.value = client.nombre_empresa;
+      if (client.cups && calcClientCupsInput) {
+        calcClientCupsInput.value = client.cups;
+      }
+      closeAutocomplete();
+    };
+
+    calcClientNameInput.addEventListener('input', () => {
+      renderSuggestions();
+    });
+
+    calcClientNameInput.addEventListener('focus', () => {
+      if (calcClientNameInput.value.trim().length > 0) {
+        renderSuggestions();
+      }
+    });
+
+    // Cerrar al hacer click fuera
+    document.addEventListener('click', (e) => {
+      if (!calcClientNameInput.contains(e.target) && !autocompleteList.contains(e.target)) {
+        closeAutocomplete();
+      }
+    });
+
+    // Teclado: Navegación por flechas y Enter
+    calcClientNameInput.addEventListener('keydown', (e) => {
+      const items = autocompleteList.querySelectorAll('.m3-autocomplete-item');
+      if (items.length === 0 || !autocompleteList.classList.contains('open')) {
+        return;
+      }
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        activeIndex++;
+        if (activeIndex >= items.length) {
+          activeIndex = 0;
+        }
+        updateSelection(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeIndex--;
+        if (activeIndex < 0) {
+          activeIndex = items.length - 1;
+        }
+        updateSelection(items);
+      } else if (e.key === 'Enter') {
+        if (activeIndex !== -1 && items[activeIndex]) {
+          e.preventDefault();
+          selectClient(currentFilteredClients[activeIndex]);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeAutocomplete();
+      }
+    });
+
+    const updateSelection = (items) => {
+      items.forEach((item, idx) => {
+        if (idx === activeIndex) {
+          item.classList.add('selected');
+          item.scrollIntoView({ block: 'nearest' });
+        } else {
+          item.classList.remove('selected');
+        }
+      });
+    };
   }
 }
 
@@ -167,6 +296,28 @@ function setupCalcFormSubmit() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    const consentCheckbox = document.getElementById('calc-client-consent');
+    if (consentCheckbox && !consentCheckbox.checked) {
+      window.showToast("Debe confirmar que dispone del consentimiento explícito del cliente para poder continuar.", "warning");
+      return;
+    }
+
+    const clientNameInput = document.getElementById('calc-client-name');
+    const clientName = clientNameInput ? clientNameInput.value.trim() : "";
+    
+    // Verificar si el cliente existe en base de datos
+    const clients = await getClientes();
+    const clientExists = clients.some(c => c.nombre_empresa.toLowerCase() === clientName.toLowerCase());
+
+    if (!clientExists) {
+      const choice = await showNoClientAlert();
+      if (choice === 'redirect') {
+        const navClients = document.getElementById('nav-clients');
+        if (navClients) navClients.click();
+      }
+      return;
+    }
+
     const energyType = document.getElementById('calc-energy-type').value;
 
     if (!bypassTariffCheck) {
@@ -206,7 +357,6 @@ function setupCalcFormSubmit() {
 
     bypassTariffCheck = false;
 
-    const clientName = document.getElementById('calc-client-name').value.trim();
     const clientCups = document.getElementById('calc-client-cups').value.trim();
 
     // Resetear contenedores de resultados
@@ -453,6 +603,9 @@ function setupCalcFormReset() {
   if (!form) return;
 
   form.addEventListener('reset', () => {
+    const consentCheckbox = document.getElementById('calc-client-consent');
+    if (consentCheckbox) consentCheckbox.checked = false;
+
     // 1. Ocultar el contenedor de resultados
     const resultsWrapper = document.getElementById('calc-results-wrapper');
     if (resultsWrapper) {
@@ -605,10 +758,6 @@ function renderResultsList(containerId, results, type) {
             <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
             Previsualizar
           </button>
-          <button class="m3-btn m3-btn-outlined btn-pdf-report" data-type="${type}" data-idx="${index}">
-            <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
-            Imprimir Reporte
-          </button>
           <button class="m3-btn btn-save-comparison" data-type="${type}" data-idx="${index}">
             <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
             Guardar Comparativa
@@ -620,10 +769,6 @@ function renderResultsList(containerId, results, type) {
     // Enlazar eventos de cada tarjeta
     card.querySelector('.btn-preview-report').addEventListener('click', () => {
       exportPDF(item, type, true);
-    });
-
-    card.querySelector('.btn-pdf-report').addEventListener('click', () => {
-      exportPDF(item, type, false);
     });
 
     card.querySelector('.btn-save-comparison').addEventListener('click', async () => {
@@ -794,3 +939,35 @@ function showNoTariffsAlert(mensaje) {
     overlay.classList.add('active');
   });
 }
+
+function showNoClientAlert() {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('dialog-no-client');
+    const btnOmit = document.getElementById('dialog-no-client-omit');
+    const btnRedirect = document.getElementById('dialog-no-client-redirect');
+
+    if (!overlay || !btnOmit || !btnRedirect) {
+      resolve('omit');
+      return;
+    }
+
+    // Clonar botones para limpiar event listeners previos
+    const omitClone = btnOmit.cloneNode(true);
+    const redirectClone = btnRedirect.cloneNode(true);
+    btnOmit.replaceWith(omitClone);
+    btnRedirect.replaceWith(redirectClone);
+
+    omitClone.addEventListener('click', () => {
+      overlay.classList.remove('active');
+      resolve('omit');
+    });
+
+    redirectClone.addEventListener('click', () => {
+      overlay.classList.remove('active');
+      resolve('redirect');
+    });
+
+    overlay.classList.add('active');
+  });
+}
+

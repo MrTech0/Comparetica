@@ -16,7 +16,9 @@ function setupTabs() {
     { btn: 'tab-btn-settings-appearance', panel: 'panel-settings-appearance' },
     { btn: 'tab-btn-settings-company', panel: 'panel-settings-company' },
     { btn: 'tab-btn-settings-updates', panel: 'panel-settings-updates' },
-    { btn: 'tab-btn-settings-cleanup', panel: 'panel-settings-cleanup' }
+    { btn: 'tab-btn-settings-cleanup', panel: 'panel-settings-cleanup' },
+    { btn: 'tab-btn-settings-params', panel: 'panel-settings-params' },
+    { btn: 'tab-btn-settings-legal', panel: 'panel-settings-legal' }
   ];
 
   tabs.forEach(item => {
@@ -147,15 +149,26 @@ function setupCleanup() {
       localStorage.clear();
 
       // 3. Ejecutar comando Rust (borrar config y logos)
+      let msg = "";
       if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-        await window.__TAURI__.core.invoke('factory_reset');
+        msg = await window.__TAURI__.core.invoke('factory_reset');
       }
 
-      // 4. Mostrar Toast y Recargar ventana para reiniciar en limpio
-      window.showToast("Aplicación restablecida con éxito. Recargando...", "success");
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      // 4. Mostrar Toast y Recargar o Reiniciar
+      if (msg === "DEV_MODE") {
+        window.showToast("Aplicación restablecida con éxito. Recargando...", "success");
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else if (msg) {
+        window.showToast(msg, "success");
+        // El proceso nativo se reiniciará automáticamente, no necesitamos hacer reload()
+      } else {
+        window.showToast("Aplicación restablecida con éxito. Recargando...", "success");
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
     } catch (error) {
       console.error("Error al restablecer la aplicación:", error);
       submitBtn.disabled = false;
@@ -500,3 +513,4 @@ function setupUpdates() {
     }
   }
 }
+

@@ -1,7 +1,14 @@
 /* src/js/views/history.js */
 
-import { getComparativas, deleteComparativa } from '../db.js';
+import { getComparativas, deleteComparativa, updateComparativaEstado } from '../db.js';
 import { generatePDFReport } from '../pdf.js';
+
+let activeLockTimers = [];
+
+function clearActiveLockTimers() {
+  activeLockTimers.forEach(timer => clearTimeout(timer));
+  activeLockTimers = [];
+}
 
 export async function initHistoryView() {
   await loadHistoryTable();
@@ -16,17 +23,18 @@ async function refreshHistory() {
 }
 
 async function loadHistoryTable() {
+  clearActiveLockTimers();
   const tbody = document.querySelector('#table-history tbody');
   if (!tbody) return;
 
-  tbody.innerHTML = '<tr><td colspan="7" class="text-muted">Cargando historial...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" class="text-muted">Cargando historial...</td></tr>';
 
   try {
     const list = await getComparativas();
     tbody.innerHTML = '';
 
     if (list.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-muted">No se han registrado comparativas aún.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="text-muted">No se han registrado comparativas aún.</td></tr>';
       return;
     }
 
@@ -37,7 +45,29 @@ async function loadHistoryTable() {
       });
 
       const totalAhorro = c.ahorro_luz_anual + c.ahorro_gas_anual;
+      const currentEstado = c.estado || 'Pendiente de aceptación';
       
+      let estadoClass = 'estado-pendiente';
+      if (currentEstado === 'Aceptada') estadoClass = 'estado-aceptada';
+      else if (currentEstado === 'Rechazada') estadoClass = 'estado-rechazada';
+
+      // Calcular si el selector de estado está bloqueado (transcurrido más de 1 minuto en Aceptada/Rechazada)
+      let isLocked = false;
+      if (currentEstado === 'Aceptada' || currentEstado === 'Rechazada') {
+        if (!c.estado_cambiado_en) {
+          isLocked = true; // Sin registro de tiempo (registro antiguo) -> bloqueado
+        } else {
+          const cambiadoEnMs = new Date(c.estado_cambiado_en).getTime();
+          const diffMs = Date.now() - cambiadoEnMs;
+          isLocked = diffMs >= 60 * 1000; // Bloquear después de 60 segundos
+        }
+      }
+
+      const isAceptada = (currentEstado === 'Aceptada');
+      const deleteAttr = isAceptada
+        ? 'disabled style="opacity: 0.3; cursor: not-allowed;" title="Las comparativas aceptadas no se pueden eliminar por motivos de retención legal (Art. 30 Cód. Comercio)"'
+        : 'title="Eliminar del historial"';
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${dateStr}</td>
@@ -49,6 +79,19 @@ async function loadHistoryTable() {
           </span>
         </td>
         <td class="text-success">${totalAhorro.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/año</td>
+        <td>
+          <div class="m3-custom-status-select ${isLocked ? 'disabled' : ''}" data-id="${c.id}" ${isLocked ? 'title="El estado ya no se puede modificar al haber transcurrido el tiempo límite de cambio."' : ''}>
+            <div class="status-select-trigger ${estadoClass}" style="${isLocked ? 'cursor: not-allowed; opacity: 0.75;' : ''}">
+              <span>${escapeHtml(currentEstado)}</span>
+              <svg class="status-select-arrow" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+            </div>
+            <div class="status-select-options">
+              <div class="status-select-option estado-pendiente" data-value="Pendiente de aceptación">Pendiente de aceptación</div>
+              <div class="status-select-option estado-aceptada" data-value="Aceptada">Aceptada</div>
+              <div class="status-select-option estado-rechazada" data-value="Rechazada">Rechazada</div>
+            </div>
+          </div>
+        </td>
         <td class="private-value" style="font-weight: 600;">${c.comision_total.toFixed(2)} €</td>
         <td style="text-align: right; white-space: nowrap;">
           <button class="m3-btn-icon btn-preview-history" data-id="${c.id}" title="Previsualizar Reporte PDF">
@@ -57,7 +100,7 @@ async function loadHistoryTable() {
           <button class="m3-btn-icon btn-print-history" data-id="${c.id}" title="Guardar Reporte PDF">
             <svg viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
           </button>
-          <button class="m3-btn-icon btn-delete-history" data-id="${c.id}" title="Eliminar del historial">
+          <button class="m3-btn-icon btn-delete-history" data-id="${c.id}" ${deleteAttr}>
             <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
           </button>
         </td>
@@ -74,17 +117,106 @@ async function loadHistoryTable() {
       });
 
       // Evento de borrado
-      tr.querySelector('.btn-delete-history').addEventListener('click', async () => {
+      tr.querySelector('.btn-delete-history').addEventListener('click', async (e) => {
+        if (e.currentTarget.hasAttribute('disabled')) return;
         if (await window.showConfirm(`¿Está seguro de eliminar del historial la comparativa de ${c.cliente_nombre}?`, "Eliminar Comparativa")) {
           await deleteComparativa(c.id);
           await loadHistoryTable();
         }
       });
 
+      // Configurar eventos para el custom select de estado
+      const customSelect = tr.querySelector('.m3-custom-status-select');
+      const trigger = customSelect.querySelector('.status-select-trigger');
+      const triggerText = trigger.querySelector('span');
+      const options = customSelect.querySelectorAll('.status-select-option');
+
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (customSelect.classList.contains('disabled')) return;
+        
+        // Cerrar todos los demás custom status selects abiertos
+        document.querySelectorAll('.m3-custom-status-select').forEach(cs => {
+          if (cs !== customSelect) {
+            cs.classList.remove('open');
+          }
+        });
+        
+        customSelect.classList.toggle('open');
+      });
+
+      options.forEach(option => {
+        option.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const nuevoEstado = option.getAttribute('data-value');
+          
+          try {
+            await updateComparativaEstado(c.id, nuevoEstado);
+            
+            // Actualizar el texto del trigger
+            triggerText.textContent = nuevoEstado;
+            
+            // Actualizar la clase de color del trigger y habilitar/deshabilitar el borrado
+            trigger.className = 'status-select-trigger';
+            const deleteBtn = tr.querySelector('.btn-delete-history');
+            
+            if (nuevoEstado === 'Aceptada') {
+              trigger.classList.add('estado-aceptada');
+              deleteBtn.setAttribute('disabled', 'true');
+              deleteBtn.style.opacity = '0.3';
+              deleteBtn.style.cursor = 'not-allowed';
+              deleteBtn.setAttribute('title', 'Las comparativas aceptadas no se pueden eliminar por motivos de retención legal (Art. 30 Cód. Comercio)');
+            } else {
+              deleteBtn.removeAttribute('disabled');
+              deleteBtn.style.opacity = '';
+              deleteBtn.style.cursor = '';
+              deleteBtn.setAttribute('title', 'Eliminar del historial');
+              
+              if (nuevoEstado === 'Rechazada') {
+                trigger.classList.add('estado-rechazada');
+              } else {
+                trigger.classList.add('estado-pendiente');
+              }
+            }
+            
+            // Iniciar un temporizador de 1 minuto para bloquear el selector en la UI
+            if (customSelect._lockTimer) clearTimeout(customSelect._lockTimer);
+            
+            if (nuevoEstado === 'Aceptada' || nuevoEstado === 'Rechazada') {
+              const timer = setTimeout(() => {
+                customSelect.classList.add('disabled');
+                customSelect.setAttribute('title', 'El estado ya no se puede modificar al haber transcurrido el tiempo límite de cambio.');
+                trigger.style.cursor = 'not-allowed';
+                trigger.style.opacity = '0.75';
+                window.showToast(`El estado de la comparativa de ${c.cliente_nombre} ha quedado fijado de forma definitiva.`, "info");
+              }, 60000); // 60 segundos
+              customSelect._lockTimer = timer;
+              activeLockTimers.push(timer);
+            } else {
+              customSelect._lockTimer = null;
+            }
+            
+            customSelect.classList.remove('open');
+            window.showToast("Estado de la comparativa actualizado correctamente.", "success");
+            
+            // Recargar tabla de clientes si es necesario para refrescar su Tipo Cliente
+            const clientsSection = document.getElementById('section-clients');
+            if (clientsSection && clientsSection.classList.contains('active')) {
+              // Si la sección de clientes está visible/activa, refrescar la tabla de clientes
+              const { loadClientsTable } = await import('./clients.js');
+              await loadClientsTable();
+            }
+          } catch (err) {
+            window.showToast("Error al actualizar el estado.", "error");
+            console.error(err);
+          }
+        });
+      });
+
       tbody.appendChild(tr);
     });
   } catch (error) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-error">Error al cargar el historial.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-error">Error al cargar el historial.</td></tr>';
     console.error(error);
   }
 }
@@ -194,3 +326,10 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+// Cerrar todos los selectores de estado personalizados si se hace click fuera
+document.addEventListener('click', () => {
+  document.querySelectorAll('.m3-custom-status-select').forEach(cs => {
+    cs.classList.remove('open');
+  });
+});
