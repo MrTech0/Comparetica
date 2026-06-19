@@ -1,3 +1,21 @@
+# Novedades en la versión v0.2.1
+
+Esta versión introduce mejoras de seguridad en los formularios de registro y refina la experiencia de búsqueda y cumplimiento legal de borrado.
+
+### 📋 Cambios Introducidos:
+
+* **🔍 Búsqueda Case y Accent Insensitive:**
+  * Corregido un error de referencia de búsqueda en el menú de Clientes.
+  * Implementado filtrado insensible a mayúsculas, minúsculas, tildes y diacríticos en las búsquedas de los paneles de *Gestión de Clientes* (por Nombre, CIF/DNI y CUPS) e *Historial de Comparativas* (por Nombre y CUPS).
+
+* **🛡️ Validación de DNI / NIE / CIF:**
+  * Se valida matemáticamente el formato y el carácter de control de los documentos de identidad españoles al registrar o actualizar clientes, previniendo errores tipográficos involuntarios.
+
+* **⚖️ Aviso Informativo al Intentar Borrar Comparativas Aceptadas:**
+  * Se permite hacer clic en el botón de borrar de las comparativas del historial que estén en estado *Aceptada*. En lugar de estar deshabilitado, al pulsarlo se muestra un diálogo modal Material Design 3 informativo sobre las obligaciones de retención del Artículo 30 del Código de Comercio.
+
+---
+
 # Novedades en la versión v0.2.0
 
 Esta actualización introduce el nuevo régimen de retención legal obligatoria de datos y soluciona por completo el restablecimiento de fábrica limpio con reinicio de IDs a 1.

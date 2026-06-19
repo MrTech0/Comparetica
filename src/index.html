@@ -155,6 +155,16 @@
                 Crea, edita o elimina los datos de tus clientes (particulares y empresas). Los campos <strong>Nombre de la Empresa / Particular</strong> y <strong>CIF/DNI</strong> son obligatorios para poder registrar un cliente y realizar estudios comparativos de ahorro.
               </p>
 
+              <!-- Buscador de Clientes -->
+              <div class="m3-field" style="margin-bottom: 16px;">
+                <div style="position: relative; display: flex; align-items: center; width: 100%;">
+                  <svg viewBox="0 0 24 24" style="position: absolute; left: 16px; width: 20px; height: 20px; fill: var(--color-on-surface-variant); pointer-events: none; opacity: 0.7;">
+                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                  </svg>
+                  <input type="text" id="search-clients-input" class="m3-input" placeholder="Buscar cliente por nombre, CIF/DNI o CUPS..." style="padding-left: 48px;" />
+                </div>
+              </div>
+
               <div class="table-container">
                 <table class="m3-table" id="table-clients">
                   <thead>
@@ -658,7 +668,23 @@
                SECTION: HISTORY
                ========================================== -->
           <section id="section-history" class="view-section">
-            <div class="table-container margin-top-md">
+            <div class="m3-card margin-top-md" style="margin-bottom: 16px;">
+              <h2 class="m3-card-title" style="margin-top: 0; margin-bottom: 8px;">Historial de Comparativas</h2>
+              <p class="text-muted" style="font-size: 13px; line-height: 1.5; margin-bottom: 16px;">
+                Consulta las comparativas generadas, realiza un seguimiento del estado de aceptación y descarga los reportes detallados en PDF.
+              </p>
+              <!-- Buscador de Comparativas -->
+              <div class="m3-field" style="margin-bottom: 0;">
+                <div style="position: relative; display: flex; align-items: center; width: 100%;">
+                  <svg viewBox="0 0 24 24" style="position: absolute; left: 16px; width: 20px; height: 20px; fill: var(--color-on-surface-variant); pointer-events: none; opacity: 0.7;">
+                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                  </svg>
+                  <input type="text" id="search-history-input" class="m3-input" placeholder="Buscar comparativa por nombre de cliente o CUPS..." style="padding-left: 48px;" />
+                </div>
+              </div>
+            </div>
+
+            <div class="table-container margin-top-none">
               <table class="m3-table" id="table-history">
                 <thead>
                   <tr>
@@ -1087,26 +1113,25 @@
                 <input type="number" id="dialog-light-excedente" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" value="0" />
               </div>
   
-              <div class="m3-field">
-                <label class="m3-label" for="dialog-light-comision-tipo">Tipo de Comisión *</label>
-                <select id="dialog-light-comision-tipo" class="m3-input m3-select" required>
-                  <option value="fija">Fija</option>
-                  <option value="tramos">Por Tramos de Consumo</option>
-                </select>
-              </div>
-  
-              <div id="dialog-light-comision-fija-group" class="m3-field">
-                <label class="m3-label" for="dialog-light-commission">Comisión Asesor (&euro;) *</label>
-                <input type="number" id="dialog-light-commission" class="m3-input" placeholder="0.00" step="0.01" min="0" value="0" />
-              </div>
-  
-              <div id="dialog-light-comision-tramos-group" style="display: none;">
-                <label class="m3-label">Comisiones por Tramos de Consumo Anual</label>
-                <div id="dialog-light-tramos-container" class="comision-tramos-container">
+              <div style="font-family: var(--font-title); font-weight: 500; font-size: 14px; color: var(--color-primary); margin: 16px 0 8px 0; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 4px;">Comisiones de la Tarifa</div>
+
+              <div id="dialog-light-comision-tramos-consumo-group" style="margin-top: 12px;">
+                <label class="m3-label">Comisiones por Tramos de Consumo Anual (kWh)</label>
+                <div id="dialog-light-tramos-consumo-container" class="comision-tramos-container">
                   <!-- Filas dinámicas aquí -->
                 </div>
-                <button type="button" id="dialog-light-add-tramo-btn" class="m3-btn m3-btn-text comision-tramo-add-btn">
-                  <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor; margin-right: 6px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Añadir Tramo
+                <button type="button" id="dialog-light-add-tramo-consumo-btn" class="m3-btn m3-btn-text comision-tramo-add-btn">
+                  <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor; margin-right: 6px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Añadir Tramo de Consumo
+                </button>
+              </div>
+
+              <div id="dialog-light-comision-tramos-potencia-group" style="margin-top: 16px;">
+                <label class="m3-label">Comisiones por Tramos de Potencia Contratada (kW)</label>
+                <div id="dialog-light-tramos-potencia-container" class="comision-tramos-container">
+                  <!-- Filas dinámicas aquí -->
+                </div>
+                <button type="button" id="dialog-light-add-tramo-potencia-btn" class="m3-btn m3-btn-text comision-tramo-add-btn">
+                  <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor; margin-right: 6px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Añadir Tramo de Potencia
                 </button>
               </div>
   
@@ -1166,26 +1191,15 @@
                 </div>
               </div>
   
-              <div class="m3-field">
-                <label class="m3-label" for="dialog-gas-comision-tipo">Tipo de Comisión *</label>
-                <select id="dialog-gas-comision-tipo" class="m3-input m3-select" required>
-                  <option value="fija">Fija</option>
-                  <option value="tramos">Por Tramos de Consumo</option>
-                </select>
-              </div>
-  
-              <div id="dialog-gas-comision-fija-group" class="m3-field">
-                <label class="m3-label" for="dialog-gas-commission">Comisión Asesor (€) *</label>
-                <input type="number" id="dialog-gas-commission" class="m3-input" placeholder="0.00" step="0.01" min="0" value="0" />
-              </div>
-  
-              <div id="dialog-gas-comision-tramos-group" style="display: none;">
-                <label class="m3-label">Comisiones por Tramos de Consumo Anual</label>
-                <div id="dialog-gas-tramos-container" class="comision-tramos-container">
+              <div style="font-family: var(--font-title); font-weight: 500; font-size: 14px; color: var(--color-primary); margin: 16px 0 8px 0; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 4px;">Comisiones de la Tarifa</div>
+
+              <div id="dialog-gas-comision-tramos-consumo-group" style="margin-top: 12px;">
+                <label class="m3-label">Comisiones por Tramos de Consumo Anual (kWh)</label>
+                <div id="dialog-gas-tramos-consumo-container" class="comision-tramos-container">
                   <!-- Filas dinámicas aquí -->
                 </div>
-                <button type="button" id="dialog-gas-add-tramo-btn" class="m3-btn m3-btn-text comision-tramo-add-btn">
-                  <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor; margin-right: 6px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Añadir Tramo
+                <button type="button" id="dialog-gas-add-tramo-consumo-btn" class="m3-btn m3-btn-text comision-tramo-add-btn">
+                  <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor; margin-right: 6px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Añadir Tramo de Consumo
                 </button>
               </div>
   
@@ -1461,6 +1475,48 @@
             <button type="button" id="dialog-update-alert-close" class="m3-btn m3-btn-text">Cerrar</button>
             <button type="button" id="dialog-update-alert-postpone" class="m3-btn m3-btn-outlined">Posponer 1 Día</button>
             <button type="button" id="dialog-update-alert-accept" class="m3-btn">Actualizar Ahora</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: ADVERTENCIA RETENCIÓN LEGAL DE CLIENTE -->
+      <div id="dialog-legal-retention-warn" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="border-left: 6px solid var(--color-error); max-width: 500px;">
+          <h3 class="m3-dialog-title" style="color: var(--color-error); display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: currentColor;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            Acción Bloqueada por Ley
+          </h3>
+          <div class="m3-dialog-body" style="margin-top: 12px;">
+            <p style="margin: 0 0 12px 0; font-size: 14px; line-height: 1.5; color: var(--color-on-surface); font-weight: 500;">
+              No se puede eliminar a este cliente de la base de datos.
+            </p>
+            <p style="margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--color-on-surface-variant);">
+              Este cliente tiene <strong>comparativas aceptadas activas</strong> en el sistema. Según el <strong>Artículo 30 del Código de Comercio</strong> de España, es obligatorio conservar toda la documentación y justificantes concernientes al negocio (la base de cálculo de tus comisiones) durante un plazo de <strong>6 años</strong> tras su aceptación.
+            </p>
+          </div>
+          <div class="m3-dialog-actions" style="margin-top: 20px;">
+            <button type="button" id="dialog-legal-retention-close" class="m3-btn">Entendido</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: ADVERTENCIA RETENCIÓN LEGAL DE COMPARATIVA -->
+      <div id="dialog-legal-retention-comp-warn" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="border-left: 6px solid var(--color-error); max-width: 500px;">
+          <h3 class="m3-dialog-title" style="color: var(--color-error); display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: currentColor;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            Acción Bloqueada por Ley
+          </h3>
+          <div class="m3-dialog-body" style="margin-top: 12px;">
+            <p style="margin: 0 0 12px 0; font-size: 14px; line-height: 1.5; color: var(--color-on-surface); font-weight: 500;">
+              No se puede eliminar esta comparativa del historial.
+            </p>
+            <p style="margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--color-on-surface-variant);">
+              Esta comparativa está marcada como <strong>Aceptada</strong>. Según el <strong>Artículo 30 del Código de Comercio</strong> de España, es obligatorio conservar toda la documentación y justificantes concernientes al negocio durante un plazo de <strong>6 años</strong> tras su aceptación. Al estar aceptada, esta comparativa constituye el soporte y la justificación de una transacción comercial y la comisión devengada asociada.
+            </p>
+          </div>
+          <div class="m3-dialog-actions" style="margin-top: 20px;">
+            <button type="button" id="dialog-legal-retention-comp-close" class="m3-btn">Entendido</button>
           </div>
         </div>
       </div>

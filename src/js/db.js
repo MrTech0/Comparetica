@@ -77,8 +77,8 @@ async function initSchema(db) {
         energia_p5 REAL DEFAULT 0.0,
         energia_p6 REAL DEFAULT 0.0,
         excedente REAL DEFAULT 0.0,
-        comision REAL NOT NULL DEFAULT 0.0,
-        comision_tramos TEXT,
+        comision_tramos_consumo TEXT,
+        comision_tramos_potencia TEXT,
         notas TEXT,
         activo INTEGER DEFAULT 1,
         creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -112,10 +112,61 @@ async function initSchema(db) {
       await db.execute("ALTER TABLE tarifas_luz ADD COLUMN excedente REAL DEFAULT 0.0;");
       console.log("Migración excedente en tarifas_luz completada.");
     }
-    const hasComisionTramos = columns.some(c => c.name === 'comision_tramos');
-    if (!hasComisionTramos) {
-      await db.execute("ALTER TABLE tarifas_luz ADD COLUMN comision_tramos TEXT;");
-      console.log("Migración comision_tramos en tarifas_luz completada.");
+
+    const hasTramosConsumo = columns.some(c => c.name === 'comision_tramos_consumo');
+    if (!hasTramosConsumo) {
+      await db.execute("ALTER TABLE tarifas_luz ADD COLUMN comision_tramos_consumo TEXT;");
+      await db.execute("ALTER TABLE tarifas_luz ADD COLUMN comision_tramos_potencia TEXT;");
+      console.log("Añadidas columnas comision_tramos_consumo y comision_tramos_potencia a tarifas_luz.");
+
+      // Migrar datos de tarifas_luz
+      const rows = await db.select("SELECT id, comision, comision_potencia, comision_tramos FROM tarifas_luz;");
+      for (const row of rows) {
+        let trConsumo = [];
+        let trPotencia = [];
+
+        if (row.comision_tramos) {
+          try {
+            const parsed = JSON.parse(row.comision_tramos);
+            if (Array.isArray(parsed)) {
+              parsed.forEach(tr => {
+                const u = (tr.unidad || 'kW').toLowerCase();
+                const limit = tr.tipo === 'hasta' ? tr.hasta : (tr.tipo === 'desde' ? tr.desde : tr.hasta);
+                if (u === 'kw' && limit <= 120) {
+                  trPotencia.push(tr);
+                } else {
+                  trConsumo.push(tr);
+                }
+              });
+            }
+          } catch (e) {
+            console.error("Error al migrar comision_tramos de luz id", row.id, e);
+          }
+        }
+
+        if (row.comision > 0 && trConsumo.length === 0) {
+          trConsumo.push({ tipo: 'desde', desde: 0, unidad: 'kWh', comision: row.comision });
+        }
+
+        await db.execute(
+          "UPDATE tarifas_luz SET comision_tramos_consumo = $1, comision_tramos_potencia = $2 WHERE id = $3;",
+          [
+            trConsumo.length > 0 ? JSON.stringify(trConsumo) : null,
+            trPotencia.length > 0 ? JSON.stringify(trPotencia) : null,
+            row.id
+          ]
+        );
+      }
+      console.log("Migración de datos de comisiones en tarifas_luz completada.");
+
+      // Eliminar columnas antiguas
+      const hasOldComision = columns.some(c => c.name === 'comision');
+      if (hasOldComision) {
+        await db.execute("ALTER TABLE tarifas_luz DROP COLUMN comision;");
+        await db.execute("ALTER TABLE tarifas_luz DROP COLUMN comision_potencia;");
+        await db.execute("ALTER TABLE tarifas_luz DROP COLUMN comision_tramos;");
+        console.log("Columnas antiguas de comisión eliminadas de tarifas_luz.");
+      }
     }
   } catch (err) {
     console.error("Error al migrar la tabla tarifas_luz:", err);
@@ -131,8 +182,7 @@ async function initSchema(db) {
         tipo_tarifa TEXT NOT NULL DEFAULT 'RL.1',
         termino_fijo REAL NOT NULL,
         termino_variable REAL NOT NULL,
-        comision REAL NOT NULL DEFAULT 0.0,
-        comision_tramos TEXT,
+        comision_tramos_consumo TEXT,
         notas TEXT,
         activo INTEGER DEFAULT 1,
         creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -154,10 +204,51 @@ async function initSchema(db) {
       await db.execute("ALTER TABLE tarifas_gas ADD COLUMN creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP;");
       console.log("Migración creado_en en tarifas_gas completada.");
     }
-    const hasComisionTramosGas = columns.some(c => c.name === 'comision_tramos');
-    if (!hasComisionTramosGas) {
-      await db.execute("ALTER TABLE tarifas_gas ADD COLUMN comision_tramos TEXT;");
-      console.log("Migración comision_tramos en tarifas_gas completada.");
+
+    const hasTramosConsumoGas = columns.some(c => c.name === 'comision_tramos_consumo');
+    if (!hasTramosConsumoGas) {
+      await db.execute("ALTER TABLE tarifas_gas ADD COLUMN comision_tramos_consumo TEXT;");
+      console.log("Añadida columna comision_tramos_consumo a tarifas_gas.");
+
+      // Migrar datos de tarifas_gas
+      const rows = await db.select("SELECT id, comision, comision_tramos FROM tarifas_gas;");
+      for (const row of rows) {
+        let trConsumo = [];
+
+        if (row.comision_tramos) {
+          try {
+            const parsed = JSON.parse(row.comision_tramos);
+            if (Array.isArray(parsed)) {
+              parsed.forEach(tr => {
+                trConsumo.push(tr);
+              });
+            }
+          } catch (e) {
+            console.error("Error al migrar comision_tramos de gas id", row.id, e);
+          }
+        }
+
+        if (row.comision > 0 && trConsumo.length === 0) {
+          trConsumo.push({ tipo: 'desde', desde: 0, unidad: 'kWh', comision: row.comision });
+        }
+
+        await db.execute(
+          "UPDATE tarifas_gas SET comision_tramos_consumo = $1 WHERE id = $2;",
+          [
+            trConsumo.length > 0 ? JSON.stringify(trConsumo) : null,
+            row.id
+          ]
+        );
+      }
+      console.log("Migración de datos de comisiones en tarifas_gas completada.");
+
+      // Eliminar columnas antiguas
+      const hasOldComisionGas = columns.some(c => c.name === 'comision');
+      if (hasOldComisionGas) {
+        await db.execute("ALTER TABLE tarifas_gas DROP COLUMN comision;");
+        await db.execute("ALTER TABLE tarifas_gas DROP COLUMN comision_tramos;");
+        console.log("Columnas antiguas de comisión eliminadas de tarifas_gas.");
+      }
     }
   } catch (err) {
     console.error("Error al migrar la tabla tarifas_gas:", err);
@@ -216,6 +307,78 @@ function createMockDb() {
     clientes: JSON.parse(localStorage.getItem('mock_clientes') || '[]')
   };
 
+  // Migración de mockStorage en localStorage para comisiones
+  let mockStorageChanged = false;
+  
+  mockStorage.tarifas_luz.forEach(t => {
+    if (t.comision_tramos_consumo === undefined) {
+      let trConsumo = [];
+      let trPotencia = [];
+      
+      if (t.comision_tramos) {
+        try {
+          const parsed = JSON.parse(t.comision_tramos);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(tr => {
+              const u = (tr.unidad || 'kW').toLowerCase();
+              const limit = tr.tipo === 'hasta' ? tr.hasta : (tr.tipo === 'desde' ? tr.desde : tr.hasta);
+              if (u === 'kw' && limit <= 120) {
+                trPotencia.push(tr);
+              } else {
+                trConsumo.push(tr);
+              }
+            });
+          }
+        } catch (e) {}
+      }
+      
+      if (t.comision > 0 && trConsumo.length === 0) {
+        trConsumo.push({ tipo: 'desde', desde: 0, unidad: 'kWh', comision: t.comision });
+      }
+      
+      t.comision_tramos_consumo = trConsumo.length > 0 ? JSON.stringify(trConsumo) : null;
+      t.comision_tramos_potencia = trPotencia.length > 0 ? JSON.stringify(trPotencia) : null;
+      
+      delete t.comision;
+      delete t.comision_potencia;
+      delete t.comision_tramos;
+      mockStorageChanged = true;
+    }
+  });
+
+  mockStorage.tarifas_gas.forEach(t => {
+    if (t.comision_tramos_consumo === undefined) {
+      let trConsumo = [];
+      
+      if (t.comision_tramos) {
+        try {
+          const parsed = JSON.parse(t.comision_tramos);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(tr => {
+              trConsumo.push(tr);
+            });
+          }
+        } catch (e) {}
+      }
+      
+      if (t.comision > 0 && trConsumo.length === 0) {
+        trConsumo.push({ tipo: 'desde', desde: 0, unidad: 'kWh', comision: t.comision });
+      }
+      
+      t.comision_tramos_consumo = trConsumo.length > 0 ? JSON.stringify(trConsumo) : null;
+      
+      delete t.comision;
+      delete t.comision_tramos;
+      mockStorageChanged = true;
+    }
+  });
+
+  if (mockStorageChanged) {
+    localStorage.setItem('mock_tarifas_luz', JSON.stringify(mockStorage.tarifas_luz));
+    localStorage.setItem('mock_tarifas_gas', JSON.stringify(mockStorage.tarifas_gas));
+    console.log("Migración de mockStorage en localStorage completada.");
+  }
+
   const save = () => {
     localStorage.setItem('mock_comercializadoras', JSON.stringify(mockStorage.comercializadoras));
     localStorage.setItem('mock_tarifas_luz', JSON.stringify(mockStorage.tarifas_luz));
@@ -227,7 +390,6 @@ function createMockDb() {
   return {
     async execute(query, params = []) {
       console.log("Mock DB Execute:", query, params);
-      // Analizar queries comunes de inserción/borrado muy simplificadas
       if (query.includes("INSERT INTO comercializadoras")) {
         const id = mockStorage.comercializadoras.length + 1;
         mockStorage.comercializadoras.push({ id, nombre: params[0], creado_en: new Date().toISOString() });
@@ -261,8 +423,8 @@ function createMockDb() {
           energia_p5: params[13],
           energia_p6: params[14],
           excedente: params[15],
-          comision: params[16],
-          comision_tramos: params[17],
+          comision_tramos_consumo: params[16],
+          comision_tramos_potencia: params[17],
           notas: params[18],
           activo: 1,
           creado_en: new Date().toISOString().replace('T', ' ').substring(0, 19)
@@ -291,8 +453,8 @@ function createMockDb() {
             energia_p5: params[12],
             energia_p6: params[13],
             excedente: params[14],
-            comision: params[15],
-            comision_tramos: params[16],
+            comision_tramos_consumo: params[15],
+            comision_tramos_potencia: params[16],
             notas: params[17]
           };
           save();
@@ -313,9 +475,8 @@ function createMockDb() {
           tipo_tarifa: params[2],
           termino_fijo: params[3],
           termino_variable: params[4],
-          comision: params[5],
-          comision_tramos: params[6],
-          notas: params[7],
+          comision_tramos_consumo: params[5],
+          notas: params[6],
           activo: 1,
           creado_en: new Date().toISOString().replace('T', ' ').substring(0, 19)
         });
@@ -323,7 +484,7 @@ function createMockDb() {
         return { lastInsertId: id, rowsAffected: 1 };
       }
       if (query.includes("UPDATE tarifas_gas")) {
-        const id = params[7];
+        const id = params[6];
         const index = mockStorage.tarifas_gas.findIndex(item => item.id === id);
         if (index !== -1) {
           mockStorage.tarifas_gas[index] = {
@@ -332,9 +493,8 @@ function createMockDb() {
             tipo_tarifa: params[1],
             termino_fijo: params[2],
             termino_variable: params[3],
-            comision: params[4],
-            comision_tramos: params[5],
-            notas: params[6]
+            comision_tramos_consumo: params[4],
+            notas: params[5]
           };
           save();
         }
@@ -517,8 +677,8 @@ export async function getTarifasLuz(comercializadoraId = null) {
  * @param {number} energiaP5 - Precio energía P5 (€/kWh).
  * @param {number} energiaP6 - Precio energía P6 (€/kWh).
  * @param {number} excedente - Precio compensación excedente (€/kWh).
- * @param {number} comision - Comisión base (€).
- * @param {string} comisionTramos - Cadena JSON con tramos de comisión según consumo.
+ * @param {string} comisionTramosConsumo - Cadena JSON con tramos de comisión según consumo.
+ * @param {string} comisionTramosPotencia - Cadena JSON con tramos de comisión según potencia.
  * @param {string} notas - Comentarios o notas aclaratorias.
  * @returns {Promise<Object>} Resultado de la inserción.
  */
@@ -526,7 +686,7 @@ export async function addTarifaLuz(
   comercializadoraId, nombre, tipoTarifa,
   potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
   energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-  excedente, comision, comisionTramos, notas
+  excedente, comisionTramosConsumo, comisionTramosPotencia, notas
 ) {
   const db = await getDb();
   return await db.execute(
@@ -534,13 +694,13 @@ export async function addTarifaLuz(
       comercializadora_id, nombre, tipo_tarifa, 
       potencia_p1, potencia_p2, potencia_p3, potencia_p4, potencia_p5, potencia_p6, 
       energia_p1, energia_p2, energia_p3, energia_p4, energia_p5, energia_p6, 
-      excedente, comision, comision_tramos, notas
+      excedente, comision_tramos_consumo, comision_tramos_potencia, notas
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19);`,
     [
       comercializadoraId, nombre, tipoTarifa,
       potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
       energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-      excedente, comision, comisionTramos, notas
+      excedente, comisionTramosConsumo, comisionTramosPotencia, notas
     ]
   );
 }
@@ -563,8 +723,8 @@ export async function addTarifaLuz(
  * @param {number} energiaP5 - Precio energía P5 (€/kWh).
  * @param {number} energiaP6 - Precio energía P6 (€/kWh).
  * @param {number} excedente - Precio compensación excedente (€/kWh).
- * @param {number} comision - Comisión base (€).
- * @param {string} comisionTramos - Cadena JSON con tramos de comisión.
+ * @param {string} comisionTramosConsumo - Cadena JSON con tramos de comisión según consumo.
+ * @param {string} comisionTramosPotencia - Cadena JSON con tramos de comisión según potencia.
  * @param {string} notas - Comentarios o notas.
  * @returns {Promise<Object>} Resultado de la actualización.
  */
@@ -572,7 +732,7 @@ export async function updateTarifaLuz(
   id, nombre, tipoTarifa,
   potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
   energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-  excedente, comision, comisionTramos, notas
+  excedente, comisionTramosConsumo, comisionTramosPotencia, notas
 ) {
   const db = await getDb();
   return await db.execute(
@@ -580,13 +740,13 @@ export async function updateTarifaLuz(
       nombre = $1, tipo_tarifa = $2, 
       potencia_p1 = $3, potencia_p2 = $4, potencia_p3 = $5, potencia_p4 = $6, potencia_p5 = $7, potencia_p6 = $8, 
       energia_p1 = $9, energia_p2 = $10, energia_p3 = $11, energia_p4 = $12, energia_p5 = $13, energia_p6 = $14, 
-      excedente = $15, comision = $16, comision_tramos = $17, notas = $18 
+      excedente = $15, comision_tramos_consumo = $16, comision_tramos_potencia = $17, notas = $18 
      WHERE id = $19;`,
     [
       nombre, tipoTarifa,
       potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
       energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-      excedente, comision, comisionTramos, notas, id
+      excedente, comisionTramosConsumo, comisionTramosPotencia, notas, id
     ]
   );
 }
@@ -628,17 +788,16 @@ export async function getTarifasGas(comercializadoraId = null) {
  * @param {string} tipoTarifa - Peaje de gas ('RL.1' a 'RL.6').
  * @param {number} terminoFijo - Término fijo mensual (€/mes).
  * @param {number} terminoVariable - Término variable (€/kWh).
- * @param {number} comision - Comisión base (€).
- * @param {string} comisionTramos - Cadena JSON con los tramos de comisión.
+ * @param {string} comisionTramosConsumo - Cadena JSON con los tramos de comisión.
  * @param {string} notas - Notas o aclaraciones.
  * @returns {Promise<Object>} Resultado de la inserción.
  */
-export async function addTarifaGas(comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas) {
+export async function addTarifaGas(comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comisionTramosConsumo, notas) {
   const db = await getDb();
   return await db.execute(
-    `INSERT INTO tarifas_gas (comercializadora_id, nombre, tipo_tarifa, termino_fijo, termino_variable, comision, comision_tramos, notas) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
-    [comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas]
+    `INSERT INTO tarifas_gas (comercializadora_id, nombre, tipo_tarifa, termino_fijo, termino_variable, comision_tramos_consumo, notas) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7);`,
+    [comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comisionTramosConsumo, notas]
   );
 }
 
@@ -654,12 +813,12 @@ export async function addTarifaGas(comercializadoraId, nombre, tipoTarifa, termi
  * @param {string} notas - Notas.
  * @returns {Promise<Object>} Resultado de la actualización.
  */
-export async function updateTarifaGas(id, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas) {
+export async function updateTarifaGas(id, nombre, tipoTarifa, terminoFijo, terminoVariable, comisionTramosConsumo, notas) {
   const db = await getDb();
   return await db.execute(
-    `UPDATE tarifas_gas SET nombre = $1, tipo_tarifa = $2, termino_fijo = $3, termino_variable = $4, comision = $5, comision_tramos = $6, notas = $7 
-     WHERE id = $8;`,
-    [nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas, id]
+    `UPDATE tarifas_gas SET nombre = $1, tipo_tarifa = $2, termino_fijo = $3, termino_variable = $4, comision_tramos_consumo = $5, notas = $6 
+     WHERE id = $7;`,
+    [nombre, tipoTarifa, terminoFijo, terminoVariable, comisionTramosConsumo, notas, id]
   );
 }
 
@@ -832,14 +991,68 @@ export async function updateCliente(id, nombre, cif, representante, cups) {
   );
 }
 
-/**
- * Elimina un cliente por su ID de la base de datos.
- * @param {number} id - ID del cliente a eliminar.
- * @returns {Promise<Object>} Resultado de la eliminación.
- */
 export async function deleteCliente(id) {
   const db = await getDb();
-  return await db.execute("DELETE FROM clientes WHERE id = $1;", [id]);
+  if (window.__TAURI__ && window.__TAURI__.sql) {
+    // 1. Obtener el nombre del cliente
+    const clientRows = await db.select("SELECT nombre_empresa FROM clientes WHERE id = $1;", [id]);
+    if (clientRows.length === 0) {
+      throw new Error("Cliente no encontrado.");
+    }
+    const nombre = clientRows[0].nombre_empresa;
+
+    // 2. Comprobar si tiene comparativas aceptadas (menos de 6 años)
+    const comps = await db.select(`
+      SELECT COUNT(*) as count FROM comparativas 
+      WHERE cliente_nombre = $1 AND estado = 'Aceptada' 
+        AND fecha >= datetime('now', '-6 years');
+    `, [nombre]);
+    
+    const count = comps.length > 0 ? (comps[0].count || 0) : 0;
+    if (count > 0) {
+      throw new Error("OBLIGACION_LEGAL_RETENCION");
+    }
+
+    // 3. Eliminar comparativas pendientes o rechazadas asociadas
+    await db.execute(`
+      DELETE FROM comparativas 
+      WHERE cliente_nombre = $1 AND (estado != 'Aceptada' OR estado IS NULL);
+    `, [nombre]);
+
+    // 4. Eliminar el cliente
+    return await db.execute("DELETE FROM clientes WHERE id = $1;", [id]);
+  } else {
+    // Modo mock
+    const mockClients = await db.select("SELECT * FROM clientes;");
+    const client = mockClients.find(c => c.id === id);
+    if (!client) {
+      throw new Error("Cliente no encontrado.");
+    }
+    const nombre = client.nombre_empresa;
+
+    const mockComps = await db.select("SELECT * FROM comparativas;");
+    
+    // Comprobar si tiene comparativas aceptadas (menos de 6 años)
+    const legalAcceptedCutoff = Date.now() - (6 * 365 * 24 * 60 * 60 * 1000);
+    const hasAccepted = mockComps.some(c => 
+      c.cliente_nombre === nombre && 
+      c.estado === 'Aceptada' && 
+      new Date(c.fecha).getTime() >= legalAcceptedCutoff
+    );
+
+    if (hasAccepted) {
+      throw new Error("OBLIGACION_LEGAL_RETENCION");
+    }
+
+    // Limpiar comparativas asociadas pendientes o rechazadas en localStorage
+    const filteredComps = mockComps.filter(c => 
+      !(c.cliente_nombre === nombre && (c.estado !== 'Aceptada' || c.estado === null))
+    );
+    localStorage.setItem('mock_comparativas', JSON.stringify(filteredComps));
+
+    // Eliminar el cliente de localStorage usando db.execute de mock
+    return await db.execute("DELETE FROM clientes WHERE id = $1;", [id]);
+  }
 }
 
 /**

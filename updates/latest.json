@@ -1,11 +1,11 @@
 {
-  "version": "0.2.0",
-  "notes": "Esta actualización introduce el nuevo régimen de retención legal obligatoria de datos y soluciona por completo el restablecimiento de fábrica limpio con reinicio de IDs a 1. * **⚖️ Retención Legal ...",
-  "pub_date": "2026-06-16T20:17:08.002Z",
+  "version": "0.2.1",
+  "notes": "Esta versión introduce búsquedas insensibles a mayúsculas y acentos, validación de DNI/NIE/CIF al registrar clientes, y un botón de eliminación clicable en el historial con aviso explicativo legal si la comparativa está aceptada.",
+  "pub_date": "2026-06-19T02:30:00.000Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0pMdHVtY3JtdVZBWkxxZFByY2Y4ZWxLektyV0hyKzJrV0FkaGFMUXU1anZkVDVCTlRtenZYc2duYmVHcFBvVFdyT2ZFZHNSNHJpQWxkTkNEMjM4a0FNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxNjQxMDIzCWZpbGU6Q29tcGFyZXRpY2FfMC4yLjBfeDY0X2VuLVVTLm1zaQp0ZUJVQ2U3TjkrV1hyUUc1WTg2ajNiR1pIK1RPVmtKa0ZSMFVsSHpLOGxmZXR2NzlSbldaZWFzWTIxU2lVSDlxQlQ5ekk4U3Q2cDBUTjJqOFI4ZFhDQT09Cg==",
-      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.2.0/Comparetica_0.2.0_x64.msi"
+      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.2.1/Comparetica_0.2.1_x64.msi"
     }
   }
 }

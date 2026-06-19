@@ -27,8 +27,9 @@ export async function initTariffsView() {
   setupTarifasGas();
 
   // Inicializar constructores de tramos
-  setupComisionTramosBuilder('light');
-  setupComisionTramosBuilder('gas');
+  setupComisionTramosBuilder('dialog-light-tramos-consumo-container', 'dialog-light-add-tramo-consumo-btn', 'kWh');
+  setupComisionTramosBuilder('dialog-light-tramos-potencia-container', 'dialog-light-add-tramo-potencia-btn', 'kW');
+  setupComisionTramosBuilder('dialog-gas-tramos-consumo-container', 'dialog-gas-add-tramo-consumo-btn', 'kWh');
 
   // Cargar datos iniciales
   await loadComercializadoras();
@@ -185,13 +186,11 @@ function setupTarifasLuz() {
       typeSelect.value = '2.0TD';
       typeSelect.dispatchEvent(new Event('change'));
     }
-    const comTipo = document.getElementById('dialog-light-comision-tipo');
-    if (comTipo) {
-      comTipo.value = 'fija';
-      comTipo.dispatchEvent(new Event('change'));
-    }
-    const tramosContainer = document.getElementById('dialog-light-tramos-container');
-    if (tramosContainer) tramosContainer.innerHTML = '';
+
+    const trConsumo = document.getElementById('dialog-light-tramos-consumo-container');
+    if (trConsumo) trConsumo.innerHTML = '';
+    const trPotencia = document.getElementById('dialog-light-tramos-potencia-container');
+    if (trPotencia) trPotencia.innerHTML = '';
     dialog.classList.add('active');
   });
 
@@ -236,45 +235,8 @@ function setupTarifasLuz() {
 
     const excedente = parseFloat(document.getElementById('dialog-light-excedente').value || 0);
 
-    let comision = 0;
-    let comisionTramos = null;
-    const comisionTipo = document.getElementById('dialog-light-comision-tipo').value;
-    if (comisionTipo === 'fija') {
-      comision = parseFloat(document.getElementById('dialog-light-commission').value || 0);
-    } else {
-      const rows = document.querySelectorAll('#dialog-light-tramos-container .comision-tramo-row');
-      const tramos = [];
-      rows.forEach(r => {
-        const tipo = r.querySelector('.tramo-tipo').value;
-        const valCom = parseFloat(r.querySelector('.tramo-comision').value);
-        if (isNaN(valCom)) return;
-
-        if (tipo === 'hasta') {
-          const hasta = parseInt(r.querySelector('.tramo-hasta').value);
-          if (!isNaN(hasta)) {
-            tramos.push({ tipo, hasta, comision: valCom });
-          }
-        } else if (tipo === 'rango') {
-          const desde = parseInt(r.querySelector('.tramo-desde').value);
-          const hasta = parseInt(r.querySelector('.tramo-hasta').value);
-          if (!isNaN(desde) && !isNaN(hasta)) {
-            tramos.push({ tipo, desde, hasta, comision: valCom });
-          }
-        } else if (tipo === 'desde') {
-          const desde = parseInt(r.querySelector('.tramo-desde').value);
-          if (!isNaN(desde)) {
-            tramos.push({ tipo, desde, comision: valCom });
-          }
-        }
-      });
-      tramos.sort((a, b) => {
-        const minA = a.tipo === 'hasta' ? 0 : a.desde;
-        const minB = b.tipo === 'hasta' ? 0 : b.desde;
-        return minA - minB;
-      });
-      comisionTramos = JSON.stringify(tramos);
-    }
-
+    const comisionTramosConsumo = parseTramosFromContainer('#dialog-light-tramos-consumo-container');
+    const comisionTramosPotencia = parseTramosFromContainer('#dialog-light-tramos-potencia-container');
     const notas = document.getElementById('dialog-light-notes').value.trim();
 
     try {
@@ -283,14 +245,14 @@ function setupTarifasLuz() {
           parseInt(id), nombre, tipoTarifa,
           potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
           energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-          excedente, comision, comisionTramos, notas
+          excedente, comisionTramosConsumo, comisionTramosPotencia, notas
         );
       } else {
         await addTarifaLuz(
           comercializadoraId, nombre, tipoTarifa,
           potenciaP1, potenciaP2, potenciaP3, potenciaP4, potenciaP5, potenciaP6,
           energiaP1, energiaP2, energiaP3, energiaP4, energiaP5, energiaP6,
-          excedente, comision, comisionTramos, notas
+          excedente, comisionTramosConsumo, comisionTramosPotencia, notas
         );
       }
       dialog.classList.remove('active');
@@ -370,12 +332,12 @@ async function loadTarifasLuz() {
         eneHtml += `<br><span class="text-success" style="font-weight: 500;">Exc: ${t.excedente.toFixed(7)} &euro;/kWh</span>`;
       }
 
-      let comisionHtml = '';
-      if (t.comision_tramos) {
+      let comHtmlParts = [];
+      if (t.comision_tramos_consumo) {
         try {
-          const tramos = JSON.parse(t.comision_tramos);
+          const tramos = JSON.parse(t.comision_tramos_consumo);
           if (Array.isArray(tramos) && tramos.length > 0) {
-            comisionHtml = tramos.map(tr => {
+            const trLines = tramos.map(tr => {
               if (tr.tipo === 'hasta' || !tr.tipo) {
                 return `&le; ${tr.hasta} kWh: ${tr.comision.toFixed(2)} &euro;`;
               } else if (tr.tipo === 'rango') {
@@ -384,15 +346,36 @@ async function loadTarifasLuz() {
                 return `&gt; ${tr.desde} kWh: ${tr.comision.toFixed(2)} &euro;`;
               }
               return `${tr.comision.toFixed(2)} &euro;`;
-            }).join('<br>');
-          } else {
-            comisionHtml = `${t.comision.toFixed(2)} &euro;`;
+            }).join(', ');
+            comHtmlParts.push(`Consumo: <span style="font-size: 11px;">${trLines}</span>`);
           }
         } catch (e) {
-          comisionHtml = `${t.comision.toFixed(2)} &euro;`;
+          console.error(e);
         }
-      } else {
-        comisionHtml = `${t.comision.toFixed(2)} &euro;`;
+      }
+      if (t.comision_tramos_potencia) {
+        try {
+          const tramos = JSON.parse(t.comision_tramos_potencia);
+          if (Array.isArray(tramos) && tramos.length > 0) {
+            const trLines = tramos.map(tr => {
+              if (tr.tipo === 'hasta' || !tr.tipo) {
+                return `&le; ${tr.hasta} kW: ${tr.comision.toFixed(2)} &euro;`;
+              } else if (tr.tipo === 'rango') {
+                return `${tr.desde} - ${tr.hasta} kW: ${tr.comision.toFixed(2)} &euro;`;
+              } else if (tr.tipo === 'desde') {
+                return `&gt; ${tr.desde} kW: ${tr.comision.toFixed(2)} &euro;`;
+              }
+              return `${tr.comision.toFixed(2)} &euro;`;
+            }).join(', ');
+            comHtmlParts.push(`Potencia: <span style="font-size: 11px;">${trLines}</span>`);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      let comisionHtml = comHtmlParts.join('<div style="border-top: 1px solid var(--color-outline-variant); margin: 4px 0; padding-top: 4px;"></div>');
+      if (!comisionHtml) {
+        comisionHtml = '0.00 &euro;';
       }
 
       tr.innerHTML = `
@@ -448,26 +431,33 @@ async function loadTarifasLuz() {
 
         document.getElementById('dialog-light-excedente').value = t.excedente ? t.excedente.toFixed(7) : '0.0000000';
 
-        const comTipo = document.getElementById('dialog-light-comision-tipo');
-        const tramosContainer = document.getElementById('dialog-light-tramos-container');
-        tramosContainer.innerHTML = '';
-        if (t.comision_tramos) {
-          comTipo.value = 'tramos';
-          comTipo.dispatchEvent(new Event('change'));
+        const tramosConsumoContainer = document.getElementById('dialog-light-tramos-consumo-container');
+        const tramosPotenciaContainer = document.getElementById('dialog-light-tramos-potencia-container');
+        tramosConsumoContainer.innerHTML = '';
+        tramosPotenciaContainer.innerHTML = '';
+        if (t.comision_tramos_consumo) {
           try {
-            const tramos = JSON.parse(t.comision_tramos);
+            const tramos = JSON.parse(t.comision_tramos_consumo);
             if (Array.isArray(tramos)) {
               tramos.forEach(tr => {
-                addTramoRow('light', tr);
+                addTramoRow('dialog-light-tramos-consumo-container', tr, 'kWh');
               });
             }
           } catch(e) {
             console.error(e);
           }
-        } else {
-          comTipo.value = 'fija';
-          comTipo.dispatchEvent(new Event('change'));
-          document.getElementById('dialog-light-commission').value = t.comision;
+        }
+        if (t.comision_tramos_potencia) {
+          try {
+            const tramos = JSON.parse(t.comision_tramos_potencia);
+            if (Array.isArray(tramos)) {
+              tramos.forEach(tr => {
+                addTramoRow('dialog-light-tramos-potencia-container', tr, 'kW');
+              });
+            }
+          } catch(e) {
+            console.error(e);
+          }
         }
 
         document.getElementById('dialog-light-notes').value = t.notas || t.notes || "";
@@ -510,13 +500,9 @@ function setupTarifasGas() {
     document.getElementById('dialog-gas-title').innerText = "Registrar Tarifa Gas";
     document.getElementById('dialog-gas-id').value = "";
     form.reset();
-    const comTipo = document.getElementById('dialog-gas-comision-tipo');
-    if (comTipo) {
-      comTipo.value = 'fija';
-      comTipo.dispatchEvent(new Event('change'));
-    }
-    const tramosContainer = document.getElementById('dialog-gas-tramos-container');
-    if (tramosContainer) tramosContainer.innerHTML = '';
+
+    const trConsumo = document.getElementById('dialog-gas-tramos-consumo-container');
+    if (trConsumo) trConsumo.innerHTML = '';
     dialog.classList.add('active');
   });
 
@@ -546,52 +532,14 @@ function setupTarifasGas() {
     const terminoFijo = parseFloat(document.getElementById('dialog-gas-fixed').value);
     const terminoVariable = parseFloat(document.getElementById('dialog-gas-var').value);
 
-    let comision = 0;
-    let comisionTramos = null;
-    const comisionTipo = document.getElementById('dialog-gas-comision-tipo').value;
-    if (comisionTipo === 'fija') {
-      comision = parseFloat(document.getElementById('dialog-gas-commission').value || 0);
-    } else {
-      const rows = document.querySelectorAll('#dialog-gas-tramos-container .comision-tramo-row');
-      const tramos = [];
-      rows.forEach(r => {
-        const tipo = r.querySelector('.tramo-tipo').value;
-        const valCom = parseFloat(r.querySelector('.tramo-comision').value);
-        if (isNaN(valCom)) return;
-
-        if (tipo === 'hasta') {
-          const hasta = parseInt(r.querySelector('.tramo-hasta').value);
-          if (!isNaN(hasta)) {
-            tramos.push({ tipo, hasta, comision: valCom });
-          }
-        } else if (tipo === 'rango') {
-          const desde = parseInt(r.querySelector('.tramo-desde').value);
-          const hasta = parseInt(r.querySelector('.tramo-hasta').value);
-          if (!isNaN(desde) && !isNaN(hasta)) {
-            tramos.push({ tipo, desde, hasta, comision: valCom });
-          }
-        } else if (tipo === 'desde') {
-          const desde = parseInt(r.querySelector('.tramo-desde').value);
-          if (!isNaN(desde)) {
-            tramos.push({ tipo, desde, comision: valCom });
-          }
-        }
-      });
-      tramos.sort((a, b) => {
-        const minA = a.tipo === 'hasta' ? 0 : a.desde;
-        const minB = b.tipo === 'hasta' ? 0 : b.desde;
-        return minA - minB;
-      });
-      comisionTramos = JSON.stringify(tramos);
-    }
-
+    const comisionTramosConsumo = parseTramosFromContainer('#dialog-gas-tramos-consumo-container');
     const notas = document.getElementById('dialog-gas-notes').value.trim();
 
     try {
       if (id) {
-        await updateTarifaGas(parseInt(id), nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas);
+        await updateTarifaGas(parseInt(id), nombre, tipoTarifa, terminoFijo, terminoVariable, comisionTramosConsumo, notas);
       } else {
-        await addTarifaGas(comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comision, comisionTramos, notas);
+        await addTarifaGas(comercializadoraId, nombre, tipoTarifa, terminoFijo, terminoVariable, comisionTramosConsumo, notas);
       }
       dialog.classList.remove('active');
       await loadTarifasGas();
@@ -651,12 +599,12 @@ async function loadTarifasGas() {
     filteredList.forEach(t => {
       const tr = document.createElement('tr');
       
-      let comisionHtml = '';
-      if (t.comision_tramos) {
+      let comHtmlParts = [];
+      if (t.comision_tramos_consumo) {
         try {
-          const tramos = JSON.parse(t.comision_tramos);
+          const tramos = JSON.parse(t.comision_tramos_consumo);
           if (Array.isArray(tramos) && tramos.length > 0) {
-            comisionHtml = tramos.map(tr => {
+            const trLines = tramos.map(tr => {
               if (tr.tipo === 'hasta' || !tr.tipo) {
                 return `&le; ${tr.hasta} kWh: ${tr.comision.toFixed(2)} &euro;`;
               } else if (tr.tipo === 'rango') {
@@ -665,15 +613,16 @@ async function loadTarifasGas() {
                 return `&gt; ${tr.desde} kWh: ${tr.comision.toFixed(2)} &euro;`;
               }
               return `${tr.comision.toFixed(2)} &euro;`;
-            }).join('<br>');
-          } else {
-            comisionHtml = `${t.comision.toFixed(2)} &euro;`;
+            }).join(', ');
+            comHtmlParts.push(`Consumo: <span style="font-size: 11px;">${trLines}</span>`);
           }
         } catch (e) {
-          comisionHtml = `${t.comision.toFixed(2)} &euro;`;
+          console.error(e);
         }
-      } else {
-        comisionHtml = `${t.comision.toFixed(2)} &euro;`;
+      }
+      let comisionHtml = comHtmlParts.join('<div style="border-top: 1px solid var(--color-outline-variant); margin: 4px 0; padding-top: 4px;"></div>');
+      if (!comisionHtml) {
+        comisionHtml = '0.00 &euro;';
       }
 
       tr.innerHTML = `
@@ -709,26 +658,19 @@ async function loadTarifasGas() {
         document.getElementById('dialog-gas-fixed').value = t.termino_fijo.toFixed(7);
         document.getElementById('dialog-gas-var').value = t.termino_variable.toFixed(7);
 
-        const comTipo = document.getElementById('dialog-gas-comision-tipo');
-        const tramosContainer = document.getElementById('dialog-gas-tramos-container');
-        tramosContainer.innerHTML = '';
-        if (t.comision_tramos) {
-          comTipo.value = 'tramos';
-          comTipo.dispatchEvent(new Event('change'));
+        const tramosConsumoContainer = document.getElementById('dialog-gas-tramos-consumo-container');
+        tramosConsumoContainer.innerHTML = '';
+        if (t.comision_tramos_consumo) {
           try {
-            const tramos = JSON.parse(t.comision_tramos);
+            const tramos = JSON.parse(t.comision_tramos_consumo);
             if (Array.isArray(tramos)) {
               tramos.forEach(tr => {
-                addTramoRow('gas', tr);
+                addTramoRow('dialog-gas-tramos-consumo-container', tr, 'kWh');
               });
             }
           } catch(e) {
             console.error(e);
           }
-        } else {
-          comTipo.value = 'fija';
-          comTipo.dispatchEvent(new Event('change'));
-          document.getElementById('dialog-gas-commission').value = t.comision;
         }
 
         document.getElementById('dialog-gas-notes').value = t.notes || t.notas || "";
@@ -783,42 +725,63 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
-function setupComisionTramosBuilder(prefix) {
-  const selectTipo = document.getElementById(`dialog-${prefix}-comision-tipo`);
-  const fijaGroup = document.getElementById(`dialog-${prefix}-comision-fija-group`);
-  const tramosGroup = document.getElementById(`dialog-${prefix}-comision-tramos-group`);
-  const tramosContainer = document.getElementById(`dialog-${prefix}-tramos-container`);
-  const addBtn = document.getElementById(`dialog-${prefix}-add-tramo-btn`);
+function parseTramosFromContainer(containerId) {
+  const container = document.querySelector(containerId);
+  if (!container) return null;
+  const rows = container.querySelectorAll('.comision-tramo-row');
+  if (rows.length === 0) return null;
+  const tramos = [];
+  rows.forEach(r => {
+    const tipo = r.querySelector('.tramo-tipo').value;
+    const unidad = r.querySelector('.tramo-unidad').value;
+    const valCom = parseFloat(r.querySelector('.tramo-comision').value);
+    if (isNaN(valCom)) return;
 
-  if (!selectTipo) return;
-
-  selectTipo.addEventListener('change', () => {
-    if (selectTipo.value === 'tramos') {
-      fijaGroup.style.display = 'none';
-      tramosGroup.style.display = 'block';
-      if (tramosContainer.children.length === 0) {
-        addTramoRow(prefix, null);
+    if (tipo === 'hasta') {
+      const hasta = parseInt(r.querySelector('.tramo-hasta').value);
+      if (!isNaN(hasta)) {
+        tramos.push({ tipo, hasta, unidad, comision: valCom });
       }
-    } else {
-      fijaGroup.style.display = 'block';
-      tramosGroup.style.display = 'none';
+    } else if (tipo === 'rango') {
+      const desde = parseInt(r.querySelector('.tramo-desde').value);
+      const hasta = parseInt(r.querySelector('.tramo-hasta').value);
+      if (!isNaN(desde) && !isNaN(hasta)) {
+        tramos.push({ tipo, desde, hasta, unidad, comision: valCom });
+      }
+    } else if (tipo === 'desde') {
+      const desde = parseInt(r.querySelector('.tramo-desde').value);
+      if (!isNaN(desde)) {
+        tramos.push({ tipo, desde, unidad, comision: valCom });
+      }
     }
   });
+  if (tramos.length === 0) return null;
+  tramos.sort((a, b) => {
+    const minA = a.tipo === 'hasta' ? 0 : a.desde;
+    const minB = b.tipo === 'hasta' ? 0 : b.desde;
+    return minA - minB;
+  });
+  return JSON.stringify(tramos);
+}
+
+function setupComisionTramosBuilder(containerId, addBtnId, defaultUnidad = 'kWh') {
+  const addBtn = document.getElementById(addBtnId);
+  if (!addBtn) return;
 
   addBtn.addEventListener('click', () => {
-    addTramoRow(prefix, null);
+    addTramoRow(containerId, null, defaultUnidad);
   });
 }
 
-function addTramoRow(prefix, tr = null) {
-  const container = document.getElementById(`dialog-${prefix}-tramos-container`);
+function addTramoRow(containerId, tr = null, defaultUnidad = 'kWh') {
+  const container = document.getElementById(containerId);
   if (!container) return;
 
   const row = document.createElement('div');
   row.className = 'comision-tramo-row';
   
   const tipo = tr && tr.tipo ? tr.tipo : 'hasta';
-  const unidad = tr && tr.unidad ? tr.unidad : 'kW';
+  const unidad = tr && tr.unidad ? tr.unidad : defaultUnidad;
   const valDesde = tr && tr.desde !== undefined && tr.desde !== null ? tr.desde : '';
   const valHasta = tr && tr.hasta !== undefined && tr.hasta !== null ? tr.hasta : '';
   const valComision = tr && tr.comision !== undefined && tr.comision !== null ? tr.comision : '';
@@ -834,12 +797,9 @@ function addTramoRow(prefix, tr = null) {
     <div class="tramo-inputs-wrapper" style="display: flex; align-items: center; gap: 4px; flex: 1.5; min-width: 90px;">
       <!-- Rellenado dinámicamente -->
     </div>
-    <div style="width: 70px; flex-shrink: 0;">
-      <select class="m3-select tramo-unidad m3-select-sm">
-        <option value="kW" ${unidad === 'kW' ? 'selected' : ''}>kW</option>
-        <option value="mW" ${unidad === 'mW' ? 'selected' : ''}>mW</option>
-        <option value="gW" ${unidad === 'gW' ? 'selected' : ''}>gW</option>
-      </select>
+    <div style="width: 50px; flex-shrink: 0; text-align: center; font-size: 13px; font-weight: 500; color: var(--color-on-surface-variant); display: flex; align-items: center; justify-content: center;">
+      ${unidad}
+      <input type="hidden" class="tramo-unidad" value="${unidad}" />
     </div>
     <div style="flex: 1; min-width: 90px;">
       <input type="number" class="m3-input tramo-comision" placeholder="Comisión" value="${valComision}" min="0" step="0.01" style="width: 100%;" required />

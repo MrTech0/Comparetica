@@ -517,7 +517,7 @@ function setupCalcFormSubmit() {
 
       lightTariffs.forEach(tariff => {
         const costDetail = calculateLightBill(lightInput, tariff);
-        const resolvedCom = resolveCommission(tariff, clientLightConsumoAnual);
+        const resolvedCom = resolveCommission(tariff, clientLightConsumoAnual, lightInput);
         tariff.resolvedComision = resolvedCom;
 
         const ahorro = currentLightAnnual - costDetail.annual.total;
@@ -877,33 +877,79 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
-function resolveCommission(tariff, consumoAnual) {
-  if (tariff.comision_tramos) {
-    try {
-      const tramos = JSON.parse(tariff.comision_tramos);
-      if (Array.isArray(tramos) && tramos.length > 0) {
-        for (const tr of tramos) {
-          if (tr.tipo === 'hasta' || !tr.tipo) {
-            if (consumoAnual <= tr.hasta) {
-              return tr.comision;
-            }
-          } else if (tr.tipo === 'rango') {
-            if (consumoAnual > tr.desde && consumoAnual <= tr.hasta) {
-              return tr.comision;
-            }
-          } else if (tr.tipo === 'desde') {
-            if (consumoAnual > tr.desde) {
-              return tr.comision;
-            }
-          }
+function resolveCommission(tariff, consumoAnual, potencias = {}) {
+  let comisionTramosConsumo = 0;
+  let comisionTramosPotencia = 0;
+
+  const maxPot = Math.max(
+    potencias.p1Pot || 0,
+    potencias.p2Pot || 0,
+    potencias.p3Pot || 0,
+    potencias.p4Pot || 0,
+    potencias.p5Pot || 0,
+    potencias.p6Pot || 0
+  );
+
+  const evaluateTramosList = (tList, value) => {
+    if (tList.length > 0) {
+      const firstTramo = tList[0];
+      const limitMin = firstTramo.tipo === 'hasta' ? 0 : (firstTramo.desde || 0);
+      if (value < limitMin) {
+        return 0;
+      }
+    }
+
+    let resolvedVal = null;
+    // Evaluar de derecha a izquierda (de mayor a menor rango/desde) para que
+    // los tramos de categorías superiores tengan prioridad si hay solapamiento.
+    for (let i = tList.length - 1; i >= 0; i--) {
+      const tr = tList[i];
+      if (tr.tipo === 'hasta' || !tr.tipo) {
+        if (value <= tr.hasta) {
+          resolvedVal = tr.comision;
+          break;
         }
-        return tramos[tramos.length - 1].comision;
+      } else if (tr.tipo === 'rango') {
+        if (value >= tr.desde && value <= tr.hasta) {
+          resolvedVal = tr.comision;
+          break;
+        }
+      } else if (tr.tipo === 'desde') {
+        if (value >= tr.desde) {
+          resolvedVal = tr.comision;
+          break;
+        }
+      }
+    }
+    if (resolvedVal === null && tList.length > 0) {
+      resolvedVal = tList[tList.length - 1].comision;
+    }
+    return resolvedVal || 0;
+  };
+
+  if (tariff.comision_tramos_consumo) {
+    try {
+      const tramos = JSON.parse(tariff.comision_tramos_consumo);
+      if (Array.isArray(tramos) && tramos.length > 0) {
+        comisionTramosConsumo = evaluateTramosList(tramos, consumoAnual);
       }
     } catch (e) {
-      console.error("Error parsing comision_tramos:", e);
+      console.error("Error parsing comision_tramos_consumo:", e);
     }
   }
-  return tariff.comision || 0;
+
+  if (tariff.comision_tramos_potencia) {
+    try {
+      const tramos = JSON.parse(tariff.comision_tramos_potencia);
+      if (Array.isArray(tramos) && tramos.length > 0) {
+        comisionTramosPotencia = evaluateTramosList(tramos, maxPot);
+      }
+    } catch (e) {
+      console.error("Error parsing comision_tramos_potencia:", e);
+    }
+  }
+
+  return Math.max(comisionTramosConsumo, comisionTramosPotencia);
 }
 
 function showNoTariffsAlert(mensaje) {
