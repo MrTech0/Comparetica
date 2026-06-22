@@ -1,11 +1,11 @@
 {
-  "version": "0.2.1",
-  "notes": "Esta versión introduce mejoras de seguridad en los formularios de registro y refina la experiencia de búsqueda y cumplimiento legal de borrado. * **🔍 Búsqueda Case y Accent Insensitive:** * Correg...",
-  "pub_date": "2026-06-19T00:39:18.438Z",
+  "version": "0.2.2",
+  "notes": "Esta versión introduce desgloses exactos en los reportes de comparativas de luz y gas, y una nueva pestaña \"Acerca de\" en el menú de configuración. * **📊 Desglose de Factura 100% Real:** * Elimina...",
+  "pub_date": "2026-06-22T23:31:32.622Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR05jMndtZWw2OExVWmFsMUpWeklibFhxS09QVlNPRkNIdXE3cW1FQnVWNVAxdlNIRjNvRldEOHM4U1M4bDdteHlVTFAwbjVlUnh3dGhRTWJTTXVFbWdvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxODI5NTUyCWZpbGU6Q29tcGFyZXRpY2FfMC4yLjFfeDY0X2VuLVVTLm1zaQpRQU9XTG5FTDlUN1FPRzhHdThBc1g1a3BRVnF2bC9UMUl5Z2g1aVVGZGZOT0swNnZ3K2Z2eTRGZ09PMXhhejI2ZXNkdjRmV0RUL3RQWnN1bUsxVFNBZz09Cg==",
-      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.2.1/Comparetica_0.2.1_x64.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0k4alc5RUhqcEZoU3YxRXp3YnR6RzRqY0ZGWHhLS3pSQjM4MDZWNzVOZm9lWmtkQ3JjS2kxRFltWWNJbUVkN0VWeFQ2T0hLSFJUVDhKMEVSS3FrTVFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMTcxMDg2CWZpbGU6Q29tcGFyZXRpY2FfMC4yLjJfeDY0X2VuLVVTLm1zaQp2cnlTRW9KQzFnbWtieWdhc1h1emNVZ2VMMHFMWHY4aE42V3V2MUcrM285aTlsak9mNTdYMlJiQU5ybUpGcTRka3RQZ0tDR3JNMG93TXduZzVsdFRDQT09Cg==",
+      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.2.2/Comparetica_0.2.2_x64.msi"
     }
   }
 }
