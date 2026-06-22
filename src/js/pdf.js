@@ -315,10 +315,10 @@ export async function generatePDFReport(data, previewMode = false, returnBase64 
       prop: details.iee
     });
 
-    // 6. Alquiler de Medida y Bono Social
+    // 6. Alquiler contador y Tasa bono social
     const alquBsCur = currentDetails ? (currentDetails.alquiler + currentDetails.bonoSocial) : data.currentCost * 0.015;
     rows.push({
-      name: 'Alquiler de Medida y Bono Social',
+      name: 'Alquiler contador y Tasa bono social',
       cur: alquBsCur,
       prop: details.alquiler + details.bonoSocial
     });
