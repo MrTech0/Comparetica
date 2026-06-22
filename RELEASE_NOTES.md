@@ -1,3 +1,24 @@
+# Novedades en la versión v0.2.2
+
+Esta versión introduce desgloses exactos en los reportes de comparativas de luz y gas, y una nueva pestaña "Acerca de" en el menú de configuración.
+
+### 📋 Cambios Introducidos:
+
+* **📊 Desglose de Factura 100% Real:**
+  * Eliminadas las estimaciones porcentuales fijas de la columna "Actual" del reporte PDF.
+  * Ahora el reporte muestra los costes anuales reales de potencia, energía, tasas e impuestos calculados de la factura real del cliente.
+  * Añadidos campos opcionales para "Otros Conceptos / Mantenimiento" y "Reactiva / Penalizaciones" que se integran en la base imponible del reporte de forma dinámica y conforme a la normativa fiscal.
+  * Las propuestas simulan la eliminación del mantenimiento mostrando el consiguiente ahorro comercial neto.
+
+* **ℹ️ Nueva pestaña "Acerca de":**
+  * Añadida una nueva sección en el panel de Configuración que muestra dinámicamente las versiones del software.
+  * Informa de las versiones de la APP, Node.js, Rust, Tauri, SQLite y la librería jsPDF.
+
+* **🔒 Ajuste de Visibilidad del Modo Privado:**
+  * El interruptor de "Modo Privado" para ocultar comisiones del asesor se muestra exclusivamente en el menú del Historial de Comparativas.
+
+---
+
 # Novedades en la versión v0.2.1
 
 Esta versión introduce mejoras de seguridad en los formularios de registro y refina la experiencia de búsqueda y cumplimiento legal de borrado.
