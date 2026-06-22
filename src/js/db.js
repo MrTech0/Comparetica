@@ -1169,3 +1169,22 @@ export async function purgeOldData(days) {
     }
   }
 }
+
+/**
+ * Obtiene la versión actual del motor SQLite.
+ * @returns {Promise<string>} Versión de SQLite.
+ */
+export async function getSqliteVersion() {
+  const db = await getDb();
+  if (window.__TAURI__ && window.__TAURI__.sql) {
+    try {
+      const res = await db.select("SELECT sqlite_version() as version;");
+      return res[0].version;
+    } catch (err) {
+      console.error(err);
+      return "Desconocida";
+    }
+  } else {
+    return "3.45.0 (Simulado)";
+  }
+}

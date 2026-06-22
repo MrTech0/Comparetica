@@ -1,6 +1,6 @@
 /* src/js/views/settings.js */
 
-import { clearAllTables } from '../db.js';
+import { clearAllTables, getSqliteVersion } from '../db.js';
 
 export function initSettingsView() {
   setupTabs();
@@ -520,24 +520,39 @@ function setupUpdates() {
 async function loadAboutInfo() {
   const appVersionEl = document.getElementById('about-app-version');
   const nodeVersionEl = document.getElementById('about-node-version');
+  const rustVersionEl = document.getElementById('about-rust-version');
   const tauriVersionEl = document.getElementById('about-tauri-version');
+  const sqliteVersionEl = document.getElementById('about-sqlite-version');
+  const jspdfVersionEl = document.getElementById('about-jspdf-version');
+
+  // Obtener versión de jsPDF de forma dinámica
+  const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+  const jspdfVersion = jsPDFClass ? (jsPDFClass.version || 'Desconocida') : 'No cargado';
+  if (jspdfVersionEl) jspdfVersionEl.textContent = jspdfVersion;
+
+  // Obtener versión de SQLite de forma dinámica
+  const sqliteVersion = await getSqliteVersion();
+  if (sqliteVersionEl) sqliteVersionEl.textContent = sqliteVersion;
 
   if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
     try {
       const info = await window.__TAURI__.core.invoke('get_about_info');
       if (appVersionEl) appVersionEl.textContent = info.app_version || 'Desconocida';
       if (nodeVersionEl) nodeVersionEl.textContent = info.node_version || 'No instalado';
+      if (rustVersionEl) rustVersionEl.textContent = info.rust_version || 'No instalado';
       if (tauriVersionEl) tauriVersionEl.textContent = info.tauri_version || 'Desconocida';
     } catch (err) {
       console.error("Error al obtener información de Acerca de:", err);
       if (appVersionEl) appVersionEl.textContent = 'Error';
       if (nodeVersionEl) nodeVersionEl.textContent = 'Error';
+      if (rustVersionEl) rustVersionEl.textContent = 'Error';
       if (tauriVersionEl) tauriVersionEl.textContent = 'Error';
     }
   } else {
     // Fallback de navegador/desarrollo sin Tauri
     if (appVersionEl) appVersionEl.textContent = '0.2.1 (Navegador)';
     if (nodeVersionEl) nodeVersionEl.textContent = 'v18.16.0 (Simulado)';
+    if (rustVersionEl) rustVersionEl.textContent = 'rustc 1.75.0 (Simulado)';
     if (tauriVersionEl) tauriVersionEl.textContent = '2.0.0 (Simulado)';
   }
 }

@@ -600,11 +600,24 @@ fn get_about_info(app_handle: tauri::AppHandle) -> Result<serde_json::Value, Str
         Err(_) => "No instalado".to_string(),
     };
     
+    // Get Rust version by running `rustc -V`
+    let rust_version = match std::process::Command::new("rustc").arg("-V").output() {
+        Ok(output) => {
+            if output.status.success() {
+                String::from_utf8_lossy(&output.stdout).trim().to_string()
+            } else {
+                "No instalado".to_string()
+            }
+        }
+        Err(_) => "No instalado".to_string(),
+    };
+    
     let tauri_version = tauri::VERSION.to_string();
 
     Ok(serde_json::json!({
         "app_version": app_version,
         "node_version": node_version,
+        "rust_version": rust_version,
         "tauri_version": tauri_version
     }))
 }
