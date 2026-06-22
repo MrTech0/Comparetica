@@ -160,7 +160,8 @@ pub fn run() {
             factory_reset,
             restart_app,
             log_frontend_error,
-            open_email_with_attachment
+            open_email_with_attachment,
+            get_about_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -581,4 +582,29 @@ fn open_email_with_attachment(
         .map_err(|e| e.to_string())?;
 
     Ok("Correo abierto correctamente".to_string())
+}
+
+#[tauri::command]
+fn get_about_info(app_handle: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let app_version = app_handle.package_info().version.to_string();
+    
+    // Get Node version by running `node -v`
+    let node_version = match std::process::Command::new("node").arg("-v").output() {
+        Ok(output) => {
+            if output.status.success() {
+                String::from_utf8_lossy(&output.stdout).trim().to_string()
+            } else {
+                "No instalado".to_string()
+            }
+        }
+        Err(_) => "No instalado".to_string(),
+    };
+    
+    let tauri_version = tauri::VERSION.to_string();
+
+    Ok(serde_json::json!({
+        "app_version": app_version,
+        "node_version": node_version,
+        "tauri_version": tauri_version
+    }))
 }

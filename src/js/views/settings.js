@@ -18,7 +18,8 @@ function setupTabs() {
     { btn: 'tab-btn-settings-updates', panel: 'panel-settings-updates' },
     { btn: 'tab-btn-settings-cleanup', panel: 'panel-settings-cleanup' },
     { btn: 'tab-btn-settings-params', panel: 'panel-settings-params' },
-    { btn: 'tab-btn-settings-legal', panel: 'panel-settings-legal' }
+    { btn: 'tab-btn-settings-legal', panel: 'panel-settings-legal' },
+    { btn: 'tab-btn-settings-about', panel: 'panel-settings-about' }
   ];
 
   tabs.forEach(item => {
@@ -44,9 +45,11 @@ function setupTabs() {
       panel.classList.add('active');
       panel.style.display = 'block';
 
-      // Recargar datos si es la pestaña de la consultora
+      // Recargar datos si corresponde
       if (item.btn === 'tab-btn-settings-company') {
         await loadCurrentCompanyData();
+      } else if (item.btn === 'tab-btn-settings-about') {
+        await loadAboutInfo();
       }
     });
   });
@@ -511,6 +514,31 @@ function setupUpdates() {
       statusDesc.textContent = `No se pudo conectar con el servidor de actualizaciones: ${error.message || error.toString() || 'Error desconocido'}\n\nPor favor, compruebe su conexión a internet.`;
       actionsContainer.innerHTML = '';
     }
+  }
+}
+
+async function loadAboutInfo() {
+  const appVersionEl = document.getElementById('about-app-version');
+  const nodeVersionEl = document.getElementById('about-node-version');
+  const tauriVersionEl = document.getElementById('about-tauri-version');
+
+  if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+    try {
+      const info = await window.__TAURI__.core.invoke('get_about_info');
+      if (appVersionEl) appVersionEl.textContent = info.app_version || 'Desconocida';
+      if (nodeVersionEl) nodeVersionEl.textContent = info.node_version || 'No instalado';
+      if (tauriVersionEl) tauriVersionEl.textContent = info.tauri_version || 'Desconocida';
+    } catch (err) {
+      console.error("Error al obtener información de Acerca de:", err);
+      if (appVersionEl) appVersionEl.textContent = 'Error';
+      if (nodeVersionEl) nodeVersionEl.textContent = 'Error';
+      if (tauriVersionEl) tauriVersionEl.textContent = 'Error';
+    }
+  } else {
+    // Fallback de navegador/desarrollo sin Tauri
+    if (appVersionEl) appVersionEl.textContent = '0.2.1 (Navegador)';
+    if (nodeVersionEl) nodeVersionEl.textContent = 'v18.16.0 (Simulado)';
+    if (tauriVersionEl) tauriVersionEl.textContent = '2.0.0 (Simulado)';
   }
 }
 

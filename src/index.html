@@ -804,6 +804,7 @@
               <button class="m3-tab-btn" id="tab-btn-settings-cleanup">Limpieza</button>
               <button class="m3-tab-btn" id="tab-btn-settings-params">Parámetros</button>
               <button class="m3-tab-btn" id="tab-btn-settings-legal">Información Legal</button>
+              <button class="m3-tab-btn" id="tab-btn-settings-about">Acerca de</button>
             </div>
 
             <!-- PANEL: APARIENCIA -->
@@ -1029,6 +1030,31 @@
                   <li><strong>Sqlite / Tauri SQL Plugin:</strong> Licencia MIT / Apache 2.0. Motor de base de datos local de la aplicación.</li>
                   <li><strong>Chrono & RFD (Rust Crates):</strong> Licencia MIT. Utilizados para el control de copias de seguridad nativas y ventanas de diálogo del sistema.</li>
                 </ul>
+              </div>
+            </div>
+
+            <!-- PANEL: ACERCA DE -->
+            <div id="panel-settings-about" class="tab-panel" style="display:none;">
+              <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Acerca de Comparetica</h3>
+                <p class="text-muted" style="font-size: 13px; line-height: 1.6; margin-bottom: 20px;">
+                  Información sobre el software y las versiones de sus componentes tecnológicos centrales.
+                </p>
+
+                <div style="display: flex; flex-direction: column; gap: 12px; font-size: 14px; color: var(--color-on-surface);">
+                  <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 8px;">
+                    <span style="font-weight: 500;">Versión de la APP:</span>
+                    <span id="about-app-version" class="text-muted">Cargando...</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 8px;">
+                    <span style="font-weight: 500;">Versión de Node.js:</span>
+                    <span id="about-node-version" class="text-muted">Cargando...</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding-bottom: 8px;">
+                    <span style="font-weight: 500;">Versión de Tauri:</span>
+                    <span id="about-tauri-version" class="text-muted">Cargando...</span>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
