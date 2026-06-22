@@ -377,7 +377,12 @@ function setupCalcFormSubmit() {
     let currentLightAnnual = 0;
     let clientLightConsumoAnual = 0;
 
+    let currentLightBillDetail = null;
+    let currentGasBillDetail = null;
+
     if (energyType === 'LUZ' || energyType === 'DUAL') {
+      const lightOther = parseFloat(document.getElementById('calc-light-other-concepts').value || 0);
+      const lightReactive = parseFloat(document.getElementById('calc-light-reactive-penalties').value || 0);
       const is30td = document.getElementById('calc-light-tariff-type').value === '3.0TD';
       if (is30td) {
         lightInput = {
@@ -400,7 +405,9 @@ function setupCalcFormSubmit() {
           excedenteCons,
           excedentePrice,
           bonoSocialPct: 0,
-          bonoSocialFinanciacion
+          bonoSocialFinanciacion,
+          otherConcepts: lightOther,
+          reactivePenalties: lightReactive
         };
 
         const currentTariffMock = {
@@ -420,8 +427,8 @@ function setupCalcFormSubmit() {
           excedente: excedentePrice
         };
 
-        const billDetail = calculateLightBill(lightInput, currentTariffMock);
-        currentLightAnnual = billDetail.annual.total;
+        currentLightBillDetail = calculateLightBill(lightInput, currentTariffMock);
+        currentLightAnnual = currentLightBillDetail.annual.total;
 
         const totalCons = lightInput.p1Cons + lightInput.p2Cons + lightInput.p3Cons + lightInput.p4Cons + lightInput.p5Cons + lightInput.p6Cons;
         clientLightConsumoAnual = totalCons * (365 / lightInput.dias);
@@ -439,7 +446,9 @@ function setupCalcFormSubmit() {
           excedenteCons,
           excedentePrice,
           bonoSocialPct,
-          bonoSocialFinanciacion
+          bonoSocialFinanciacion,
+          otherConcepts: lightOther,
+          reactivePenalties: lightReactive
         };
 
         const currentTariffMock = {
@@ -452,8 +461,8 @@ function setupCalcFormSubmit() {
           excedente: excedentePrice
         };
 
-        const billDetail = calculateLightBill(lightInput, currentTariffMock);
-        currentLightAnnual = billDetail.annual.total;
+        currentLightBillDetail = calculateLightBill(lightInput, currentTariffMock);
+        currentLightAnnual = currentLightBillDetail.annual.total;
 
         const totalCons = lightInput.p1Cons + lightInput.p2Cons + lightInput.p3Cons;
         clientLightConsumoAnual = totalCons * (365 / lightInput.dias);
@@ -466,12 +475,14 @@ function setupCalcFormSubmit() {
     let clientGasConsumoAnual = 0;
 
     if (energyType === 'GAS' || energyType === 'DUAL') {
+      const gasOther = parseFloat(document.getElementById('calc-gas-other-concepts').value || 0);
       gasInput = {
         dias: parseInt(document.getElementById('calc-gas-days').value),
         consumo: parseFloat(document.getElementById('calc-gas-consumption').value),
         alquiler: parseFloat(document.getElementById('calc-gas-meter').value || 0),
         impuestoHidrocarburos: parseFloat(document.getElementById('calc-gas-tax').value),
-        iva: parseFloat(document.getElementById('calc-gas-vat').value)
+        iva: parseFloat(document.getElementById('calc-gas-vat').value),
+        otherConcepts: gasOther
       };
 
       // Tarifa actual de Gas mock
@@ -481,8 +492,8 @@ function setupCalcFormSubmit() {
         termino_variable: parseFloat(document.getElementById('calc-gas-var-price').value || 0)
       };
 
-      const billDetail = calculateGasBill(gasInput, currentTariffMock);
-      currentGasAnnual = billDetail.annual.total;
+      currentGasBillDetail = calculateGasBill(gasInput, currentTariffMock);
+      currentGasAnnual = currentGasBillDetail.annual.total;
 
       clientGasConsumoAnual = gasInput.consumo * (365 / gasInput.dias);
     }
@@ -501,7 +512,9 @@ function setupCalcFormSubmit() {
       bestLightTariff: null,
       bestGasTariff: null,
       currentLightCost: currentLightAnnual,
-      currentGasCost: currentGasAnnual
+      currentLightCostDetail: currentLightBillDetail,
+      currentGasCost: currentGasAnnual,
+      currentGasCostDetail: currentGasBillDetail
     };
 
     // 3. Procesar propuestas de Luz
@@ -516,7 +529,8 @@ function setupCalcFormSubmit() {
       const lightResults = [];
 
       lightTariffs.forEach(tariff => {
-        const costDetail = calculateLightBill(lightInput, tariff);
+        const proposedInput = { ...lightInput, otherConcepts: 0 };
+        const costDetail = calculateLightBill(proposedInput, tariff);
         const resolvedCom = resolveCommission(tariff, clientLightConsumoAnual, lightInput);
         tariff.resolvedComision = resolvedCom;
 
@@ -554,7 +568,8 @@ function setupCalcFormSubmit() {
       const gasResults = [];
 
       gasTariffs.forEach(tariff => {
-        const costDetail = calculateGasBill(gasInput, tariff);
+        const proposedInput = { ...gasInput, otherConcepts: 0 };
+        const costDetail = calculateGasBill(proposedInput, tariff);
         const resolvedCom = resolveCommission(tariff, clientGasConsumoAnual);
         tariff.resolvedComision = resolvedCom;
 
@@ -794,7 +809,9 @@ async function saveComparisonToDb(item, type, buttonEl) {
       lightInput: lastComparisonData.lightInput,
       gasInput: lastComparisonData.gasInput,
       currentLightCost: lastComparisonData.currentLightCost,
+      currentLightCostDetail: lastComparisonData.currentLightCostDetail,
       currentGasCost: lastComparisonData.currentGasCost,
+      currentGasCostDetail: lastComparisonData.currentGasCostDetail,
       proposedTariffSnapshot: item.tariff,
       proposedCostDetail: item.costDetail
     };
@@ -851,6 +868,7 @@ async function exportPDF(item, type, previewMode = false) {
     clientCups: lastComparisonData.clientCups,
     energyType: type,
     currentCost: type === 'LUZ' ? lastComparisonData.currentLightCost : lastComparisonData.currentGasCost,
+    currentCostDetail: type === 'LUZ' ? lastComparisonData.currentLightCostDetail : lastComparisonData.currentGasCostDetail,
     proposedCost: item.costDetail.annual.total,
     ahorro: item.ahorro,
     inputDetails: type === 'LUZ' ? lastComparisonData.lightInput : lastComparisonData.gasInput,

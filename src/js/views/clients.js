@@ -50,6 +50,7 @@ function setupFormSubmit() {
     const cif = document.getElementById('dialog-client-cif').value.trim().toUpperCase();
     const representante = document.getElementById('dialog-client-rep').value.trim();
     const cups = document.getElementById('dialog-client-cups').value.trim().toUpperCase();
+    const email = document.getElementById('dialog-client-email').value.trim();
 
     if (!isValidSpanishId(cif)) {
       window.showToast("Error: El DNI / CIF introducido no es un documento válido.", "error");
@@ -63,11 +64,11 @@ function setupFormSubmit() {
 
       if (id) {
         // Actualizar
-        await updateCliente(parseInt(id), nombre, cif, representante, cups);
+        await updateCliente(parseInt(id), nombre, cif, representante, cups, email);
         window.showToast("Cliente actualizado correctamente.", "success");
       } else {
         // Registrar nuevo
-        await addCliente(nombre, cif, representante, cups);
+        await addCliente(nombre, cif, representante, cups, email);
         window.showToast("Cliente registrado correctamente.", "success");
       }
 
@@ -143,7 +144,7 @@ function applyClientsFilter() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align: center; color: var(--color-outline); padding: 32px 16px;">
+        <td colspan="8" style="text-align: center; color: var(--color-outline); padding: 32px 16px;">
           ${query ? 'No se encontraron clientes que coincidan con la búsqueda.' : 'No hay clientes registrados en la base de datos. Haga clic en \'Nuevo Cliente\' para empezar.'}
         </td>
       </tr>
@@ -167,6 +168,7 @@ function applyClientsFilter() {
       <td><code>${escapeHtml(client.cif)}</code></td>
       <td>${escapeHtml(client.representante || '-')}</td>
       <td><small class="text-muted">${escapeHtml(client.cups || '-')}</small></td>
+      <td>${escapeHtml(client.email || '-')}</td>
       <td>${clientTypeHtml}</td>
       <td>${createdDate}</td>
       <td style="text-align: right; white-space: nowrap;">
@@ -251,6 +253,7 @@ function openEditDialog(client) {
   document.getElementById('dialog-client-cif').value = client.cif;
   document.getElementById('dialog-client-rep').value = client.representante || "";
   document.getElementById('dialog-client-cups').value = client.cups || "";
+  document.getElementById('dialog-client-email').value = client.email || "";
 
   dialog.classList.add('active');
 }

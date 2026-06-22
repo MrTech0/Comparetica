@@ -1,11 +1,73 @@
 /* src/js/pdf.js */
 
 /**
+ * Solicita una contraseña para proteger el PDF exportado mediante un diálogo modal.
+ * @returns {Promise<{cancelled: boolean, password: string|null}>}
+ */
+function promptPdfPassword() {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('dialog-pdf-password');
+    const input = document.getElementById('pdf-password-input');
+    const btnCancel = document.getElementById('btn-pdf-password-cancel');
+    const btnSubmit = document.getElementById('btn-pdf-password-submit');
+
+    if (!overlay || !input || !btnCancel || !btnSubmit) {
+      resolve({ password: null });
+      return;
+    }
+
+    input.value = '';
+
+    const cleanListeners = () => {
+      btnCancel.removeEventListener('click', onCancel);
+      btnSubmit.removeEventListener('click', onSubmit);
+      input.removeEventListener('keydown', onKeyDown);
+      overlay.classList.remove('active');
+    };
+
+    const onCancel = () => {
+      cleanListeners();
+      resolve({ cancelled: true });
+    };
+
+    const onSubmit = () => {
+      const password = input.value;
+      cleanListeners();
+      resolve({ password: password || null });
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        onSubmit();
+      }
+    };
+
+    btnCancel.addEventListener('click', onCancel);
+    btnSubmit.addEventListener('click', onSubmit);
+    input.addEventListener('keydown', onKeyDown);
+
+    overlay.classList.add('active');
+    
+    // Autoenfocar el input para mayor comodidad
+    setTimeout(() => input.focus(), 100);
+  });
+}
+
+/**
  * Genera y descarga un reporte ejecutivo estético en PDF con los resultados de la comparación.
  * @param {Object} data - Datos consolidados de la comparación.
  * @param {boolean} previewMode - Si se debe previsualizar en modal en lugar de guardar/descargar.
  */
-export async function generatePDFReport(data, previewMode = false) {
+export async function generatePDFReport(data, previewMode = false, returnBase64 = false) {
+  let password = null;
+  if (!previewMode) {
+    const result = await promptPdfPassword();
+    if (result.cancelled) {
+      return null; // Cancelado por el usuario
+    }
+    password = result.password;
+  }
+
   const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
   if (!jsPDFClass) {
     if (window.showToast) {
@@ -37,11 +99,21 @@ export async function generatePDFReport(data, previewMode = false) {
     }
   }
 
-  const doc = new jsPDFClass({
+  const options = {
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4'
-  });
+  };
+
+  if (password) {
+    options.encryption = {
+      userPassword: password,
+      ownerPassword: password + '_owner',
+      userPermissions: ['print', 'copy']
+    };
+  }
+
+  const doc = new jsPDFClass(options);
 
   const primaryColor = [10, 62, 130];     // Azul elegante MD3
   const secondaryColor = [74, 91, 108];   // Gris azulado
@@ -196,23 +268,86 @@ export async function generatePDFReport(data, previewMode = false) {
   // Insertar filas según el tipo de energía
   if (data.energyType === 'LUZ') {
     const details = data.costDetail.annual;
-    const rows = [
-      { name: is30TD ? 'Término de Potencia (P1-P6)' : 'Término de Potencia (Capacidad)', cur: data.currentCost * 0.28, prop: details.potenciaTotal },
-      { name: is30TD ? 'Término de Energía (P1-P6)' : 'Término de Energía (Consumos P1/P2/P3)', cur: data.currentCost * 0.52, prop: details.energiaTotal },
-    ];
+    const currentDetails = (data.currentCostDetail && data.currentCostDetail.annual) ? data.currentCostDetail.annual : null;
+    const rows = [];
 
+    // 1. Término de Potencia
+    const potCur = currentDetails ? currentDetails.potenciaTotal : data.currentCost * 0.28;
+    rows.push({
+      name: is30TD ? 'Término de Potencia (P1-P6)' : 'Término de Potencia (Capacidad)',
+      cur: potCur,
+      prop: details.potenciaTotal
+    });
+
+    // 2. Término de Energía
+    const eneCur = currentDetails ? currentDetails.energiaTotal : data.currentCost * 0.52;
+    rows.push({
+      name: is30TD ? 'Término de Energía (P1-P6)' : 'Término de Energía (Consumos P1/P2/P3)',
+      cur: eneCur,
+      prop: details.energiaTotal
+    });
+
+    // 3. Compensación de Excedentes
     if (details.excedenteDiscount && details.excedenteDiscount > 0) {
-      rows.push({ name: 'Compensación de Excedentes', cur: 0, prop: -details.excedenteDiscount });
-    }
-    if (details.bonoSocialDiscount && details.bonoSocialDiscount > 0) {
-      rows.push({ name: 'Descuento Bono Social', cur: 0, prop: -details.bonoSocialDiscount });
+      const excCur = currentDetails ? (currentDetails.excedenteDiscount || 0) : 0;
+      rows.push({
+        name: 'Compensación de Excedentes',
+        cur: -excCur,
+        prop: -details.excedenteDiscount
+      });
     }
 
-    rows.push(
-      { name: 'Impuesto de Electricidad (IEE)', cur: data.currentCost * 0.045, prop: details.iee },
-      { name: 'Alquiler de Medida y Bono Social', cur: data.currentCost * 0.015, prop: details.alquiler + details.bonoSocial },
-      { name: 'IVA / IGIC aplicable', cur: data.currentCost * 0.14, prop: details.impuestos }
-    );
+    // 4. Descuento Bono Social
+    if (details.bonoSocialDiscount && details.bonoSocialDiscount > 0) {
+      const bsDiscCur = currentDetails ? (currentDetails.bonoSocialDiscount || 0) : 0;
+      rows.push({
+        name: 'Descuento Bono Social',
+        cur: -bsDiscCur,
+        prop: -details.bonoSocialDiscount
+      });
+    }
+
+    // 5. Impuesto de Electricidad (IEE)
+    const ieeCur = currentDetails ? currentDetails.iee : data.currentCost * 0.045;
+    rows.push({
+      name: 'Impuesto de Electricidad (IEE)',
+      cur: ieeCur,
+      prop: details.iee
+    });
+
+    // 6. Alquiler de Medida y Bono Social
+    const alquBsCur = currentDetails ? (currentDetails.alquiler + currentDetails.bonoSocial) : data.currentCost * 0.015;
+    rows.push({
+      name: 'Alquiler de Medida y Bono Social',
+      cur: alquBsCur,
+      prop: details.alquiler + details.bonoSocial
+    });
+
+    // 7. Conceptos Especiales Opcionales (Mantenimiento, Reactiva)
+    if (currentDetails) {
+      if (currentDetails.otherConcepts && currentDetails.otherConcepts > 0) {
+        rows.push({
+          name: 'Mantenimientos y Otros Conceptos',
+          cur: currentDetails.otherConcepts,
+          prop: 0
+        });
+      }
+      if (currentDetails.reactivePenalties && currentDetails.reactivePenalties > 0) {
+        rows.push({
+          name: 'Recargo Reactiva y Penalizaciones',
+          cur: currentDetails.reactivePenalties,
+          prop: currentDetails.reactivePenalties
+        });
+      }
+    }
+
+    // 8. IVA / IGIC
+    const taxCur = currentDetails ? currentDetails.impuestos : data.currentCost * 0.14;
+    rows.push({
+      name: 'IVA / IGIC aplicable',
+      cur: taxCur,
+      prop: details.impuestos
+    });
 
     rows.forEach(r => {
       currentY += 7;
@@ -236,15 +371,59 @@ export async function generatePDFReport(data, previewMode = false) {
     });
 
   } else {
-    // GAS RL.1
+    // GAS
     const details = data.costDetail.annual;
-    const rows = [
-      { name: 'Término Fijo (Mensualidad)', cur: data.currentCost * 0.22, prop: details.fijo },
-      { name: 'Término Variable (Energía Gas)', cur: data.currentCost * 0.61, prop: details.variable },
-      { name: 'Impuesto sobre Hidrocarburos', cur: data.currentCost * 0.02, prop: details.hidrocarburos },
-      { name: 'Alquiler de Contador Gas', cur: data.currentCost * 0.01, prop: details.alquiler },
-      { name: 'IVA / IGIC aplicable', cur: data.currentCost * 0.14, prop: details.impuestos },
-    ];
+    const currentDetails = (data.currentCostDetail && data.currentCostDetail.annual) ? data.currentCostDetail.annual : null;
+    const rows = [];
+
+    // 1. Término Fijo
+    const fixedCur = currentDetails ? currentDetails.fijo : data.currentCost * 0.22;
+    rows.push({
+      name: 'Término Fijo (Mensualidad)',
+      cur: fixedCur,
+      prop: details.fijo
+    });
+
+    // 2. Término Variable
+    const varCur = currentDetails ? currentDetails.variable : data.currentCost * 0.61;
+    rows.push({
+      name: 'Término Variable (Energía Gas)',
+      cur: varCur,
+      prop: details.variable
+    });
+
+    // 3. Impuesto sobre Hidrocarburos
+    const hidCur = currentDetails ? currentDetails.hidrocarburos : data.currentCost * 0.02;
+    rows.push({
+      name: 'Impuesto sobre Hidrocarburos',
+      cur: hidCur,
+      prop: details.hidrocarburos
+    });
+
+    // 4. Alquiler Contador Gas
+    const alquCur = currentDetails ? currentDetails.alquiler : data.currentCost * 0.01;
+    rows.push({
+      name: 'Alquiler de Contador Gas',
+      cur: alquCur,
+      prop: details.alquiler
+    });
+
+    // 5. Conceptos Opcionales (Mantenimiento)
+    if (currentDetails && currentDetails.otherConcepts && currentDetails.otherConcepts > 0) {
+      rows.push({
+        name: 'Mantenimientos y Otros Conceptos',
+        cur: currentDetails.otherConcepts,
+        prop: 0
+      });
+    }
+
+    // 6. IVA / IGIC
+    const taxCur = currentDetails ? currentDetails.impuestos : data.currentCost * 0.14;
+    rows.push({
+      name: 'IVA / IGIC aplicable',
+      cur: taxCur,
+      prop: details.impuestos
+    });
 
     rows.forEach(r => {
       currentY += 7;
@@ -394,6 +573,10 @@ export async function generatePDFReport(data, previewMode = false) {
       }
     }
     return;
+  }
+
+  if (returnBase64) {
+    return doc.output('datauristring').split(',')[1];
   }
 
   // Descarga el archivo

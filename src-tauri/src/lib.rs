@@ -159,7 +159,8 @@ pub fn run() {
             delete_company_logo,
             factory_reset,
             restart_app,
-            log_frontend_error
+            log_frontend_error,
+            open_email_with_attachment
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -518,4 +519,66 @@ fn restart_app(app_handle: tauri::AppHandle) {
 #[tauri::command]
 fn log_frontend_error(error: String) {
     println!("FRONTEND ERROR: {}", error);
+}
+
+#[tauri::command]
+fn open_email_with_attachment(
+    recipient: String,
+    pdf_filename: String,
+    pdf_base64: String,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    use std::fs::File;
+    use std::io::Write;
+    use tauri_plugin_opener::OpenerExt;
+
+    // Wrap base64 string to 76 chars per line for MIME spec compliance
+    let mut wrapped_base64 = String::new();
+    let chars: Vec<char> = pdf_base64.chars().collect();
+    for chunk in chars.chunks(76) {
+        let line: String = chunk.iter().collect();
+        wrapped_base64.push_str(&line);
+        wrapped_base64.push_str("\r\n");
+    }
+
+    // Generate EML content with X-Unsent: 1 to force compose mode
+    let eml_content = format!(
+        "X-Unsent: 1\r\n\
+         To: {}\r\n\
+         Subject: \r\n\
+         MIME-Version: 1.0\r\n\
+         Content-Type: multipart/mixed; boundary=\"boundary\"\r\n\
+         \r\n\
+         --boundary\r\n\
+         Content-Type: text/plain; charset=\"utf-8\"\r\n\
+         Content-Transfer-Encoding: 7bit\r\n\
+         \r\n\
+         \r\n\
+         --boundary\r\n\
+         Content-Type: application/pdf; name=\"{}\"\r\n\
+         Content-Transfer-Encoding: base64\r\n\
+         Content-Disposition: attachment; filename=\"{}\"\r\n\
+         \r\n\
+         {}\r\n\
+         --boundary--\r\n",
+        recipient, pdf_filename, pdf_filename, wrapped_base64
+    );
+
+    // Save EML to temporary file
+    let temp_dir = std::env::temp_dir();
+    let random_id = chrono::Local::now().timestamp_millis();
+    let eml_filename = format!("comparativa_correo_{}.eml", random_id);
+    let eml_path = temp_dir.join(&eml_filename);
+    
+    let mut file = File::create(&eml_path).map_err(|e| e.to_string())?;
+    file.write_all(eml_content.as_bytes()).map_err(|e| e.to_string())?;
+
+    // Open using system opener
+    let path_str = eml_path.to_string_lossy().to_string();
+    app_handle
+        .opener()
+        .open_path(&path_str, None::<&str>)
+        .map_err(|e| e.to_string())?;
+
+    Ok("Correo abierto correctamente".to_string())
 }

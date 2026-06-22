@@ -156,6 +156,16 @@ function initNavigation() {
       // Actualizar título
       if (viewTitle) viewTitle.innerText = item.title;
 
+      // Mostrar/Ocultar Modo Privado según la vista (sólo en Historial)
+      const privateModeToggle = document.getElementById('private-mode-toggle-container');
+      if (privateModeToggle) {
+        if (item.btn === 'nav-history') {
+          privateModeToggle.style.display = 'flex';
+        } else {
+          privateModeToggle.style.display = 'none';
+        }
+      }
+
       // Acciones especiales al cambiar de pestaña
       if (item.btn === 'nav-clients') {
         const clientsModule = await import('./views/clients.js');

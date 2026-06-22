@@ -43,6 +43,7 @@ async function initSchema(db) {
         cif TEXT NOT NULL UNIQUE,
         representante TEXT,
         cups TEXT,
+        email TEXT,
         creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -88,6 +89,17 @@ async function initSchema(db) {
   `);
 
   // Migración dinámica para bases de datos existentes
+  try {
+    const clientColumns = await db.select("PRAGMA table_info(clientes);");
+    const hasEmail = clientColumns.some(c => c.name === 'email');
+    if (!hasEmail) {
+      await db.execute("ALTER TABLE clientes ADD COLUMN email TEXT;");
+      console.log("Migración completada: Columna 'email' añadida a 'clientes'.");
+    }
+  } catch (err) {
+    console.error("Error al migrar la tabla clientes:", err);
+  }
+
   try {
     const columns = await db.select("PRAGMA table_info(tarifas_luz);");
     const hasTipoTarifa = columns.some(c => c.name === 'tipo_tarifa');
@@ -543,13 +555,14 @@ function createMockDb() {
           cif: params[1],
           representante: params[2],
           cups: params[3],
+          email: params[4],
           creado_en: new Date().toISOString()
         });
         save();
         return { lastInsertId: id, rowsAffected: 1 };
       }
       if (query.includes("UPDATE clientes")) {
-        const id = params[4];
+        const id = params[5];
         const index = mockStorage.clientes.findIndex(item => item.id === id);
         if (index !== -1) {
           mockStorage.clientes[index] = {
@@ -557,7 +570,8 @@ function createMockDb() {
             nombre_empresa: params[0],
             cif: params[1],
             representante: params[2],
-            cups: params[3]
+            cups: params[3],
+            email: params[4]
           };
           save();
         }
@@ -871,17 +885,32 @@ export async function addComparativa(clienteNombre, clienteCups, tipoEnergia, da
  */
 export async function getComparativas() {
   const db = await getDb();
-  return await db.select(`
-    SELECT c.*, 
-           tl.nombre as tarifa_luz_nombre, cl.nombre as comercializadora_luz_nombre,
-           tg.nombre as tarifa_gas_nombre, cg.nombre as comercializadora_gas_nombre
-    FROM comparativas c
-    LEFT JOIN tarifas_luz tl ON c.tarifa_luz_propuesta_id = tl.id
-    LEFT JOIN comercializadoras cl ON tl.comercializadora_id = cl.id
-    LEFT JOIN tarifas_gas tg ON c.tarifa_gas_propuesta_id = tg.id
-    LEFT JOIN comercializadoras cg ON tg.comercializadora_id = cg.id
-    ORDER BY c.fecha DESC;
-  `);
+  if (window.__TAURI__ && window.__TAURI__.sql) {
+    return await db.select(`
+      SELECT c.*, 
+             tl.nombre as tarifa_luz_nombre, cl.nombre as comercializadora_luz_nombre,
+             tg.nombre as tarifa_gas_nombre, cg.nombre as comercializadora_gas_nombre,
+             cli.email as cliente_email
+      FROM comparativas c
+      LEFT JOIN tarifas_luz tl ON c.tarifa_luz_propuesta_id = tl.id
+      LEFT JOIN comercializadoras cl ON tl.comercializadora_id = cl.id
+      LEFT JOIN tarifas_gas tg ON c.tarifa_gas_propuesta_id = tg.id
+      LEFT JOIN comercializadoras cg ON tg.comercializadora_id = cg.id
+      LEFT JOIN clientes cli ON c.cliente_nombre = cli.nombre_empresa
+      ORDER BY c.fecha DESC;
+    `);
+  } else {
+    // Modo mock
+    const comps = await db.select("SELECT * FROM comparativas;");
+    const clients = await db.select("SELECT * FROM clientes;");
+    return comps.map(c => {
+      const client = clients.find(cli => cli.nombre_empresa === c.cliente_nombre);
+      return {
+        ...c,
+        cliente_email: client ? client.email : null
+      };
+    }).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  }
 }
 
 /**
@@ -966,11 +995,11 @@ export async function getClientes() {
  * @param {string} cups - Código CUPS (opcional).
  * @returns {Promise<Object>} Resultado de la inserción.
  */
-export async function addCliente(nombre, cif, representante, cups) {
+export async function addCliente(nombre, cif, representante, cups, email = null) {
   const db = await getDb();
   return await db.execute(
-    "INSERT INTO clientes (nombre_empresa, cif, representante, cups) VALUES ($1, $2, $3, $4);",
-    [nombre, cif, representante, cups]
+    "INSERT INTO clientes (nombre_empresa, cif, representante, cups, email) VALUES ($1, $2, $3, $4, $5);",
+    [nombre, cif, representante, cups, email]
   );
 }
 
@@ -981,13 +1010,14 @@ export async function addCliente(nombre, cif, representante, cups) {
  * @param {string} cif - DNI/CIF fiscal.
  * @param {string} representante - Nombre del representante (opcional).
  * @param {string} cups - Código CUPS (opcional).
+ * @param {string} email - Correo electrónico de contacto (opcional).
  * @returns {Promise<Object>} Resultado de la actualización.
  */
-export async function updateCliente(id, nombre, cif, representante, cups) {
+export async function updateCliente(id, nombre, cif, representante, cups, email = null) {
   const db = await getDb();
   return await db.execute(
-    "UPDATE clientes SET nombre_empresa = $1, cif = $2, representante = $3, cups = $4 WHERE id = $5;",
-    [nombre, cif, representante, cups, id]
+    "UPDATE clientes SET nombre_empresa = $1, cif = $2, representante = $3, cups = $4, email = $5 WHERE id = $6;",
+    [nombre, cif, representante, cups, email, id]
   );
 }
 

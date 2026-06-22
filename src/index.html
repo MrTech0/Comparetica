@@ -82,7 +82,7 @@
           </div>
           <div class="header-actions">
             <!-- Private Mode Toggle Switch -->
-            <label class="m3-switch-container">
+            <label id="private-mode-toggle-container" class="m3-switch-container" style="display: none;">
               <input type="checkbox" id="private-mode-checkbox" class="hidden-checkbox" />
               <div class="m3-switch"></div>
               <span class="m3-switch-label">Modo Privado (Ocultar comisiones)</span>
@@ -173,6 +173,7 @@
                       <th>CIF / DNI</th>
                       <th>Representante</th>
                       <th>CUPS</th>
+                      <th>Email</th>
                       <th>Tipo Cliente</th>
                       <th>Fecha Registro</th>
                       <th style="text-align: right;">Acciones</th>
@@ -404,6 +405,18 @@
                       </div>
                     </div>
                   </div>
+                  
+                  <!-- Conceptos Opcionales Luz -->
+                  <div class="m3-field-row" style="margin-top: 12px; border-top: 1px dashed var(--color-outline-variant); padding-top: 12px;">
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-other-concepts">Mantenimientos / Otros conceptos (&euro;/periodo)</label>
+                      <input type="number" id="calc-light-other-concepts" class="m3-input" placeholder="Ej. 5.95 (opcional)" min="0" step="0.01" />
+                    </div>
+                    <div class="m3-field">
+                      <label class="m3-label" for="calc-light-reactive-penalties">Recargo Reactiva / Penalizaciones (&euro;/periodo)</label>
+                      <input type="number" id="calc-light-reactive-penalties" class="m3-input" placeholder="Ej. 12.45 (opcional)" min="0" step="0.01" />
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Bloque de Gas -->
@@ -464,6 +477,14 @@
                     <div class="m3-field">
                       <label class="m3-label" for="calc-gas-var-price">Término Variable Actual (€/kWh)</label>
                       <input type="number" id="calc-gas-var-price" class="m3-input" placeholder="Ej. 0.0800000" step="0.0000001" min="0" />
+                    </div>
+                  </div>
+                  
+                  <!-- Conceptos Opcionales Gas -->
+                  <div class="m3-field-row" style="margin-top: 12px; border-top: 1px dashed var(--color-outline-variant); padding-top: 12px;">
+                    <div class="m3-field" style="max-width: 50%;">
+                      <label class="m3-label" for="calc-gas-other-concepts">Mantenimientos / Otros conceptos (&euro;/periodo)</label>
+                      <input type="number" id="calc-gas-other-concepts" class="m3-input" placeholder="Ej. 4.95 (opcional)" min="0" step="0.01" />
                     </div>
                   </div>
                 </div>
@@ -1245,6 +1266,11 @@
                 <label class="m3-label" for="dialog-client-cups">CUPS (Código de Suministro)</label>
                 <input type="text" id="dialog-client-cups" class="m3-input" placeholder="Ej. ES0021..." />
               </div>
+              
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-client-email">Email de contacto</label>
+                <input type="email" id="dialog-client-email" class="m3-input" placeholder="Ej. correo@cliente.com" />
+              </div>
             </div>
             
             <div class="m3-dialog-actions">
@@ -1517,6 +1543,29 @@
           </div>
           <div class="m3-dialog-actions" style="margin-top: 20px;">
             <button type="button" id="dialog-legal-retention-comp-close" class="m3-btn">Entendido</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: PROTEGER PDF CON CONTRASEÑA -->
+      <div id="dialog-pdf-password" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="border-left: 6px solid var(--color-primary); max-width: 500px;">
+          <h3 class="m3-dialog-title" style="color: var(--color-primary); display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: currentColor;"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+            Proteger Reporte PDF
+          </h3>
+          <div class="m3-dialog-body" style="margin-top: 12px;">
+            <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.5; color: var(--color-on-surface-variant);">
+              Si desea proteger este reporte PDF, introduzca una contraseña a continuación. Si se deja en blanco, el PDF se exportará sin contraseña.
+            </p>
+            <div class="m3-field-container">
+              <label for="pdf-password-input" class="m3-label">Contraseña (Opcional)</label>
+              <input type="text" id="pdf-password-input" class="m3-input" placeholder="Escriba la contraseña para abrir el PDF..." autocomplete="off" style="width: 100%; box-sizing: border-box;" />
+            </div>
+          </div>
+          <div class="m3-dialog-actions" style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" id="btn-pdf-password-cancel" class="m3-btn m3-btn-text">Cancelar</button>
+            <button type="button" id="btn-pdf-password-submit" class="m3-btn">Exportar</button>
           </div>
         </div>
       </div>

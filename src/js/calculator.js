@@ -71,13 +71,17 @@ export function calculateLightBill(input, tariff) {
   const dailyRate = input.bonoSocialFinanciacion !== undefined ? input.bonoSocialFinanciacion : BONO_SOCIAL_DAILY_RATE;
   const bonoSocialCost = dailyRate * dias;
 
-  // 5. Base Imponible
-  const baseImponible = ieeBase + ieeCost + alquiler + bonoSocialCost;
+  // 5. Conceptos Opcionales (Mantenimiento, Reactiva, etc.)
+  const otherConcepts = input.otherConcepts || 0;
+  const reactivePenalties = input.reactivePenalties || 0;
 
-  // 6. IVA/IGIC
+  // 6. Base Imponible
+  const baseImponible = ieeBase + ieeCost + alquiler + bonoSocialCost + otherConcepts + reactivePenalties;
+
+  // 7. IVA/IGIC
   const taxCost = baseImponible * (iva / 100);
 
-  // 7. Total Factura
+  // 8. Total Factura
   const totalBill = baseImponible + taxCost;
 
   // Proyecciones Anuales (multiplicar conceptos prorrateables por 365 / dias)
@@ -97,6 +101,8 @@ export function calculateLightBill(input, tariff) {
       iee: ieeCost,
       bonoSocial: bonoSocialCost,
       alquiler: alquiler,
+      otherConcepts: otherConcepts,
+      reactivePenalties: reactivePenalties,
       base: baseImponible,
       impuestos: taxCost,
       total: totalBill
@@ -109,6 +115,8 @@ export function calculateLightBill(input, tariff) {
       iee: ieeCost * scale,
       bonoSocial: bonoSocialCost * scale,
       alquiler: alquiler * scale,
+      otherConcepts: otherConcepts * scale,
+      reactivePenalties: reactivePenalties * scale,
       base: baseImponible * scale,
       impuestos: taxCost * scale,
       total: totalBill * scale
@@ -147,13 +155,16 @@ export function calculateGasBill(input, tariff) {
   // 3. Impuesto de Hidrocarburos
   const taxHidrocarburos = consumo * impuestoHidrocarburos;
 
-  // 4. Base Imponible
-  const baseImponible = fixedTermCost + variableTermCost + taxHidrocarburos + alquiler;
+  // 4. Conceptos Opcionales (Mantenimiento, etc.)
+  const otherConcepts = input.otherConcepts || 0;
 
-  // 5. IVA / IGIC
+  // 5. Base Imponible
+  const baseImponible = fixedTermCost + variableTermCost + taxHidrocarburos + alquiler + otherConcepts;
+
+  // 6. IVA / IGIC
   const taxCost = baseImponible * (iva / 100);
 
-  // 6. Total Factura
+  // 7. Total Factura
   const totalBill = baseImponible + taxCost;
 
   // Proyección Anual
@@ -165,6 +176,7 @@ export function calculateGasBill(input, tariff) {
       variable: variableTermCost,
       hidrocarburos: taxHidrocarburos,
       alquiler: alquiler,
+      otherConcepts: otherConcepts,
       base: baseImponible,
       impuestos: taxCost,
       total: totalBill
@@ -174,6 +186,7 @@ export function calculateGasBill(input, tariff) {
       variable: variableTermCost * scale,
       hidrocarburos: taxHidrocarburos * scale,
       alquiler: alquiler * scale,
+      otherConcepts: otherConcepts * scale,
       base: baseImponible * scale,
       impuestos: taxCost * scale,
       total: totalBill * scale
@@ -233,13 +246,17 @@ export function calculateLightBill30TD(input, tariff) {
   const dailyRate = input.bonoSocialFinanciacion !== undefined ? input.bonoSocialFinanciacion : BONO_SOCIAL_DAILY_RATE;
   const bonoSocialCost = dailyRate * dias;
 
-  // 5. Base Imponible
-  const baseImponible = ieeBase + ieeCost + alquiler + bonoSocialCost;
+  // 5. Conceptos Opcionales (Mantenimiento, Reactiva, etc.)
+  const otherConcepts = input.otherConcepts || 0;
+  const reactivePenalties = input.reactivePenalties || 0;
 
-  // 6. IVA/IGIC
+  // 6. Base Imponible
+  const baseImponible = ieeBase + ieeCost + alquiler + bonoSocialCost + otherConcepts + reactivePenalties;
+
+  // 7. IVA/IGIC
   const taxCost = baseImponible * (iva / 100);
 
-  // 7. Total Factura
+  // 8. Total Factura
   const totalBill = baseImponible + taxCost;
 
   // Proyecciones Anuales
@@ -266,6 +283,8 @@ export function calculateLightBill30TD(input, tariff) {
       iee: ieeCost,
       bonoSocial: bonoSocialCost,
       alquiler: alquiler,
+      otherConcepts: otherConcepts,
+      reactivePenalties: reactivePenalties,
       base: baseImponible,
       impuestos: taxCost,
       total: totalBill
@@ -278,6 +297,8 @@ export function calculateLightBill30TD(input, tariff) {
       iee: ieeCost * scale,
       bonoSocial: bonoSocialCost * scale,
       alquiler: alquiler * scale,
+      otherConcepts: otherConcepts * scale,
+      reactivePenalties: reactivePenalties * scale,
       base: baseImponible * scale,
       impuestos: taxCost * scale,
       total: totalBill * scale
