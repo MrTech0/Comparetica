@@ -1,3 +1,21 @@
+# Novedades en la versión v0.2.3
+
+Esta versión perfecciona las opciones del comparador de tarifas, simplifica los textos de cumplimiento normativo y amplía el modo privado del consultor.
+
+### 📋 Cambios Introducidos:
+
+* **⚖️ Simplificación y ajuste del Bono Social:**
+  * Se elimina el campo de "Ayuda Bono Social (%)" del comparador por no ser viable su tramitación, garantizando un flujo más realista.
+  * La "Tasa del Bono Social" fija diaria se mantiene para el cómputo del coste.
+
+* **✍️ Reducción del texto de consentimiento LOPD/RGPD:**
+  * Se ha simplificado la redacción del descargo de responsabilidad y conformidad en el formulario de cálculo.
+
+* **🔒 Modo Privado en Gestión de Tarifas:**
+  * El botón para activar/desactivar el "Modo Privado" (que difumina las comisiones del consultor) ahora también está disponible en la pestaña de "Gestión de Tarifas y Comisiones" para permitir ediciones seguras frente al cliente.
+
+---
+
 # Novedades en la versión v0.2.2
 
 Esta versión introduce desgloses exactos en los reportes de comparativas de luz y gas, y una nueva pestaña "Acerca de" en el menú de configuración.
