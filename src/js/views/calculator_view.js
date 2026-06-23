@@ -230,7 +230,6 @@ function setupLightTariffTypeToggle() {
   const extraConsRow = document.getElementById('calc-light-30td-cons-row');
   const extraPotPriceRow = document.getElementById('calc-light-30td-pot-price-row');
   const extraEnePriceRow = document.getElementById('calc-light-30td-ene-price-row');
-  const bonoSocialGroup = document.getElementById('calc-light-bono-social-group');
 
   if (lightTariffTypeSelect) {
     lightTariffTypeSelect.addEventListener('change', () => {
@@ -239,14 +238,6 @@ function setupLightTariffTypeToggle() {
       if (extraConsRow) extraConsRow.style.display = is30td ? 'flex' : 'none';
       if (extraPotPriceRow) extraPotPriceRow.style.display = is30td ? 'flex' : 'none';
       if (extraEnePriceRow) extraEnePriceRow.style.display = is30td ? 'flex' : 'none';
-      
-      if (bonoSocialGroup) {
-        bonoSocialGroup.style.display = is30td ? 'none' : 'flex';
-      }
-      if (is30td) {
-        const bonoSocialEl = document.getElementById('calc-light-bono-social');
-        if (bonoSocialEl) bonoSocialEl.value = "";
-      }
 
       // Set required attribute on extra inputs if 3.0TD
       const extraInputs = [
@@ -369,7 +360,7 @@ function setupCalcFormSubmit() {
     const hasExcedente = document.getElementById('calc-light-has-excedente').checked;
     const excedenteCons = hasExcedente ? parseFloat(document.getElementById('calc-light-excedente-cons').value || 0) : 0;
     const excedentePrice = hasExcedente ? parseFloat(document.getElementById('calc-light-excedente-price').value || 0) : 0;
-    const bonoSocialPct = parseFloat(document.getElementById('calc-light-bono-social').value || 0);
+    const bonoSocialPct = 0;
     const bonoSocialFinanciacion = parseFloat(document.getElementById('calc-light-bono-social-financiacion').value || 0);
 
     // 1. Obtener y parsear inputs de Luz

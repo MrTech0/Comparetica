@@ -156,10 +156,10 @@ function initNavigation() {
       // Actualizar título
       if (viewTitle) viewTitle.innerText = item.title;
 
-      // Mostrar/Ocultar Modo Privado según la vista (sólo en Historial)
+      // Mostrar/Ocultar Modo Privado según la vista (sólo en Historial y Tarifas)
       const privateModeToggle = document.getElementById('private-mode-toggle-container');
       if (privateModeToggle) {
-        if (item.btn === 'nav-history') {
+        if (item.btn === 'nav-history' || item.btn === 'nav-tariffs') {
           privateModeToggle.style.display = 'flex';
         } else {
           privateModeToggle.style.display = 'none';
