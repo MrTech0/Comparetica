@@ -1,11 +1,11 @@
 {
-  "version": "0.2.2",
-  "notes": "Esta versión introduce desgloses exactos en los reportes de comparativas de luz y gas, y una nueva pestaña \"Acerca de\" en el menú de configuración. * **📊 Desglose de Factura 100% Real:** * Elimina...",
-  "pub_date": "2026-06-22T23:31:32.622Z",
+  "version": "0.2.3",
+  "notes": "Esta versión perfecciona las opciones del comparador de tarifas, simplifica los textos de cumplimiento normativo y amplía el modo privado del consultor. * **⚖️ Simplificación y ajuste del Bono Soci...",
+  "pub_date": "2026-06-23T11:58:19.745Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0k4alc5RUhqcEZoU3YxRXp3YnR6RzRqY0ZGWHhLS3pSQjM4MDZWNzVOZm9lWmtkQ3JjS2kxRFltWWNJbUVkN0VWeFQ2T0hLSFJUVDhKMEVSS3FrTVFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMTcxMDg2CWZpbGU6Q29tcGFyZXRpY2FfMC4yLjJfeDY0X2VuLVVTLm1zaQp2cnlTRW9KQzFnbWtieWdhc1h1emNVZ2VMMHFMWHY4aE42V3V2MUcrM285aTlsak9mNTdYMlJiQU5ybUpGcTRka3RQZ0tDR3JNMG93TXduZzVsdFRDQT09Cg==",
-      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.2.2/Comparetica_0.2.2_x64.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0VWZ3J3am9KN2FvMFp1UGNGVDZpMUFCczF0M3BTOHlabnFNUllBRi95UjVoOG82WG1FTmtnNCtxNmcrYlllQ1RmTVd4dHYva1JpQW9yU0U5TlJDaXcwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMjE1ODkzCWZpbGU6Q29tcGFyZXRpY2FfMC4yLjNfeDY0X2VuLVVTLm1zaQpLb0RrMlo0emZJM0xLSXlmVjFya0w1OWx0ZGZQMlJGQ0ZPdlFvcU8xRkdaVkErdWlXWnVUc1lPZkZiK1FzbXY2bklKQU5nOWRzQW9JZHhyTjRTRU5Edz09Cg==",
+      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.2.3/Comparetica_0.2.3_x64.msi"
     }
   }
 }
