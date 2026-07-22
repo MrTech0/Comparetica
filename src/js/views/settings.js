@@ -557,7 +557,8 @@ function setupUpdates() {
   }
 
   async function runCheckUpdate(manual = false) {
-    if (!window.__TAURI__ || !window.__TAURI__.updater) {
+    const updater = window.__TAURI__ ? (window.__TAURI__.updater || window.__TAURI__.plugin?.updater || window.__TAURI__.pluginUpdater) : null;
+    if (!updater) {
       if (manual) {
         window.showToast("El servicio de actualizaciones solo está disponible dentro de la aplicación instalada.", "info");
       }
@@ -573,7 +574,6 @@ function setupUpdates() {
     }
 
     try {
-      const updater = window.__TAURI__.updater;
       const update = await updater.check();
 
       if (update) {

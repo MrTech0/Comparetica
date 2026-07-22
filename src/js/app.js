@@ -456,7 +456,8 @@ function initSidebarCollapse() {
 
 // --- COMPROBACIÓN DE ACTUALIZACIONES AL INICIAR ---
 async function initStartupUpdateCheck() {
-  if (!window.__TAURI__ || !window.__TAURI__.updater) {
+  const updater = window.__TAURI__ ? (window.__TAURI__.updater || window.__TAURI__.plugin?.updater || window.__TAURI__.pluginUpdater) : null;
+  if (!updater) {
     return; // Solo funciona dentro de Tauri
   }
 
@@ -475,7 +476,6 @@ async function initStartupUpdateCheck() {
   }
 
   try {
-    const updater = window.__TAURI__.updater;
     const update = await updater.check();
 
     if (update) {

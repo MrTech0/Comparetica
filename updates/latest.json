@@ -6,6 +6,14 @@
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0FQMzQzQmVvOW1pSWZNYzZ3aUg1bWphMlBUbklnallJZy9Yc05EOW9JMGRnLzFHTVhCSm9BUmhXcUlrRGdielhXelpsSFBmczJwUFB1SHpWZlVOSmdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NjgwNDEwCWZpbGU6Q29tcGFyZXRpY2FfMC4zLjBfeDY0X2VuLVVTLm1zaQpzcFBjZHplaVRORi9xZVdrbDRqSWYwVkNXaUk0aS85OXlUejZZWmFJYzByNzVoNUJQc0ovdWY2N1VmZHlxajZyVHFsNFBmQTV2dkp1TXIvU3FiRTJEUT09Cg==",
       "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.3.0/Comparetica_0.3.0_x64.msi"
+    },
+    "windows-x86_64-msvc": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0FQMzQzQmVvOW1pSWZNYzZ3aUg1bWphMlBUbklnallJZy9Yc05EOW9JMGRnLzFHTVhCSm9BUmhXcUlrRGdielhXelpsSFBmczJwUFB1SHpWZlVOSmdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NjgwNDEwCWZpbGU6Q29tcGFyZXRpY2FfMC4zLjBfeDY0X2VuLVVTLm1zaQpzcFBjZHplaVRORi9xZVdrbDRqSWYwVkNXaUk0aS85OXlUejZZWmFJYzByVHFsNFBmQTV2dkp1TXIvU3FiRTJEUT09Cg==",
+      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.3.0/Comparetica_0.3.0_x64.msi"
+    },
+    "win64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0FQMzQzQmVvOW1pSWZNYzZ3aUg1bWphMlBUbklnallJZy9Yc05EOW9JMGRnLzFHTVhCSm9BUmhXcUlrRGdielhXelpsSFBmczJwUFB1SHpWZlVOSmdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NjgwNDEwCWZpbGU6Q29tcGFyZXRpY2FfMC4zLjBfeDY0X2VuLVVTLm1zaQpzcFBjZHplaVRORi9xZVdrbDRqSWYwVkNXaUk0aS85OXlUejZZWmFJYzByNzVoNUJQc0ovdWY2N1VmZHlxajZyVHFsNFBmQTV2dkp1TXIvU3FiRTJEUT09Cg==",
+      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.3.0/Comparetica_0.3.0_x64.msi"
     }
   }
 }

@@ -27,15 +27,19 @@ try {
     }
   }
 
+  const platformPayload = {
+    signature: signature,
+    url: `https://github.com/MrTech0/Comparetica/releases/download/v${version}/Comparetica_${version}_x64.msi`
+  };
+
   const latestJson = {
     version: version,
     notes: notes,
     pub_date: new Date().toISOString(),
     platforms: {
-      "windows-x86_64": {
-        signature: signature,
-        url: `https://github.com/MrTech0/Comparetica/releases/download/v${version}/Comparetica_${version}_x64.msi`
-      }
+      "windows-x86_64": platformPayload,
+      "windows-x86_64-msvc": platformPayload,
+      "win64": platformPayload
     }
   };
 
