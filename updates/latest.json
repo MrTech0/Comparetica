@@ -1,11 +1,11 @@
 {
-  "version": "0.2.3",
-  "notes": "Esta versión perfecciona las opciones del comparador de tarifas, simplifica los textos de cumplimiento normativo y amplía el modo privado del consultor. * **⚖️ Simplificación y ajuste del Bono Soci...",
-  "pub_date": "2026-06-23T11:58:19.745Z",
+  "version": "0.3.0",
+  "notes": "Esta actualización introduce el sistema de cifrado nativo en Rust para la base de datos local y copias de seguridad (AES-256-GCM + Argon2id), el nuevo importador masivo de clientes desde archivos CSV...",
+  "pub_date": "2026-07-22T00:43:42.722Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0VWZ3J3am9KN2FvMFp1UGNGVDZpMUFCczF0M3BTOHlabnFNUllBRi95UjVoOG82WG1FTmtnNCtxNmcrYlllQ1RmTVd4dHYva1JpQW9yU0U5TlJDaXcwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMjE1ODkzCWZpbGU6Q29tcGFyZXRpY2FfMC4yLjNfeDY0X2VuLVVTLm1zaQpLb0RrMlo0emZJM0xLSXlmVjFya0w1OWx0ZGZQMlJGQ0ZPdlFvcU8xRkdaVkErdWlXWnVUc1lPZkZiK1FzbXY2bklKQU5nOWRzQW9JZHhyTjRTRU5Edz09Cg==",
-      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.2.3/Comparetica_0.2.3_x64.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaU9kNnVhUWsvR0FQMzQzQmVvOW1pSWZNYzZ3aUg1bWphMlBUbklnallJZy9Yc05EOW9JMGRnLzFHTVhCSm9BUmhXcUlrRGdielhXelpsSFBmczJwUFB1SHpWZlVOSmdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NjgwNDEwCWZpbGU6Q29tcGFyZXRpY2FfMC4zLjBfeDY0X2VuLVVTLm1zaQpzcFBjZHplaVRORi9xZVdrbDRqSWYwVkNXaUk0aS85OXlUejZZWmFJYzByNzVoNUJQc0ovdWY2N1VmZHlxajZyVHFsNFBmQTV2dkp1TXIvU3FiRTJEUT09Cg==",
+      "url": "https://github.com/MrTech0/Comparetica/releases/download/v0.3.0/Comparetica_0.3.0_x64.msi"
     }
   }
 }
