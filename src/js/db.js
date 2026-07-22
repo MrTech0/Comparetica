@@ -3,28 +3,86 @@
 let dbInstance = null;
 
 /**
- * Inicializa la base de datos y crea el esquema si no existe.
- * @returns {Promise<any>} Instancia de la base de datos.
+ * Comprueba el estado de inicialización y desbloqueo de la base de datos cifrada.
+ */
+export async function checkDbStatus() {
+  if (!window.__TAURI__) {
+    return { is_initialized: true, is_unlocked: true, needs_migration: false };
+  }
+  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
+  return await invoke('db_check_status');
+}
+
+function generateMockRecoveryKey() {
+  const chars = '2345679ACDEFGHJKMNPQRSTVWXYZ';
+  let raw = '';
+  for (let i = 0; i < 16; i++) {
+    raw += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `RC-${raw.substring(0, 4)}-${raw.substring(4, 8)}-${raw.substring(8, 12)}-${raw.substring(12, 16)}`;
+}
+
+/**
+ * Configura por primera vez la Contraseña Maestra y devuelve la Clave de Recuperación.
+ */
+export async function setupMasterPassword(password) {
+  if (!window.__TAURI__) return generateMockRecoveryKey();
+  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
+  return await invoke('db_setup_master_password', { password });
+}
+
+/**
+ * Desbloquea la base de datos cifrada mediante la Contraseña Maestra.
+ */
+export async function loginDb(password) {
+  if (!window.__TAURI__) return true;
+  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
+  return await invoke('db_login', { password });
+}
+
+/**
+ * Recupera el acceso a la base de datos con la Clave de Recuperación y establece una nueva contraseña.
+ */
+export async function recoverDbAccess(recoveryKey, newPassword) {
+  if (!window.__TAURI__) return true;
+  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
+  return await invoke('db_recover_access', { recoveryKey, newPassword });
+}
+
+/**
+ * Cambia la contraseña maestra de la bóveda.
+ */
+export async function changeMasterPassword(currentPassword, newPassword) {
+  if (!window.__TAURI__) return true;
+  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
+  return await invoke('db_change_password', { currentPassword, newPassword });
+}
+
+/**
+ * Inicializa y obtiene el cliente de base de datos cifrada nativo en Rust.
+ * @returns {Promise<any>} Instancia del conector.
  */
 export async function getDb() {
   if (dbInstance) return dbInstance;
 
-  if (!window.__TAURI__ || !window.__TAURI__.sql) {
-    console.error("Tauri SQL plugin no disponible. Ejecutando en modo mock de desarrollo.");
-    // Mock para desarrollo/pruebas fuera de Tauri si es necesario
-    return createMockDb();
+  if (!window.__TAURI__) {
+    console.warn("Tauri no disponible. Ejecutando en modo mock de desarrollo.");
+    dbInstance = createMockDb();
+    return dbInstance;
   }
 
-  try {
-    const Database = window.__TAURI__.sql;
-    // Carga de la base de datos SQLite local
-    dbInstance = await Database.load('sqlite:comparetica.db');
-    await initSchema(dbInstance);
-    return dbInstance;
-  } catch (error) {
-    console.error("Error al cargar la base de datos:", error);
-    throw error;
-  }
+  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
+
+  dbInstance = {
+    async select(query, params = []) {
+      return await invoke('db_select', { query, params });
+    },
+    async execute(query, params = []) {
+      return await invoke('db_execute', { query, params });
+    }
+  };
+
+  return dbInstance;
 }
 
 /**
@@ -1187,4 +1245,139 @@ export async function getSqliteVersion() {
   } else {
     return "3.45.0 (Simulado)";
   }
+}
+
+/**
+ * Obtiene las columnas actuales de la tabla clientes directamente desde SQLite.
+ * Garantiza compatibilidad dinámica si en el futuro se añaden nuevas columnas.
+ */
+export async function getClientesSchemaColumns() {
+  const db = await getDb();
+  if (window.__TAURI__) {
+    try {
+      const columnsInfo = await db.select("PRAGMA table_info(clientes);");
+      return columnsInfo
+        .filter(col => col.name !== 'id' && col.name !== 'creado_en')
+        .map(col => ({
+          name: col.name,
+          type: col.type,
+          notnull: col.notnull === 1,
+          label: getHumanLabelForColumn(col.name)
+        }));
+    } catch (e) {
+      console.error("Error al obtener columnas de clientes via PRAGMA:", e);
+    }
+  }
+
+  // Fallback por defecto si no es Tauri o falla PRAGMA
+  return [
+    { name: 'nombre_empresa', type: 'TEXT', notnull: true, label: 'Nombre / Empresa *' },
+    { name: 'cif', type: 'TEXT', notnull: true, label: 'CIF / DNI / NIF *' },
+    { name: 'representante', type: 'TEXT', notnull: false, label: 'Representante' },
+    { name: 'cups', type: 'TEXT', notnull: false, label: 'CUPS' },
+    { name: 'email', type: 'TEXT', notnull: false, label: 'Email de Contacto' }
+  ];
+}
+
+function getHumanLabelForColumn(columnName) {
+  const labels = {
+    nombre_empresa: 'Nombre / Empresa *',
+    cif: 'CIF / DNI / NIF *',
+    representante: 'Representante',
+    cups: 'CUPS',
+    email: 'Email de Contacto'
+  };
+  if (labels[columnName]) return labels[columnName];
+
+  return columnName
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, l => l.toUpperCase());
+}
+
+/**
+ * Importa o actualiza una lista de clientes en la base de datos.
+ * @param {Array<Object>} rows Objetos con propiedades correspondientes a las columnas de SQLite.
+ * @param {boolean} updateExisting Si es true, actualiza los campos si el CIF ya existe; si es false, los omite.
+ */
+export async function importClientesBatch(rows, updateExisting = false) {
+  const db = await getDb();
+  let added = 0;
+  let updated = 0;
+  let skipped = 0;
+  const errors = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const { nombre_empresa, cif, ...otherFields } = row;
+
+    if (!nombre_empresa || !cif) {
+      skipped++;
+      errors.push(`Fila ${i + 1}: Faltan campos obligatorios (Nombre o CIF).`);
+      continue;
+    }
+
+    try {
+      if (window.__TAURI__) {
+        const existing = await db.select("SELECT id FROM clientes WHERE cif = ?;", [cif.trim()]);
+        if (existing.length > 0) {
+          if (updateExisting) {
+            const fieldsToUpdate = [];
+            const params = [];
+            fieldsToUpdate.push("nombre_empresa = ?");
+            params.push(nombre_empresa.trim());
+
+            for (const [key, val] of Object.entries(otherFields)) {
+              if (val !== undefined && val !== null && val !== '') {
+                fieldsToUpdate.push(`${key} = ?`);
+                params.push(typeof val === 'string' ? val.trim() : val);
+              }
+            }
+            params.push(existing[0].id);
+
+            const query = `UPDATE clientes SET ${fieldsToUpdate.join(', ')} WHERE id = ?;`;
+            await db.execute(query, params);
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          const keys = ['nombre_empresa', 'cif'];
+          const values = [nombre_empresa.trim(), cif.trim()];
+          const placeholders = ['?', '?'];
+
+          for (const [key, val] of Object.entries(otherFields)) {
+            if (val !== undefined && val !== null && val !== '') {
+              keys.push(key);
+              values.push(typeof val === 'string' ? val.trim() : val);
+              placeholders.push('?');
+            }
+          }
+
+          const query = `INSERT INTO clientes (${keys.join(', ')}) VALUES (${placeholders.join(', ')});`;
+          await db.execute(query, values);
+          added++;
+        }
+      } else {
+        const mockClients = JSON.parse(localStorage.getItem('mock_clientes') || '[]');
+        const existingIndex = mockClients.findIndex(c => c.cif === cif.trim());
+        if (existingIndex !== -1) {
+          if (updateExisting) {
+            mockClients[existingIndex] = { ...mockClients[existingIndex], nombre_empresa: nombre_empresa.trim(), ...otherFields };
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          mockClients.push({ id: mockClients.length + 1, nombre_empresa: nombre_empresa.trim(), cif: cif.trim(), ...otherFields, creado_en: new Date().toISOString() });
+          added++;
+        }
+        localStorage.setItem('mock_clientes', JSON.stringify(mockClients));
+      }
+    } catch (err) {
+      skipped++;
+      errors.push(`Fila ${i + 1} (${cif}): ${err.message || err}`);
+    }
+  }
+
+  return { added, updated, skipped, errors };
 }

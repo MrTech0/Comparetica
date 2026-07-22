@@ -1,11 +1,14 @@
 /* src/js/views/settings.js */
 
-import { clearAllTables, getSqliteVersion } from '../db.js';
+import { clearAllTables, getSqliteVersion, changeMasterPassword } from '../db.js';
+import { initCsvImporter } from '../csv_importer.js';
 
 export function initSettingsView() {
   setupTabs();
   setupAppearance();
   setupCompanySettings();
+  initCsvImporter();
+  setupSecuritySettings();
   setupCleanup();
   setupUpdates();
 }
@@ -15,6 +18,8 @@ function setupTabs() {
   const tabs = [
     { btn: 'tab-btn-settings-appearance', panel: 'panel-settings-appearance' },
     { btn: 'tab-btn-settings-company', panel: 'panel-settings-company' },
+    { btn: 'tab-btn-settings-import', panel: 'panel-settings-import' },
+    { btn: 'tab-btn-settings-security', panel: 'panel-settings-security' },
     { btn: 'tab-btn-settings-updates', panel: 'panel-settings-updates' },
     { btn: 'tab-btn-settings-cleanup', panel: 'panel-settings-cleanup' },
     { btn: 'tab-btn-settings-params', panel: 'panel-settings-params' },
@@ -89,6 +94,139 @@ function setupAppearance() {
       window.showToast(`Paleta de color cambiada a: ${btn.innerText.trim()}`, "success");
     });
   });
+}
+
+// --- Control de Seguridad y Cambio de Contraseña ---
+function setupSecuritySettings() {
+  const form = document.getElementById('settings-security-form');
+  const dialog = document.getElementById('dialog-settings-new-key');
+  const displayKeyInput = document.getElementById('settings-display-new-key');
+  const btnCopy = document.getElementById('btn-settings-copy-new-key');
+  const btnPdf = document.getElementById('btn-settings-download-new-pdf');
+  const btnClose = document.getElementById('btn-settings-close-new-key');
+
+  if (!form) return;
+
+  let latestNewKey = "";
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const currentPass = document.getElementById('settings-current-password').value;
+    const newPass = document.getElementById('settings-new-password').value;
+    const confirmPass = document.getElementById('settings-new-password-confirm').value;
+
+    if (newPass.length < 6) {
+      window.showToast("La nueva contraseña debe tener al menos 6 caracteres.", "error");
+      return;
+    }
+
+    if (newPass !== confirmPass) {
+      window.showToast("La nueva contraseña y la confirmación no coinciden.", "error");
+      return;
+    }
+
+    const btn = document.getElementById('btn-save-security');
+    const originalHtml = btn ? btn.innerHTML : '';
+
+    try {
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-sm"></span> Cifrando con nueva clave...`;
+      }
+
+      const newRecoveryKey = await changeMasterPassword(currentPass, newPass);
+      latestNewKey = newRecoveryKey;
+      form.reset();
+
+      if (displayKeyInput) displayKeyInput.value = newRecoveryKey;
+      if (dialog) dialog.classList.add('active');
+
+      window.showToast("¡Contraseña Maestra actualizada y nueva clave generada!", "success");
+    } catch (err) {
+      window.showToast("Error al cambiar la contraseña. Verifica tu contraseña actual.", "error");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+    }
+  });
+
+  if (btnCopy) {
+    btnCopy.addEventListener('click', () => {
+      if (latestNewKey) {
+        navigator.clipboard.writeText(latestNewKey);
+        window.showToast("¡Nueva clave de recuperación copiada al portapapeles!", "success");
+      }
+    });
+  }
+
+  if (btnPdf) {
+    btnPdf.addEventListener('click', async () => {
+      if (latestNewKey && window.jspdf) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        doc.setFontSize(20);
+        doc.setTextColor(26, 115, 232);
+        doc.text("Comparetica - NUEVA Clave de Recuperación de Emergencia", 15, 20);
+
+        doc.setFontSize(11);
+        doc.setTextColor(80, 80, 80);
+        doc.text("Documento Oficial de Respaldo de Seguridad (RGPD / LOPDGDD)", 15, 28);
+        doc.setLineWidth(0.5);
+        doc.setDrawColor(200, 200, 200);
+        doc.line(15, 32, 195, 32);
+
+        doc.setFontSize(12);
+        doc.setTextColor(40, 40, 40);
+        doc.text("Esta NUEVA clave de recuperación reemplaza e invalida cualquier clave anterior.", 15, 45);
+        doc.text("Guarda esta hoja impresa en un lugar seguro.", 15, 52);
+
+        doc.setFillColor(245, 247, 250);
+        doc.setDrawColor(26, 115, 232);
+        doc.roundedRect(15, 65, 180, 30, 3, 3, 'FD');
+
+        doc.setFontSize(18);
+        doc.setFont("courier", "bold");
+        doc.setTextColor(26, 115, 232);
+        doc.text(latestNewKey, 105, 83, { align: "center" });
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text("Fecha de actualización: " + new Date().toLocaleString('es-ES'), 15, 110);
+        doc.text("Comparetica - Sistema de Cifrado de Datos B2B", 15, 116);
+
+        if (window.__TAURI__) {
+          const pdfDataUri = doc.output('datauristring');
+          const base64Data = pdfDataUri.split(',')[1];
+          const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
+
+          try {
+            const savedPath = await invoke('save_pdf', {
+              filename: "Comparetica_NUEVA_Clave_Recuperacion.pdf",
+              base64Data: base64Data
+            });
+            window.showToast(`📄 PDF de nueva clave guardado en: ${savedPath}`, 'success');
+          } catch (err) {
+            if (err !== "Cancelado por el usuario") {
+              window.showToast(`Error al guardar PDF: ${err}`, 'error');
+            }
+          }
+        } else {
+          doc.save("Comparetica_NUEVA_Clave_Recuperacion.pdf");
+          window.showToast("📄 PDF descargado con éxito.", "success");
+        }
+      }
+    });
+  }
+
+  if (btnClose) {
+    btnClose.addEventListener('click', () => {
+      if (dialog) dialog.classList.remove('active');
+    });
+  }
 }
 
 // --- Control de Limpieza / Factory Reset ---

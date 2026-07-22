@@ -1,6 +1,7 @@
 /* src/js/app.js */
 
 import { getDb, purgeOldData } from './db.js';
+import { initAuthGuard } from './auth.js';
 import { initHomeView } from './views/home.js';
 import { initCalculatorView } from './views/calculator_view.js';
 import { initClientsView } from './views/clients.js';
@@ -11,52 +12,53 @@ import { initWizard } from './views/wizard.js';
 import { initSettingsView, refreshCompanySettings } from './views/settings.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // 1. Inicializar la base de datos y esquema
-  try {
-    await getDb();
-    console.log("Base de datos inicializada correctamente.");
-    
-    // Ejecutar purga de datos antiguos conforme a la política de retención legal
-    try {
-      await purgeOldData();
-    } catch (err) {
-      console.error("Error al ejecutar la purga automática:", err);
-    }
-  } catch (error) {
-    console.error("Error crítico al inicializar la base de datos:", error);
-  }
-
-  // 2. Inicializar sistema de temas (Claro / Oscuro)
+  // 1. Inicializar sistema de temas (Claro / Oscuro)
   initThemeSystem();
 
-  // 3. Inicializar navegación entre vistas
+  // 2. Inicializar navegación entre vistas
   initNavigation();
 
-  // 4. Inicializar control de Modo Privado
+  // 3. Inicializar control de Modo Privado
   initPrivateMode();
 
-  // 5. Inicializar vistas hijas
-  await initHomeView();
-  await initClientsView();
-  initCalculatorView();
-  await initTariffsView();
-  await initHistoryView();
-  initBackupView();
-  initPdfPreviewDialog();
-  initWizard();
-  initSettingsView();
-
-  // Alimentar selectores dinámicos
-  await updateComercializadorasSelectors();
-
-  // Inicializar contraer/expandir barra lateral
+  // 4. Inicializar contraer/expandir barra lateral
   initSidebarCollapse();
 
-  // Inicializar desplegables personalizados
+  // 5. Inicializar desplegables personalizados
   initCustomSelects();
 
-  // Comprobar actualizaciones en segundo plano al iniciar
+  // 6. Comprobar actualizaciones en segundo plano al iniciar
   initStartupUpdateCheck();
+
+  // 7. Guardián de autenticación y cifrado de datos
+  initAuthGuard(async () => {
+    try {
+      await getDb();
+      console.log("Base de datos cifrada inicializada correctamente.");
+      
+      try {
+        await purgeOldData();
+      } catch (err) {
+        console.error("Error al ejecutar la purga automática:", err);
+      }
+    } catch (error) {
+      console.error("Error crítico al acceder a la base de datos cifrada:", error);
+    }
+
+    // Cargar datos en las vistas una vez desbloqueada la app
+    await initHomeView();
+    await initClientsView();
+    initCalculatorView();
+    await initTariffsView();
+    await initHistoryView();
+    initBackupView();
+    initPdfPreviewDialog();
+    initWizard();
+    initSettingsView();
+
+    // Alimentar selectores dinámicos
+    await updateComercializadorasSelectors();
+  });
 });
 
 // --- PREVISUALIZACIÓN DE PDF GLOBAL ---

@@ -1,6 +1,6 @@
 [package]
 name = "comparetica"
-version = "0.2.3"
+version = "0.3.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -27,5 +27,9 @@ tauri-plugin-updater = "2"
 rfd = "0.17.2"
 base64 = "0.22.1"
 chrono = "0.4"
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+argon2 = "0.5"
+aes-gcm = "0.10"
+rand = "0.8"
 
 
