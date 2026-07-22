@@ -76,9 +76,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update updates/latest.json
-        run: node scripts/update-latest-json.js
-
       - name: Commit and Push updates/latest.json
         shell: bash
         run: |
@@ -87,8 +84,9 @@ jobs:
           git fetch origin main
           git checkout main
           git pull origin main
+          node scripts/update-latest-json.js
           git add updates/latest.json
-          git commit -m "Update updates/latest.json metadata for ${{ github.ref_name }} release [skip ci]"
+          git commit -m "Update updates/latest.json metadata for ${{ github.ref_name }} release [skip ci]" || echo "No hay cambios en latest.json"
           git push origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
