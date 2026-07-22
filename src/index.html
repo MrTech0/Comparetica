@@ -14,6 +14,107 @@
   </head>
 
   <body>
+    <!-- Auth / Encryption Lock Screen Overlay -->
+    <div id="auth-overlay" class="auth-overlay-backdrop hidden">
+      <div class="auth-card m3-card">
+        <!-- Header -->
+        <div class="auth-header">
+          <img src="assets/light-bulb.svg" alt="Logo" class="auth-logo" />
+          <h2 id="auth-title">Desbloquear Comparetica</h2>
+          <p id="auth-subtitle" class="auth-subtitle">Introduce tu contraseña maestra para acceder a tus datos cifrados conforme al RGPD/LOPDGDD.</p>
+        </div>
+
+        <!-- Error / Success Alert Message -->
+        <div id="auth-alert" class="auth-alert hidden"></div>
+
+        <!-- Mode 1: Setup Master Password -->
+        <form id="auth-form-setup" class="auth-form hidden">
+          <div class="m3-field">
+            <label class="m3-label" for="setup-password">Nueva Contraseña Maestra *</label>
+            <input type="password" id="setup-password" class="m3-input" placeholder="Mínimo 6 caracteres" required minlength="6" autocomplete="new-password" />
+          </div>
+          <div class="m3-field">
+            <label class="m3-label" for="setup-password-confirm">Confirmar Contraseña Maestra *</label>
+            <input type="password" id="setup-password-confirm" class="m3-input" placeholder="Repite la contraseña" required minlength="6" autocomplete="new-password" />
+          </div>
+          <button type="submit" id="btn-setup-submit" class="m3-btn" style="width: 100%; margin-top: 8px;">
+            <span>Crear Bóveda y Encriptar Datos</span>
+          </button>
+        </form>
+
+        <!-- Mode 1.5: Recovery Key Onboarding Display -->
+        <div id="auth-recovery-display" class="auth-form hidden">
+          <div style="background-color: var(--color-surface-variant); padding: 16px; border-radius: var(--radius-md); border-left: 4px solid #e65100; margin-bottom: 16px;">
+            <strong style="color: #e65100; display: block; margin-bottom: 4px;">⚠️ IMPORTANTE: Clave de Recuperación de Emergencia</strong>
+            <p style="font-size: 13px; color: var(--color-on-surface); margin: 0;">
+              Si en el futuro olvidas tu Contraseña Maestra, esta clave es el <strong>único medio</strong> para desbloquear tus datos. Guárdala en papel o en un lugar seguro.
+            </p>
+          </div>
+
+          <div class="m3-field">
+            <label class="m3-label">Tu Clave de Recuperación (Caracteres No Ambiguos)</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="text" id="display-recovery-key" class="m3-input" readonly style="font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: 2px; text-align: center; color: var(--color-primary);" />
+              <button type="button" id="btn-copy-recovery-key" class="m3-btn m3-btn-outlined" title="Copiar al portapapeles">
+                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <button type="button" id="btn-download-recovery-pdf" class="m3-btn m3-btn-tonal" style="flex: 1;">
+              <span>📄 Descargar PDF</span>
+            </button>
+            <button type="button" id="btn-confirm-recovery-done" class="m3-btn" style="flex: 1;">
+              <span>Entendido, Continuar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mode 2: Login -->
+        <form id="auth-form-login" class="auth-form hidden">
+          <div class="m3-field">
+            <label class="m3-label" for="login-password">Contraseña Maestra *</label>
+            <div style="position: relative;">
+              <input type="password" id="login-password" class="m3-input" placeholder="Introduce tu contraseña" required autocomplete="current-password" style="padding-right: 48px;" />
+              <button type="button" id="toggle-login-password-visibility" class="m3-btn-icon" style="position: absolute; right: 4px; top: 4px;" title="Mostrar/Ocultar">
+                <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" id="btn-login-submit" class="m3-btn" style="width: 100%; margin-top: 8px;">
+            <span>Desbloquear</span>
+          </button>
+          <div style="text-align: center; margin-top: 16px;">
+            <button type="button" id="btn-goto-recover" class="auth-link-btn">
+              ¿Has olvidado tu contraseña? Usar clave de emergencia
+            </button>
+          </div>
+        </form>
+
+        <!-- Mode 3: Recover Access -->
+        <form id="auth-form-recover" class="auth-form hidden">
+          <div class="m3-field">
+            <label class="m3-label" for="recover-key">Clave de Recuperación de Emergencia *</label>
+            <input type="text" id="recover-key" class="m3-input" placeholder="Ej: RC-XXXX-XXXX-XXXX" required style="font-family: monospace; letter-spacing: 1px;" />
+          </div>
+          <div class="m3-field">
+            <label class="m3-label" for="recover-password">Nueva Contraseña Maestra *</label>
+            <input type="password" id="recover-password" class="m3-input" placeholder="Mínimo 6 caracteres" required minlength="6" />
+          </div>
+          <button type="submit" id="btn-recover-submit" class="m3-btn" style="width: 100%; margin-top: 8px;">
+            <span>Restablecer Acceso</span>
+          </button>
+          <div style="text-align: center; margin-top: 16px;">
+            <button type="button" id="btn-goto-login" class="auth-link-btn">
+              Volver al inicio de sesión
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+
     <div id="app-container">
       
       <!-- Lateral Navigation -->
@@ -796,6 +897,8 @@
             <div class="tabs-header">
               <button class="m3-tab-btn active" id="tab-btn-settings-appearance">Apariencia</button>
               <button class="m3-tab-btn" id="tab-btn-settings-company">Consultora</button>
+              <button class="m3-tab-btn" id="tab-btn-settings-import">Importación CSV</button>
+              <button class="m3-tab-btn" id="tab-btn-settings-security">Seguridad y Cifrado</button>
               <button class="m3-tab-btn" id="tab-btn-settings-updates">Actualizaciones</button>
               <button class="m3-tab-btn" id="tab-btn-settings-cleanup">Limpieza</button>
               <button class="m3-tab-btn" id="tab-btn-settings-params">Parámetros</button>
@@ -825,6 +928,111 @@
                      Amarillo
                    </button>
                  </div>
+              </div>
+            </div>
+
+            <!-- PANEL: IMPORTACIÓN CSV DE CLIENTES -->
+            <div id="panel-settings-import" class="tab-panel" style="display:none;">
+              <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Importador de Clientes desde CSV</h3>
+                <p class="text-muted" style="margin-bottom: 20px; font-size: 13px;">
+                  Carga datos de clientes de forma masiva desde un archivo CSV o TXT. El sistema consultará automáticamente el esquema de la base de datos y permitirá asociar o ajustar las columnas del archivo con los campos del CRM.
+                </p>
+
+                <!-- PASO 1: CARGA DE ARCHIVO -->
+                <div id="csv-step-1" class="csv-wizard-step">
+                  <div id="csv-dropzone" style="border: 2px dashed var(--color-outline); border-radius: var(--radius-md); padding: 36px 20px; text-align: center; background-color: var(--color-surface-variant); transition: border-color var(--transition-fast);">
+                    <svg viewBox="0 0 24 24" style="width: 48px; height: 48px; fill: var(--color-primary); margin-bottom: 12px;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+                    <h4 style="margin: 0 0 6px 0; font-weight: 600; color: var(--color-on-surface);">Arrastra tu archivo CSV aquí</h4>
+                    <p class="text-muted" style="font-size: 13px; margin: 0 0 16px 0;">Soporta formatos UTF-8 / Latin-1 delimitados por comas, punto y coma o tabuladores</p>
+                    <button type="button" id="btn-select-csv-file" class="m3-btn">Seleccionar Archivo CSV</button>
+                    <input type="file" id="csv-file-input" accept=".csv, .txt" style="display: none;" />
+                  </div>
+                </div>
+
+                <!-- PASO 2: MAPEO DE COLUMNAS Y CONFIGURACIÓN -->
+                <div id="csv-step-2" class="csv-wizard-step hidden" style="margin-top: 16px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; background-color: var(--color-surface-variant); padding: 10px 16px; border-radius: var(--radius-md); margin-bottom: 20px;">
+                    <span id="csv-file-info" style="font-weight: 600; font-size: 14px; color: var(--color-primary); display: flex; align-items: center; gap: 8px;"></span>
+                    <button type="button" id="btn-csv-reset" style="color: #ef4444; background: rgba(239, 68, 68, 0.12); border: none; border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color var(--transition-fast);" title="Eliminar archivo y volver">
+                      <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </button>
+                  </div>
+
+                  <h4 style="margin-bottom: 12px; color: var(--color-on-surface);">1. Mapeo de Columnas (CRM vs CSV)</h4>
+                  <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">
+                    Compara cada campo del CRM con la columna equivalente de tu archivo. El sistema ha realizado un auto-mapeo inicial. Puedes ajustar manualmente cualquier columna.
+                  </p>
+
+                  <div id="csv-mapping-rows" style="margin-bottom: 24px; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-sm); padding: 8px 16px;"></div>
+
+                  <h4 style="margin-bottom: 12px; color: var(--color-on-surface);">2. Vista Previa de los Primeros Datos</h4>
+                  <div style="overflow-x: auto; margin-bottom: 24px; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-sm);">
+                    <table class="m3-table" style="font-size: 13px;">
+                      <thead id="csv-preview-thead"></thead>
+                      <tbody id="csv-preview-tbody"></tbody>
+                    </table>
+                  </div>
+
+                  <h4 style="margin-bottom: 12px; color: var(--color-on-surface);">3. Regla de Duplicados</h4>
+                  <div class="m3-checkbox-container" style="margin-bottom: 24px;">
+                    <input type="checkbox" id="csv-duplicate-update" />
+                    <label for="csv-duplicate-update" class="m3-checkbox-text">
+                      <strong>Actualizar clientes existentes si coincide el CIF/DNI</strong> (si no se marca, los clientes duplicados se omitirán).
+                    </label>
+                  </div>
+
+                  <div style="text-align: right;">
+                    <button type="button" id="btn-csv-process-import" class="m3-btn" style="min-width: 200px;">
+                      <span>Iniciar Importación Masiva</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- PASO 3: RESUMEN DE RESULTADOS -->
+                <div id="csv-step-3" class="csv-wizard-step hidden" style="margin-top: 16px;">
+                  <div style="background-color: var(--color-surface-variant); padding: 24px; border-radius: var(--radius-md); border-left: 5px solid var(--color-primary);">
+                    <h3 style="margin: 0 0 12px 0; color: var(--color-primary);">¡Importación Completada!</h3>
+                    <div style="display: flex; gap: 24px; margin-bottom: 16px;">
+                      <div><strong style="font-size: 20px; color: var(--color-tertiary);" id="csv-result-added">0</strong> <span style="font-size: 13px;">Clientes creados</span></div>
+                      <div><strong style="font-size: 20px; color: var(--color-primary);" id="csv-result-updated">0</strong> <span style="font-size: 13px;">Clientes actualizados</span></div>
+                      <div><strong style="font-size: 20px; color: var(--color-on-surface-variant);" id="csv-result-skipped">0</strong> <span style="font-size: 13px;">Filas omitidas</span></div>
+                    </div>
+                    <div id="csv-result-errors"></div>
+                    <div style="margin-top: 20px;">
+                      <button type="button" id="btn-csv-restart" class="m3-btn">Importar Otro Archivo</button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- PANEL: SEGURIDAD Y CIFRADO -->
+            <div id="panel-settings-security" class="tab-panel" style="display:none;">
+              <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Seguridad y Bóveda Cifrada (RGPD / LOPDGDD)</h3>
+                <p class="text-muted" style="margin-bottom: 20px; font-size: 13px;">
+                  Tu base de datos y copias de seguridad están protegidas mediante cifrado <strong>AES-256-GCM</strong> y derivación de clave <strong>Argon2id</strong>. Puedes cambiar tu Contraseña Maestra aquí.
+                </p>
+
+                <form id="settings-security-form" style="max-width: 480px;">
+                  <div class="m3-field">
+                    <label class="m3-label" for="settings-current-password">Contraseña Maestra Actual *</label>
+                    <input type="password" id="settings-current-password" class="m3-input" required />
+                  </div>
+                  <div class="m3-field">
+                    <label class="m3-label" for="settings-new-password">Nueva Contraseña Maestra *</label>
+                    <input type="password" id="settings-new-password" class="m3-input" required minlength="6" placeholder="Mínimo 6 caracteres" />
+                  </div>
+                  <div class="m3-field">
+                    <label class="m3-label" for="settings-new-password-confirm">Confirmar Nueva Contraseña *</label>
+                    <input type="password" id="settings-new-password-confirm" class="m3-input" required minlength="6" placeholder="Repite la nueva contraseña" />
+                  </div>
+                  <button type="submit" id="btn-save-security" class="m3-btn">
+                    <span>Cambiar Contraseña Maestra</span>
+                  </button>
+                </form>
               </div>
             </div>
 
@@ -1600,6 +1808,40 @@
           <div class="m3-dialog-actions" style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 8px;">
             <button type="button" id="btn-pdf-password-cancel" class="m3-btn m3-btn-text">Cancelar</button>
             <button type="button" id="btn-pdf-password-submit" class="m3-btn">Exportar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: NUEVA CLAVE DE RECUPERACIÓN TRAS CAMBIAR CONTRASEÑA EN AJUSTES -->
+      <div id="dialog-settings-new-key" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 500px;">
+          <h3 class="m3-dialog-title" style="color: var(--color-primary);">¡Contraseña Maestra Actualizada!</h3>
+          <div class="m3-dialog-body" style="margin-top: 12px;">
+            <div style="background-color: var(--color-surface-variant); padding: 14px; border-radius: var(--radius-md); border-left: 4px solid #e65100; margin-bottom: 16px;">
+              <strong style="color: #e65100; display: block; margin-bottom: 4px; font-size: 13.5px;">⚠️ Tu clave de recuperación anterior ha sido INVALIDADA</strong>
+              <p style="font-size: 12.5px; color: var(--color-on-surface); margin: 0; line-height: 1.4;">
+                Cada contraseña tiene su propia clave de recuperación. Guarda tu <strong>NUEVA Clave de Recuperación</strong> para poder restaurar tu acceso en el futuro.
+              </p>
+            </div>
+
+            <div class="m3-field">
+              <label class="m3-label">Tu NUEVA Clave de Recuperación (Caracteres No Ambiguos)</label>
+              <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px;">
+                <input type="text" id="settings-display-new-key" class="m3-input" readonly style="font-family: monospace; font-size: 17px; font-weight: 700; letter-spacing: 2px; text-align: center; color: var(--color-primary); flex: 1;" />
+                <button type="button" id="btn-settings-copy-new-key" class="m3-btn m3-btn-outlined" title="Copiar al portapapeles">
+                  <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="m3-dialog-actions" style="margin-top: 20px; display: flex; gap: 8px; justify-content: flex-end;">
+            <button type="button" id="btn-settings-download-new-pdf" class="m3-btn m3-btn-tonal">
+              <span>📄 Descargar PDF</span>
+            </button>
+            <button type="button" id="btn-settings-close-new-key" class="m3-btn">
+              <span>Entendido y Guardado</span>
+            </button>
           </div>
         </div>
       </div>

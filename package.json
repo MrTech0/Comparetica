@@ -1,7 +1,7 @@
 {
   "name": "comparetica",
   "private": true,
-  "version": "0.2.3",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "tauri": "tauri",
@@ -9,7 +9,7 @@
     "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2"
+    "@tauri-apps/cli": "^2.11.4"
   },
   "dependencies": {
     "@tauri-apps/plugin-sql": "^2.4.0",

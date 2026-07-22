@@ -1,3 +1,7 @@
+#![allow(linker_messages)]
+
+mod db;
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -28,27 +32,83 @@ fn save_pdf(filename: String, base64_data: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn export_backup(app_handle: tauri::AppHandle) -> Result<String, String> {
-    use tauri::Manager;
-    
-    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
-    let db_path = app_data_dir.join("comparetica.db");
+fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("Error al leer el archivo: {}", e))
+}
 
-    if !db_path.exists() {
-        return Err("No se encontró el archivo de base de datos actual para respaldar. Por favor, asegúrate de haber guardado al menos algún dato primero.".to_string());
+#[tauri::command]
+fn db_check_status(state: tauri::State<'_, db::SharedDbState>) -> Result<db::DbStatus, String> {
+    let db_state = state.lock().map_err(|e| e.to_string())?;
+    db_state.get_status()
+}
+
+#[tauri::command]
+fn db_setup_master_password(state: tauri::State<'_, db::SharedDbState>, password: String) -> Result<String, String> {
+    let mut db_state = state.lock().map_err(|e| e.to_string())?;
+    db_state.setup_master_password(&password)
+}
+
+#[tauri::command]
+fn db_login(state: tauri::State<'_, db::SharedDbState>, password: String) -> Result<(), String> {
+    let mut db_state = state.lock().map_err(|e| e.to_string())?;
+    db_state.login(&password)
+}
+
+#[tauri::command]
+fn db_recover_access(state: tauri::State<'_, db::SharedDbState>, recovery_key: String, new_password: String) -> Result<String, String> {
+    let mut db_state = state.lock().map_err(|e| e.to_string())?;
+    db_state.recover_access(&recovery_key, &new_password)
+}
+
+#[tauri::command]
+fn db_change_password(state: tauri::State<'_, db::SharedDbState>, current_password: String, new_password: String) -> Result<String, String> {
+    let mut db_state = state.lock().map_err(|e| e.to_string())?;
+    db_state.change_password(&current_password, &new_password)
+}
+
+#[tauri::command]
+fn db_select(state: tauri::State<'_, db::SharedDbState>, query: String, params: Option<Vec<serde_json::Value>>) -> Result<Vec<serde_json::Value>, String> {
+    let db_state = state.lock().map_err(|e| e.to_string())?;
+    db_state.select(&query, params.unwrap_or_default())
+}
+
+#[tauri::command]
+fn db_execute(state: tauri::State<'_, db::SharedDbState>, query: String, params: Option<Vec<serde_json::Value>>) -> Result<serde_json::Value, String> {
+    let mut db_state = state.lock().map_err(|e| e.to_string())?;
+    db_state.execute(&query, params.unwrap_or_default())
+}
+
+#[tauri::command]
+fn export_backup(app_handle: tauri::AppHandle, _state: tauri::State<'_, db::SharedDbState>) -> Result<String, String> {
+    use tauri::Manager;
+    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let enc_db_path = app_data_dir.join("comparetica.db.enc");
+    let vault_path = app_data_dir.join("vault.json");
+
+    if !enc_db_path.exists() || !vault_path.exists() {
+        return Err("No hay una base de datos cifrada activa para respaldar.".to_string());
     }
 
     let now = chrono::Local::now();
     let timestamp = now.format("%d_%m_%H_%M_%S").to_string();
-    let default_filename = format!("comparetica_manual_backup_{}.db", timestamp);
+    let default_filename = format!("comparetica_backup_{}.bak", timestamp);
 
     let save_path = rfd::FileDialog::new()
         .set_file_name(&default_filename)
-        .add_filter("Base de datos SQLite", &["db", "sqlite"])
+        .add_filter("Copia de seguridad cifrada (*.bak)", &["bak", "zip"])
         .save_file();
 
     if let Some(save_path) = save_path {
-        std::fs::copy(&db_path, &save_path).map_err(|e| e.to_string())?;
+        let db_bytes = std::fs::read(&enc_db_path).map_err(|e| e.to_string())?;
+        let vault_bytes = std::fs::read(&vault_path).map_err(|e| e.to_string())?;
+        
+        let mut bundle = serde_json::Map::new();
+        bundle.insert("db_enc".to_string(), serde_json::Value::String(base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &db_bytes)));
+        bundle.insert("vault".to_string(), serde_json::from_slice(&vault_bytes).unwrap_or(serde_json::Value::Null));
+
+        let bundle_str = serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())?;
+        std::fs::write(&save_path, bundle_str).map_err(|e| e.to_string())?;
+
         Ok(save_path.to_string_lossy().to_string())
     } else {
         Err("Cancelado por el usuario".to_string())
@@ -56,57 +116,56 @@ fn export_backup(app_handle: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn import_backup(app_handle: tauri::AppHandle) -> Result<String, String> {
+fn import_backup(app_handle: tauri::AppHandle, state: tauri::State<'_, db::SharedDbState>) -> Result<String, String> {
     use tauri::Manager;
-
     let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
-    let db_path = app_data_dir.join("comparetica.db");
 
     let open_path = rfd::FileDialog::new()
-        .add_filter("Base de datos SQLite", &["db", "sqlite"])
+        .add_filter("Copia de seguridad (*.bak, *.db, *.zip)", &["bak", "db", "zip"])
         .pick_file();
 
     if let Some(open_path) = open_path {
-        // Asegurarse de que el directorio de datos existe
         if !app_data_dir.exists() {
             std::fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
         }
 
-        // Crear una copia temporal de la base de datos actual antes de sobreescribir
-        let temp_db_path = app_data_dir.join("comparetica.db.backup_temp");
-        if db_path.exists() {
-            std::fs::copy(&db_path, &temp_db_path).map_err(|e| e.to_string())?;
-        }
+        let bytes = std::fs::read(&open_path).map_err(|e| format!("No se pudo leer el archivo de copia de seguridad: {}", e))?;
 
-        // Reemplazar la base de datos con el archivo de copia de seguridad
-        if let Err(e) = std::fs::copy(&open_path, &db_path) {
-            // Si falla, restauramos el backup temporal si existía
-            if temp_db_path.exists() {
-                let _ = std::fs::copy(&temp_db_path, &db_path);
-                let _ = std::fs::remove_file(&temp_db_path);
+        // 1. Intentar interpretar como paquete JSON cifrado (.bak)
+        if let Ok(content_str) = std::str::from_utf8(&bytes) {
+            if let Ok(bundle) = serde_json::from_str::<serde_json::Value>(content_str) {
+                if let (Some(db_b64), Some(vault_val)) = (bundle.get("db_enc").and_then(|v| v.as_str()), bundle.get("vault")) {
+                    let db_bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, db_b64).map_err(|e| e.to_string())?;
+                    let vault_str = serde_json::to_string_pretty(vault_val).map_err(|e| e.to_string())?;
+
+                    std::fs::write(app_data_dir.join("comparetica.db.enc"), db_bytes).map_err(|e| e.to_string())?;
+                    std::fs::write(app_data_dir.join("vault.json"), vault_str).map_err(|e| e.to_string())?;
+
+                    // Limpiar estado en memoria
+                    if let Ok(mut db_state) = state.lock() {
+                        db_state.conn = None;
+                        db_state.mdk = None;
+                    }
+
+                    #[cfg(not(dev))]
+                    {
+                        std::thread::spawn(move || {
+                            std::thread::sleep(std::time::Duration::from_millis(500));
+                            app_handle.restart();
+                        });
+                    }
+                    return Ok("Copia de seguridad cifrada restaurada con éxito. Reiniciando la aplicación...".to_string());
+                }
             }
-            return Err(format!("Error al restaurar la copia de seguridad: {}", e));
         }
 
-        // Eliminar el archivo de backup temporal si todo sale bien
-        if temp_db_path.exists() {
-            let _ = std::fs::remove_file(&temp_db_path);
+        // 2. Intentar interpretar como base de datos SQLite legacy sin cifrar (cabecera "SQLite format 3\0")
+        if bytes.len() >= 16 && &bytes[0..16] == b"SQLite format 3\0" {
+            let mut db_state = state.lock().map_err(|e| e.to_string())?;
+            return db_state.import_legacy_sqlite(&bytes);
         }
 
-        #[cfg(dev)]
-        {
-            Ok("DEV_MODE".to_string())
-        }
-        #[cfg(not(dev))]
-        {
-            // Reiniciar la aplicación de forma limpia en un hilo secundario
-            // para permitir que la función devuelva la respuesta con éxito al frontend.
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(500));
-                app_handle.restart();
-            });
-            Ok("Copia de seguridad restaurada correctamente. Reiniciando la aplicación...".to_string())
-        }
+        Err("Formato de copia de seguridad no válido o no reconocido.".to_string())
     } else {
         Err("Cancelado por el usuario".to_string())
     }
@@ -121,14 +180,17 @@ pub fn run() {
                 let reset_flag = app_data_dir.join("reset_db.flag");
                 if reset_flag.exists() {
                     let db_path = app_data_dir.join("comparetica.db");
-                    let db_shm = app_data_dir.join("comparetica.db-shm");
-                    let db_wal = app_data_dir.join("comparetica.db-wal");
+                    let db_enc = app_data_dir.join("comparetica.db.enc");
+                    let vault = app_data_dir.join("vault.json");
                     
                     let _ = std::fs::remove_file(&db_path);
-                    let _ = std::fs::remove_file(&db_shm);
-                    let _ = std::fs::remove_file(&db_wal);
+                    let _ = std::fs::remove_file(&db_enc);
+                    let _ = std::fs::remove_file(&vault);
                     let _ = std::fs::remove_file(&reset_flag);
                 }
+
+                let db_state = db::DbState::new(app_data_dir);
+                app.manage(std::sync::Arc::new(std::sync::Mutex::new(db_state)));
             }
             Ok(())
         })
@@ -144,6 +206,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             greet, 
+            read_text_file,
             save_pdf, 
             export_backup, 
             import_backup,
@@ -161,7 +224,14 @@ pub fn run() {
             restart_app,
             log_frontend_error,
             open_email_with_attachment,
-            get_about_info
+            get_about_info,
+            db_check_status,
+            db_setup_master_password,
+            db_login,
+            db_recover_access,
+            db_change_password,
+            db_select,
+            db_execute
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -173,10 +243,11 @@ fn perform_auto_backup(app_handle: &tauri::AppHandle) {
         Ok(dir) => dir,
         Err(_) => return,
     };
-    let db_path = app_data_dir.join("comparetica.db");
+    let enc_db_path = app_data_dir.join("comparetica.db.enc");
+    let vault_path = app_data_dir.join("vault.json");
 
-    if !db_path.exists() {
-        return; // No hay base de datos aún para guardar
+    if !enc_db_path.exists() || !vault_path.exists() {
+        return; // No hay base de datos cifrada aún para guardar
     }
 
     // Carpeta de copias de seguridad por defecto: home_dir
@@ -207,8 +278,17 @@ fn perform_auto_backup(app_handle: &tauri::AppHandle) {
 
     let now = chrono::Local::now();
     let timestamp = now.format("%d_%m_%H_%M_%S").to_string();
-    let backup_path = backup_dir.join(format!("comparetica_auto_backup_{}.db", timestamp));
-    let _ = std::fs::copy(&db_path, &backup_path);
+    let backup_path = backup_dir.join(format!("comparetica_auto_backup_{}.bak", timestamp));
+    
+    if let (Ok(db_bytes), Ok(vault_bytes)) = (std::fs::read(&enc_db_path), std::fs::read(&vault_path)) {
+        let mut bundle = serde_json::Map::new();
+        bundle.insert("db_enc".to_string(), serde_json::Value::String(base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &db_bytes)));
+        bundle.insert("vault".to_string(), serde_json::from_slice(&vault_bytes).unwrap_or(serde_json::Value::Null));
+
+        if let Ok(bundle_str) = serde_json::to_string_pretty(&bundle) {
+            let _ = std::fs::write(&backup_path, bundle_str);
+        }
+    }
 
     // Limpieza de copias automáticas antiguas
     if let Ok(entries) = std::fs::read_dir(&backup_dir) {
@@ -216,7 +296,7 @@ fn perform_auto_backup(app_handle: &tauri::AppHandle) {
             let path = entry.path();
             if path.is_file() {
                 if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
-                    if filename.starts_with("comparetica_auto_backup_") && filename.ends_with(".db") {
+                    if (filename.starts_with("comparetica_auto_backup_")) && (filename.ends_with(".bak") || filename.ends_with(".db")) {
                         if let Ok(metadata) = std::fs::metadata(&path) {
                             if let Ok(modified) = metadata.modified() {
                                 if let Ok(elapsed) = modified.elapsed() {
@@ -479,23 +559,33 @@ fn delete_company_logo(app_handle: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn factory_reset(app_handle: tauri::AppHandle) -> Result<String, String> {
+fn factory_reset(app_handle: tauri::AppHandle, state: tauri::State<'_, db::SharedDbState>) -> Result<String, String> {
     use std::fs;
     use tauri::Manager;
     
     let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
     
+    // 1. Cerrar conexión en memoria y limpiar clave MDK en la sesión de Rust
+    if let Ok(mut db_state) = state.lock() {
+        db_state.conn = None;
+        db_state.mdk = None;
+    }
+
+    // 2. Eliminar ficheros de base de datos, bóveda y configuración
     let config_path = app_data_dir.join("config.json");
     if config_path.exists() {
         let _ = fs::remove_file(&config_path);
     }
     
-    // Limpiar todos los logos posibles
-    delete_all_logos(&app_data_dir);
+    let db_path = app_data_dir.join("comparetica.db");
+    let db_enc = app_data_dir.join("comparetica.db.enc");
+    let vault = app_data_dir.join("vault.json");
+    let _ = fs::remove_file(&db_path);
+    let _ = fs::remove_file(&db_enc);
+    let _ = fs::remove_file(&vault);
 
-    // Crear el archivo flag para borrar la base de datos en el próximo arranque/reinicio
-    let reset_flag = app_data_dir.join("reset_db.flag");
-    let _ = fs::write(&reset_flag, "1");
+    // 3. Limpiar todos los logos posibles
+    delete_all_logos(&app_data_dir);
 
     #[cfg(dev)]
     {
@@ -503,7 +593,6 @@ fn factory_reset(app_handle: tauri::AppHandle) -> Result<String, String> {
     }
     #[cfg(not(dev))]
     {
-        // En producción, reiniciamos la aplicación para liberar recursos y borrar la base de datos
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(500));
             app_handle.restart();

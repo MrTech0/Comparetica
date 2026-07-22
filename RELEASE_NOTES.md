@@ -1,3 +1,33 @@
+# Novedades en la versión v0.3.0
+
+Esta actualización introduce el sistema de cifrado nativo en Rust para la base de datos local y copias de seguridad (AES-256-GCM + Argon2id), el nuevo importador masivo de clientes desde archivos CSV con auto-mapeo normalizado e interactivo, e importantes mejoras de seguridad y experiencia de usuario.
+
+### 📋 Cambios Introducidos:
+
+* **🔒 Bóveda de Cifrado Nativo en Rust (AES-256-GCM + Argon2id):**
+  * La base de datos local y las copias de seguridad se cifran automáticamente mediante **AES-256-GCM** y derivación de clave **Argon2id**.
+  * Configuración de Contraseña Maestra en el primer inicio de la app.
+  * **Generación Aleatoria e Invalidación de Clave de Recuperación:** Clave aleatoria Base32 en tiempo de ejecución sin caracteres ambiguos (`0, O, 1, I, L, 8, B`). Al cambiar la Contraseña Maestra o recuperar el acceso, la clave previa se destruye permanentemente y se genera una nueva clave de recuperación.
+  * Descarga nativa en PDF de la Clave de Recuperación de Emergencia.
+
+* **📥 Importador Masivo de Clientes desde Archivos CSV:**
+  * Nueva pestaña **"Importación CSV"** en el panel de Configuración.
+  * **Drag & Drop Interactivo con Animación:** Respuesta visual animada al arrastrar archivos `.csv` o `.txt`.
+  * **Consulta Dinámica del Esquema:** Inspección dinámica de la tabla de SQLite (`PRAGMA table_info(clientes)`) para detectar automáticamente las columnas presentes en la base de datos.
+  * **Auto-Mapeo Normalizado (Insensible a tildes/mayúsculas):** Asociación automática de columnas como `"RAZÓN SOCIAL"`, `"C.I.F."`, `"E-MAIL"`, `"CÓDIGO CUPS"`, etc.
+  * **Mapeo Manual Interactivo con Vista Previa:** Tabla interactiva con selectores desplegables y vista previa en vivo de las primeras 5 filas.
+  * **Gestión de Duplicados e Informe:** Configuración para omitir o actualizar clientes existentes por CIF/DNI, con resumen de resultados.
+
+* **🛡️ Importación y Cifrado Automático de Copias de Seguridad Antiguas (SQLite Sin Cifrar):**
+  * Migración transparente de archivos de respaldo `.db` antiguos. Tras ser importados a la sesión cifrada, los archivos en texto plano se eliminan inmediatamente del disco sin dejar residuos.
+
+* **✨ Pulido UX y Correcciones:**
+  * Ocultación del icono de ojo duplicado nativo en navegadores Edge/Chromium.
+  * Ocultación por defecto del modal de clave de recuperación hasta confirmar cambios de clave en Ajustes.
+  * Restablecimiento de fábrica limpiando la sesión en memoria e hipervínculos de seguridad.
+
+---
+
 # Novedades en la versión v0.2.3
 
 Esta versión perfecciona las opciones del comparador de tarifas, simplifica los textos de cumplimiento normativo y amplía el modo privado del consultor.
