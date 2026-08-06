@@ -1,9 +1,10 @@
-/* src/js/views/history.js */
-
-import { getComparativas, deleteComparativa, updateComparativaEstado } from '../db.js';
+import { getComparativas, deleteComparativa, updateComparativaEstado, updateComparativaCobro, updateComparativaContrato } from '../db.js';
 import { generatePDFReport } from '../pdf.js';
+import { openNewRenewalDialogFromHistory } from './renewals.js';
+import { relaunchComparisonForScoring } from './calculator_view.js';
 
 let activeLockTimers = [];
+let isCobroDialogInitialized = false;
 
 function clearActiveLockTimers() {
   activeLockTimers.forEach(timer => clearTimeout(timer));
@@ -36,6 +37,7 @@ export async function initHistoryView() {
     searchInput.value = '';
   }
 
+  setupCobroDialog();
   await loadHistoryTable();
 
   // Escuchar cuando se guarde una nueva comparativa para refrescar la lista automáticamente
@@ -54,12 +56,12 @@ async function loadHistoryTable() {
   const tbody = document.querySelector('#table-history tbody');
   if (!tbody) return;
 
-  tbody.innerHTML = '<tr><td colspan="8" class="text-muted">Cargando historial...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10" class="text-muted">Cargando historial...</td></tr>';
 
   try {
     cachedHistory = await getComparativas();
     
-    // Configurar listener de búsqueda
+    // Configurar listeners de búsqueda y filtros
     const searchInput = document.getElementById('search-history-input');
     if (searchInput && !searchInput.dataset.listenerAdded) {
       searchInput.addEventListener('input', () => {
@@ -68,11 +70,70 @@ async function loadHistoryTable() {
       searchInput.dataset.listenerAdded = 'true';
     }
 
+    const filterEstado = document.getElementById('filter-history-estado');
+    if (filterEstado && !filterEstado.dataset.listenerAdded) {
+      filterEstado.addEventListener('change', () => applyHistoryFilter());
+      filterEstado.dataset.listenerAdded = 'true';
+    }
+
+    const filterCobro = document.getElementById('filter-history-cobro');
+    if (filterCobro && !filterCobro.dataset.listenerAdded) {
+      filterCobro.addEventListener('change', () => applyHistoryFilter());
+      filterCobro.dataset.listenerAdded = 'true';
+    }
+
+    const tableContainer = document.querySelector('#section-history .table-container');
+    if (tableContainer && !tableContainer.dataset.scrollListenerAdded) {
+      tableContainer.addEventListener('scroll', () => {
+        document.querySelectorAll('.m3-custom-status-select, .m3-custom-contract-select').forEach(cs => cs.classList.remove('open'));
+      });
+      tableContainer.dataset.scrollListenerAdded = 'true';
+    }
+
+    if (!window._historyScrollListenerAdded) {
+      window.addEventListener('scroll', () => {
+        document.querySelectorAll('.m3-custom-status-select, .m3-custom-contract-select').forEach(cs => cs.classList.remove('open'));
+      }, true);
+      window._historyScrollListenerAdded = true;
+    }
+
     applyHistoryFilter();
   } catch (error) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-error">Error al cargar el historial.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-error">Error al cargar el historial.</td></tr>';
     console.error(error);
   }
+}
+
+function updateHistoryKpis(list) {
+  let totalEstudios = list.length;
+  let totalAceptadas = 0;
+  let totalComisionesCobradas = 0;
+  let totalComisionesPendientes = 0;
+
+  list.forEach(c => {
+    const isAceptada = c.estado === 'Aceptada';
+    if (isAceptada) totalAceptadas++;
+
+    const comision = c.comision_total || 0;
+    const isCobrado = c.estado_cobro === 'Cobrado';
+    const isScoringRejected = c.estado_contrato === 'Rechazado por Scoring';
+
+    if (isCobrado) {
+      totalComisionesCobradas += comision;
+    } else if (isAceptada && !isScoringRejected) {
+      totalComisionesPendientes += comision;
+    }
+  });
+
+  const elTotal = document.getElementById('history-kpi-total');
+  const elAceptadas = document.getElementById('history-kpi-aceptadas');
+  const elPendientes = document.getElementById('history-kpi-pendientes');
+  const elCobradas = document.getElementById('history-kpi-cobradas');
+
+  if (elTotal) elTotal.textContent = totalEstudios.toString();
+  if (elAceptadas) elAceptadas.textContent = totalAceptadas.toString();
+  if (elPendientes) elPendientes.textContent = `${totalComisionesPendientes.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  if (elCobradas) elCobradas.textContent = `${totalComisionesCobradas.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 }
 
 function applyHistoryFilter() {
@@ -80,8 +141,13 @@ function applyHistoryFilter() {
   const tbody = document.querySelector('#table-history tbody');
   if (!tbody) return;
 
+  updateHistoryKpis(cachedHistory);
+
   const searchInput = document.getElementById('search-history-input');
   const query = searchInput ? searchInput.value.trim() : '';
+
+  const estadoFilter = document.getElementById('filter-history-estado')?.value || 'ALL';
+  const cobroFilter = document.getElementById('filter-history-cobro')?.value || 'ALL';
 
   const cleanString = (str) => {
     if (!str) return '';
@@ -90,11 +156,24 @@ function applyHistoryFilter() {
 
   const cleanQuery = cleanString(query);
 
-  // Filtrar por nombre de cliente y CUPS
   const filtered = cachedHistory.filter(c => {
-    const name = cleanString(c.cliente_nombre);
-    const cups = cleanString(c.cliente_cups);
-    return name.includes(cleanQuery) || cups.includes(cleanQuery);
+    if (query) {
+      const name = cleanString(c.cliente_nombre);
+      const cups = cleanString(c.cliente_cups);
+      if (!name.includes(cleanQuery) && !cups.includes(cleanQuery)) return false;
+    }
+
+    if (estadoFilter !== 'ALL') {
+      if ((c.estado || 'Pendiente de aceptación') !== estadoFilter) return false;
+    }
+
+    if (cobroFilter !== 'ALL') {
+      const estadoCobro = c.estado_cobro || 'Pendiente';
+      if (cobroFilter === 'COBRADO' && estadoCobro !== 'Cobrado') return false;
+      if (cobroFilter === 'PENDIENTE' && estadoCobro === 'Cobrado') return false;
+    }
+
+    return true;
   });
 
   tbody.innerHTML = '';
@@ -102,8 +181,8 @@ function applyHistoryFilter() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" class="text-muted" style="text-align: center; padding: 32px 16px;">
-          ${query ? 'No se encontraron comparativas que coincidan con la búsqueda.' : 'No se han registrado comparativas aún.'}
+        <td colspan="9" class="text-muted" style="text-align: center; padding: 32px 16px;">
+          ${(query || estadoFilter !== 'ALL' || cobroFilter !== 'ALL') ? 'No se encontraron comparativas con los filtros aplicados.' : 'No se han registrado comparativas aún.'}
         </td>
       </tr>
     `;
@@ -140,6 +219,53 @@ function applyHistoryFilter() {
       ? 'style="opacity: 0.5;" title="Ver restricción legal de eliminación"'
       : 'title="Eliminar del historial"';
 
+    const isCobrado = (c.estado_cobro === 'Cobrado');
+    let cobroCellHtml = '';
+    if (isAceptada) {
+      if (isCobrado) {
+        const fechaFmt = c.fecha_cobro ? new Date(c.fecha_cobro).toLocaleDateString('es-ES') : '';
+        const titleStr = fechaFmt ? `Cobrado el ${fechaFmt}. Haz clic para gestionar.` : 'Cobrado. Haz clic para gestionar.';
+        cobroCellHtml = `<td>
+          <div class="status-select-trigger estado-aceptada btn-manage-cobro" data-id="${c.id}" title="${titleStr}" style="cursor: pointer;">
+            <span>✅ Cobrado</span>
+            <svg class="status-select-arrow" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+          </div>
+        </td>`;
+      } else {
+        cobroCellHtml = `<td>
+          <div class="status-select-trigger estado-pendiente btn-manage-cobro" data-id="${c.id}" title="Pendiente de cobro. Haz clic para registrar cobro." style="cursor: pointer;">
+            <span>🟡 Pendiente</span>
+            <svg class="status-select-arrow" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+          </div>
+        </td>`;
+      }
+    } else {
+      cobroCellHtml = `<td><span class="text-muted" style="font-size: 12px; display: block; text-align: center;">—</span></td>`;
+    }
+
+    const currentContract = c.estado_contrato || 'Pendiente';
+    let contractClass = 'contrato-pendiente';
+    if (currentContract === 'En trámite') contractClass = 'contrato-tramite';
+    else if (currentContract === 'Firmado y Activado') contractClass = 'contrato-firmado';
+    else if (currentContract === 'Rechazado por Scoring') contractClass = 'contrato-scoring';
+
+    const contractCellHtml = `
+      <td>
+        <div class="m3-custom-contract-select" data-id="${c.id}">
+          <div class="status-select-trigger ${contractClass}" style="cursor: pointer;">
+            <span>${escapeHtml(currentContract)}</span>
+            <svg class="status-select-arrow" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+          </div>
+          <div class="status-select-options">
+            <div class="status-select-option contrato-pendiente" data-value="Pendiente">Pendiente</div>
+            <div class="status-select-option contrato-tramite" data-value="En trámite">En trámite</div>
+            <div class="status-select-option contrato-firmado" data-value="Firmado y Activado">✅ Firmado y Activado</div>
+            <div class="status-select-option contrato-scoring" data-value="Rechazado por Scoring">🚫 Rechazado por Scoring</div>
+          </div>
+        </div>
+      </td>
+    `;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${dateStr}</td>
@@ -164,7 +290,9 @@ function applyHistoryFilter() {
           </div>
         </div>
       </td>
+      ${contractCellHtml}
       <td class="private-value" style="font-weight: 600;">${c.comision_total.toFixed(2)} €</td>
+      ${cobroCellHtml}
       <td style="text-align: right; white-space: nowrap;">
         <button class="m3-btn-icon btn-preview-history" data-id="${c.id}" title="Previsualizar Reporte PDF">
           <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
@@ -180,6 +308,14 @@ function applyHistoryFilter() {
         </button>
       </td>
     `;
+
+    // Evento de gestión de cobro
+    const btnCobro = tr.querySelector('.btn-manage-cobro');
+    if (btnCobro) {
+      btnCobro.addEventListener('click', () => {
+        openCobroDialog(c);
+      });
+    }
 
     // Evento de previsualización
     tr.querySelector('.btn-preview-history').addEventListener('click', () => {
@@ -214,15 +350,19 @@ function applyHistoryFilter() {
         const pdfFilename = `comparativa_${safeClientName}.pdf`;
 
         if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-          await window.__TAURI__.core.invoke('open_email_with_attachment', {
-            recipient: c.cliente_email,
-            pdfFilename: pdfFilename,
-            pdfBase64: pdfBase64
+          await window.__TAURI__.core.invoke('send_email', {
+            to: c.cliente_email,
+            subject: `Estudio Comparativo de Energía - ${c.cliente_nombre}`,
+            body: `Estimado/a cliente de ${c.cliente_nombre},\n\nAdjunto a este correo electrónico encontrará el informe detallado de su estudio comparativo de energía realizado con Comparetica.\n\nAtentamente,\nEquipo de Asesoría Energética`,
+            pdfBase64: pdfBase64,
+            filename: pdfFilename
           });
+          window.showToast("✅ Correo electrónico enviado correctamente con el PDF adjunto.", "success");
         } else {
           // Fallback para pruebas en navegador sin Tauri (abre mailto simple sin adjunto)
-          window.showToast("Atención: El archivo adjunto solo se soporta ejecutando la aplicación de escritorio. Se abrirá el cliente de correo sin adjunto.", "warning");
-          window.location.href = `mailto:${c.cliente_email}`;
+          const mailtoUrl = `mailto:${encodeURIComponent(c.cliente_email)}?subject=${encodeURIComponent(`Estudio Comparativo - ${c.cliente_nombre}`)}&body=${encodeURIComponent(`Estimado cliente,\n\nAdjuntamos el informe comparativo.`)}`;
+          window.open(mailtoUrl, '_blank');
+          window.showToast("Cliente de correo abierto para enviar el estudio.", "info");
         }
       } catch (err) {
         window.showToast("Error al preparar el envío por correo: " + err, "error");
@@ -254,8 +394,8 @@ function applyHistoryFilter() {
       e.stopPropagation();
       if (customSelect.classList.contains('disabled')) return;
       
-      // Cerrar todos los demás custom status selects abiertos
-      document.querySelectorAll('.m3-custom-status-select').forEach(cs => {
+      // Cerrar todos los demás custom status y contract selects abiertos
+      document.querySelectorAll('.m3-custom-status-select, .m3-custom-contract-select').forEach(cs => {
         if (cs !== customSelect) {
           cs.classList.remove('open');
         }
@@ -285,6 +425,9 @@ function applyHistoryFilter() {
             deleteBtn.style.opacity = '0.5';
             deleteBtn.style.cursor = '';
             deleteBtn.setAttribute('title', 'Ver restricción legal de eliminación');
+
+            // Abrir pop-up para programar renovación en el calendario
+            promptRenewalFromHistory(c);
           } else {
             deleteBtn.removeAttribute('disabled');
             deleteBtn.style.opacity = '';
@@ -332,8 +475,92 @@ function applyHistoryFilter() {
       });
     });
 
+    // Configurar eventos para el custom select de Contrato
+    const contractSelect = tr.querySelector('.m3-custom-contract-select');
+    if (contractSelect) {
+      const contractTrigger = contractSelect.querySelector('.status-select-trigger');
+      const contractOptions = contractSelect.querySelectorAll('.status-select-option');
+
+      contractTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.m3-custom-status-select, .m3-custom-contract-select').forEach(cs => {
+          if (cs !== contractSelect) cs.classList.remove('open');
+        });
+        contractSelect.classList.toggle('open');
+      });
+
+      contractOptions.forEach(option => {
+        option.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const targetValue = option.getAttribute('data-value');
+          contractSelect.classList.remove('open');
+
+          if (targetValue === 'Rechazado por Scoring') {
+            openScoringRejectionDialog(c);
+          } else {
+            await updateComparativaContrato(c.id, targetValue, '');
+            window.showToast(`Estado de contrato actualizado a: ${targetValue}`, "success");
+            
+            if (targetValue === 'Firmado y Activado') {
+              openNewRenewalDialogFromHistory(c);
+            } else {
+              await loadHistoryTable();
+            }
+          }
+        });
+      });
+    }
+
     tbody.appendChild(tr);
   });
+}
+
+function openScoringRejectionDialog(c) {
+  const dialog = document.getElementById('dialog-scoring-rejection');
+  if (!dialog) return;
+
+  const clientEl = document.getElementById('dialog-scoring-client');
+  const idEl = document.getElementById('dialog-scoring-id');
+  const reasonEl = document.getElementById('dialog-scoring-reason');
+  const closeX = document.getElementById('btn-close-scoring-dialog-x');
+  const btnSaveOnly = document.getElementById('btn-scoring-save-only');
+  const btnRecompare = document.getElementById('btn-scoring-recompare');
+
+  if (clientEl) clientEl.textContent = c.cliente_nombre || 'Cliente';
+  if (idEl) idEl.value = c.id;
+  if (reasonEl) reasonEl.value = c.motivo_rechazo_scoring || '';
+
+  const closeDialog = () => dialog.classList.remove('active');
+  if (closeX) closeX.onclick = closeDialog;
+
+  if (dialog) {
+    dialog.onclick = (e) => {
+      if (e.target === dialog) closeDialog();
+    };
+  }
+
+  if (btnSaveOnly) {
+    btnSaveOnly.onclick = async (e) => {
+      e.preventDefault();
+      const reason = reasonEl ? reasonEl.value.trim() : '';
+      await updateComparativaContrato(c.id, 'Rechazado por Scoring', reason);
+      closeDialog();
+      window.showToast("Contrato marcado como Rechazado por Scoring.", "info");
+      await loadHistoryTable();
+    };
+  }
+
+  if (btnRecompare) {
+    btnRecompare.onclick = async (e) => {
+      e.preventDefault();
+      const reason = reasonEl ? reasonEl.value.trim() : '';
+      await updateComparativaContrato(c.id, 'Rechazado por Scoring', reason);
+      closeDialog();
+      await relaunchComparisonForScoring(c);
+    };
+  }
+
+  dialog.classList.add('active');
 }
 
 // --- Obtener datos consolidados del reporte ---
@@ -453,3 +680,209 @@ document.addEventListener('click', () => {
     cs.classList.remove('open');
   });
 });
+
+export function promptRenewalFromHistory(comparativa) {
+  const dialog = document.getElementById('dialog-create-renewal-from-history');
+  if (!dialog) return;
+
+  const clientNameEl = document.getElementById('hist-ren-client-name');
+  const cupsEl = document.getElementById('hist-ren-cups');
+  const offerEl = document.getElementById('hist-ren-offer');
+
+  if (clientNameEl) clientNameEl.textContent = comparativa.cliente_nombre || 'Cliente';
+  if (cupsEl) cupsEl.textContent = comparativa.cliente_cups || 'No especificado';
+  if (offerEl) offerEl.textContent = `${comparativa.tipo_energia} - Ahorro estimado: ${(comparativa.ahorro_luz_anual + comparativa.ahorro_gas_anual).toFixed(2)} €/año`;
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const dateStartInput = document.getElementById('hist-ren-date-start');
+  const durationSelect = document.getElementById('hist-ren-duration');
+  const dateEndInput = document.getElementById('hist-ren-date-end');
+
+  if (dateStartInput) dateStartInput.value = todayStr;
+  
+  function updateEndDate() {
+    if (!dateStartInput || !durationSelect || !dateEndInput) return;
+    const val = dateStartInput.value || todayStr;
+    const parts = val.split('-');
+    if (parts.length !== 3) return;
+
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+
+    if (isNaN(y) || isNaN(m) || isNaN(d) || y < 1900 || y > 2100) return;
+
+    const months = parseInt(durationSelect.value || '12', 10);
+    const targetDate = new Date(y, m + months, d);
+
+    const resY = targetDate.getFullYear();
+    const resM = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const resD = String(targetDate.getDate()).padStart(2, '0');
+
+    dateEndInput.value = `${resY}-${resM}-${resD}`;
+  }
+
+  updateEndDate();
+
+  if (dateStartInput) {
+    dateStartInput.oninput = updateEndDate;
+    dateStartInput.onchange = updateEndDate;
+  }
+  if (durationSelect) {
+    durationSelect.onchange = updateEndDate;
+  }
+
+  dialog.classList.add('active');
+
+  const btnCancel = document.getElementById('btn-cancel-renewal-from-history');
+  const form = document.getElementById('form-renewal-from-history');
+
+  dialog.onclick = (e) => {
+    if (e.target === dialog) dialog.classList.remove('active');
+  };
+
+  if (btnCancel) {
+    btnCancel.onclick = () => {
+      dialog.classList.remove('active');
+    };
+  }
+
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const { getDb, getClientes } = await import('../db.js');
+        const db = await getDb();
+        const clients = await getClientes();
+        
+        let client = clients.find(cl => cl.nombre_empresa === comparativa.cliente_nombre || cl.cups === comparativa.cliente_cups);
+        let clientId = client ? client.id : null;
+
+        if (!clientId && clients.length > 0) {
+          clientId = clients[0].id;
+        }
+
+        if (!clientId) {
+          window.showToast("No se encontró la ficha del cliente en la base de datos.", "error");
+          dialog.classList.remove('active');
+          return;
+        }
+
+        const fecha_firma = dateStartInput.value;
+        const duracion_meses = parseInt(durationSelect.value, 10);
+        const fecha_vencimiento = dateEndInput.value;
+        const notas = document.getElementById('hist-ren-notes')?.value?.trim() || '';
+
+        if (window.__TAURI__) {
+          await db.execute(`
+            INSERT INTO renovaciones (cliente_id, tipo_energia, cups, comercializadora_actual, tarifa_actual, fecha_firma, duracion_meses, fecha_vencimiento, notas)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+          `, [clientId, comparativa.tipo_energia, comparativa.cliente_cups || '', 'Tarifa Contratada', 'Estudio Aceptado', fecha_firma, duracion_meses, fecha_vencimiento, notas]);
+        }
+
+        dialog.classList.remove('active');
+        window.showToast("✅ Renovación programada con éxito en el calendario.", "success");
+
+        const { refreshRenewals } = await import('./renewals.js');
+        await refreshRenewals();
+      } catch (err) {
+        console.error("Error al guardar renovación desde el historial:", err);
+      }
+    };
+  }
+}
+
+function openCobroDialog(c) {
+  const dialog = document.getElementById('dialog-mark-cobro');
+  if (!dialog) return;
+
+  const inputId = document.getElementById('dialog-cobro-id');
+  const clientEl = document.getElementById('dialog-cobro-client');
+  const amountEl = document.getElementById('dialog-cobro-amount');
+  const badgeEl = document.getElementById('dialog-cobro-status-badge');
+  const dateInput = document.getElementById('dialog-cobro-date');
+
+  if (inputId) inputId.value = c.id;
+  if (clientEl) clientEl.textContent = c.cliente_nombre || 'Cliente';
+  if (amountEl) amountEl.textContent = `${(c.comision_total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+
+  const isCobrado = c.estado_cobro === 'Cobrado';
+  if (badgeEl) {
+    badgeEl.className = 'status-select-trigger';
+    if (isCobrado) {
+      badgeEl.classList.add('estado-aceptada');
+      badgeEl.innerHTML = `<span>✅ Cobrado</span>`;
+    } else {
+      badgeEl.classList.add('estado-pendiente');
+      badgeEl.innerHTML = `<span>🟡 Pendiente</span>`;
+    }
+  }
+
+  if (dateInput) {
+    if (c.fecha_cobro) {
+      dateInput.value = c.fecha_cobro.substring(0, 10);
+    } else {
+      const now = new Date();
+      dateInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+  }
+
+  dialog.classList.add('active');
+}
+
+function setupCobroDialog() {
+  if (isCobroDialogInitialized) return;
+  isCobroDialogInitialized = true;
+
+  const dialog = document.getElementById('dialog-mark-cobro');
+  const closeBtnX = document.getElementById('btn-close-cobro-dialog-x');
+  const form = document.getElementById('form-mark-cobro');
+  const btnPending = document.getElementById('btn-cobro-mark-pending');
+
+  if (dialog) {
+    dialog.onclick = (e) => {
+      if (e.target === dialog) dialog.classList.remove('active');
+    };
+  }
+
+  if (closeBtnX && dialog) {
+    closeBtnX.onclick = () => dialog.classList.remove('active');
+  }
+
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const id = parseInt(document.getElementById('dialog-cobro-id').value, 10);
+      const fecha = document.getElementById('dialog-cobro-date').value;
+      if (!id) return;
+
+      try {
+        await updateComparativaCobro(id, 'Cobrado', fecha);
+        dialog.classList.remove('active');
+        window.showToast("✅ Comisión marcada como COBRADA.", "success");
+        await refreshHistory();
+      } catch (err) {
+        console.error("Error al actualizar estado de cobro:", err);
+        window.showToast("Error al registrar el cobro.", "error");
+      }
+    };
+  }
+
+  if (btnPending) {
+    btnPending.onclick = async () => {
+      const id = parseInt(document.getElementById('dialog-cobro-id').value, 10);
+      if (!id) return;
+
+      try {
+        await updateComparativaCobro(id, 'Pendiente', null);
+        dialog.classList.remove('active');
+        window.showToast("🟡 Estado de cobro cambiado a PENDIENTE.", "info");
+        await refreshHistory();
+      } catch (err) {
+        console.error("Error al actualizar estado de cobro:", err);
+        window.showToast("Error al actualizar estado de cobro.", "error");
+      }
+    };
+  }
+}

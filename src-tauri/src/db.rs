@@ -8,9 +8,32 @@ use aes_gcm::{
     Aes256Gcm, Nonce
 };
 use rand::{RngCore, thread_rng};
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, Map};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ClienteImportRow {
+    pub nombre_empresa: String,
+    pub cif: String,
+    pub representante: Option<String>,
+    pub cups: Option<String>,
+    pub email: Option<String>,
+    pub agente_id: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RenovacionImportRow {
+    pub cliente_id: i64,
+    pub tipo_energia: Option<String>,
+    pub cups: Option<String>,
+    pub comercializadora_actual: Option<String>,
+    pub tarifa_actual: Option<String>,
+    pub fecha_firma: String,
+    pub duracion_meses: Option<i32>,
+    pub fecha_vencimiento: String,
+    pub notas: Option<String>,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VaultConfig {
@@ -382,6 +405,17 @@ impl DbState {
         conn.execute("PRAGMA foreign_keys = ON;", []).map_err(|e| e.to_string())?;
 
         conn.execute("
+            CREATE TABLE IF NOT EXISTS agentes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                telefono TEXT,
+                email TEXT,
+                activo INTEGER DEFAULT 1,
+                creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        ", []).map_err(|e| e.to_string())?;
+
+        conn.execute("
             CREATE TABLE IF NOT EXISTS clientes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nombre_empresa TEXT NOT NULL,
@@ -389,9 +423,20 @@ impl DbState {
                 representante TEXT,
                 cups TEXT,
                 email TEXT,
+                agente_id INTEGER REFERENCES agentes(id),
                 creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         ", []).map_err(|e| e.to_string())?;
+
+        // Migración defensiva: asegurar que la columna agente_id existe en bases de datos existentes
+        let client_cols: Vec<String> = {
+            let mut stmt = conn.prepare("PRAGMA table_info(clientes);").map_err(|e| e.to_string())?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1)).map_err(|e| e.to_string())?;
+            rows.filter_map(|r| r.ok()).collect()
+        };
+        if !client_cols.contains(&"agente_id".to_string()) {
+            conn.execute("ALTER TABLE clientes ADD COLUMN agente_id INTEGER REFERENCES agentes(id);", []).map_err(|e| e.to_string())?;
+        }
 
         conn.execute("
             CREATE TABLE IF NOT EXISTS comercializadoras (
@@ -464,9 +509,88 @@ impl DbState {
                 comision_total REAL DEFAULT 0.0,
                 estado TEXT NOT NULL DEFAULT 'Pendiente de aceptación',
                 estado_cambiado_en TEXT,
+                estado_cobro TEXT NOT NULL DEFAULT 'Pendiente',
+                fecha_cobro TEXT,
+                estado_contrato TEXT NOT NULL DEFAULT 'Pendiente',
+                motivo_rechazo_scoring TEXT DEFAULT '',
                 FOREIGN KEY (tarifa_luz_propuesta_id) REFERENCES tarifas_luz(id) ON DELETE SET NULL,
                 FOREIGN KEY (tarifa_gas_propuesta_id) REFERENCES tarifas_gas(id) ON DELETE SET NULL
             );
+        ", []).map_err(|e| e.to_string())?;
+
+        // Migración defensiva: asegurar columnas necesarias en comparativas
+        let comp_cols: Vec<String> = {
+            let mut stmt = conn.prepare("PRAGMA table_info(comparativas);").map_err(|e| e.to_string())?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1)).map_err(|e| e.to_string())?;
+            rows.filter_map(|r| r.ok()).collect()
+        };
+        if !comp_cols.contains(&"ahorro_gas_anual".to_string()) {
+            conn.execute("ALTER TABLE comparativas ADD COLUMN ahorro_gas_anual REAL DEFAULT 0.0;", []).map_err(|e| e.to_string())?;
+        }
+        if !comp_cols.contains(&"comision_total".to_string()) {
+            conn.execute("ALTER TABLE comparativas ADD COLUMN comision_total REAL DEFAULT 0.0;", []).map_err(|e| e.to_string())?;
+        }
+        if !comp_cols.contains(&"estado".to_string()) {
+            conn.execute("ALTER TABLE comparativas ADD COLUMN estado TEXT NOT NULL DEFAULT 'Pendiente de aceptación';", []).map_err(|e| e.to_string())?;
+        }
+        if !comp_cols.contains(&"estado_cambiado_en".to_string()) {
+            conn.execute("ALTER TABLE comparativas ADD COLUMN estado_cambiado_en TEXT;", []).map_err(|e| e.to_string())?;
+        }
+        if !comp_cols.contains(&"estado_cobro".to_string()) {
+            conn.execute("ALTER TABLE comparativas ADD COLUMN estado_cobro TEXT NOT NULL DEFAULT 'Pendiente';", []).map_err(|e| e.to_string())?;
+        }
+        if !comp_cols.contains(&"fecha_cobro".to_string()) {
+            conn.execute("ALTER TABLE comparativas ADD COLUMN fecha_cobro TEXT;", []).map_err(|e| e.to_string())?;
+        }
+        if !comp_cols.contains(&"estado_contrato".to_string()) {
+            conn.execute("ALTER TABLE comparativas ADD COLUMN estado_contrato TEXT NOT NULL DEFAULT 'Pendiente';", []).map_err(|e| e.to_string())?;
+        }
+        if !comp_cols.contains(&"motivo_rechazo_scoring".to_string()) {
+            conn.execute("ALTER TABLE comparativas ADD COLUMN motivo_rechazo_scoring TEXT DEFAULT '';", []).map_err(|e| e.to_string())?;
+        }
+
+        conn.execute("
+            CREATE TABLE IF NOT EXISTS renovaciones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cliente_id INTEGER NOT NULL,
+                tipo_energia TEXT NOT NULL DEFAULT 'Luz',
+                cups TEXT,
+                comercializadora_actual TEXT,
+                tarifa_actual TEXT,
+                fecha_firma DATE NOT NULL,
+                duracion_meses INTEGER DEFAULT 12,
+                fecha_vencimiento DATE NOT NULL,
+                fecha_aviso_personalizada DATE,
+                estado_renovacion TEXT NOT NULL DEFAULT 'Pendiente',
+                notas TEXT,
+                creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+            );
+        ", []).map_err(|e| e.to_string())?;
+
+        conn.execute("
+            CREATE TABLE IF NOT EXISTS puntos_suministro (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cliente_id INTEGER NOT NULL,
+                cups TEXT NOT NULL,
+                direccion_alias TEXT,
+                tipo_energia TEXT DEFAULT 'LUZ',
+                notas TEXT,
+                creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+            );
+        ", []).map_err(|e| e.to_string())?;
+
+        // Migración automática: Copiar CUPS de clientes a puntos_suministro si aún no existen
+        conn.execute("
+            INSERT INTO puntos_suministro (cliente_id, cups, direccion_alias, tipo_energia)
+            SELECT c.id, c.cups, 'Principal', 'LUZ'
+            FROM clientes c
+            WHERE c.cups IS NOT NULL AND c.cups != ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM puntos_suministro ps WHERE ps.cliente_id = c.id AND ps.cups = c.cups
+              );
         ", []).map_err(|e| e.to_string())?;
 
         Ok(())
@@ -520,6 +644,125 @@ impl DbState {
         res.insert("lastInsertId".to_string(), Value::Number(serde_json::Number::from(last_insert_id)));
 
         Ok(Value::Object(res))
+    }
+
+    pub fn import_clientes_batch(&mut self, rows: Vec<ClienteImportRow>, update_existing: bool) -> Result<(usize, usize, usize), String> {
+        let conn = self.conn.as_mut().ok_or_else(|| "La base de datos está bloqueada. Por favor, introduce tu contraseña.".to_string())?;
+
+        let mut added = 0;
+        let mut updated = 0;
+        let mut skipped = 0;
+
+        let tx = conn.transaction().map_err(|e| format!("Error al iniciar transacción SQLite: {}", e))?;
+
+        {
+            let mut select_stmt = tx.prepare("SELECT id FROM clientes WHERE cif = ?;").map_err(|e| e.to_string())?;
+            let mut insert_stmt = tx.prepare("INSERT INTO clientes (nombre_empresa, cif, representante, cups, email, agente_id) VALUES (?, ?, ?, ?, ?, ?);").map_err(|e| e.to_string())?;
+            let mut update_stmt = tx.prepare("UPDATE clientes SET nombre_empresa = ?, representante = ?, cups = ?, email = ?, agente_id = COALESCE(?, agente_id) WHERE id = ?;").map_err(|e| e.to_string())?;
+            let mut insert_ps_stmt = tx.prepare("INSERT INTO puntos_suministro (cliente_id, cups, direccion_alias, tipo_energia) SELECT ?, ?, 'Principal', 'LUZ' WHERE NOT EXISTS (SELECT 1 FROM puntos_suministro WHERE cliente_id = ? AND cups = ?);").map_err(|e| e.to_string())?;
+
+            for row in rows {
+                let cif = row.cif.trim();
+                let nombre_empresa = row.nombre_empresa.trim();
+
+                if cif.is_empty() || nombre_empresa.is_empty() {
+                    skipped += 1;
+                    continue;
+                }
+
+                let existing_id: Option<i64> = select_stmt.query_row([cif], |r| r.get(0)).optional().map_err(|e| e.to_string())?;
+                let cups_clean = row.cups.as_deref().map(str::trim).filter(|s| !s.is_empty());
+
+                if let Some(id) = existing_id {
+                    if update_existing {
+                        update_stmt.execute(rusqlite::params![
+                            nombre_empresa,
+                            row.representante.as_deref().map(str::trim),
+                            row.cups.as_deref().map(str::trim),
+                            row.email.as_deref().map(str::trim),
+                            row.agente_id,
+                            id
+                        ]).map_err(|e| e.to_string())?;
+
+                        if let Some(cups_str) = cups_clean {
+                            let _ = insert_ps_stmt.execute(rusqlite::params![id, cups_str, id, cups_str]);
+                        }
+
+                        updated += 1;
+                    } else {
+                        skipped += 1;
+                    }
+                } else {
+                    insert_stmt.execute(rusqlite::params![
+                        nombre_empresa,
+                        cif,
+                        row.representante.as_deref().map(str::trim),
+                        row.cups.as_deref().map(str::trim),
+                        row.email.as_deref().map(str::trim),
+                        row.agente_id
+                    ]).map_err(|e| e.to_string())?;
+
+                    let new_id = tx.last_insert_rowid();
+                    if let Some(cups_str) = cups_clean {
+                        let _ = insert_ps_stmt.execute(rusqlite::params![new_id, cups_str, new_id, cups_str]);
+                    }
+
+                    added += 1;
+                }
+            }
+        }
+
+        tx.commit().map_err(|e| format!("Error al confirmar transacción SQLite: {}", e))?;
+
+        if let Err(e) = self.persist_db() {
+            eprintln!("Advertencia al guardar base de datos cifrada tras la importación: {}", e);
+        }
+
+        Ok((added, updated, skipped))
+    }
+
+    pub fn import_renovaciones_batch(&mut self, rows: Vec<RenovacionImportRow>) -> Result<usize, String> {
+        let conn = self.conn.as_mut().ok_or_else(|| "La base de datos está bloqueada. Por favor, introduce tu contraseña.".to_string())?;
+
+        let mut count = 0;
+        let tx = conn.transaction().map_err(|e| format!("Error al iniciar transacción SQLite: {}", e))?;
+
+        {
+            let mut insert_stmt = tx.prepare("
+                INSERT INTO renovaciones (cliente_id, tipo_energia, cups, comercializadora_actual, tarifa_actual, fecha_firma, duracion_meses, fecha_vencimiento, notas)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            ").map_err(|e| e.to_string())?;
+
+            for row in rows {
+                let tipo = row.tipo_energia.as_deref().unwrap_or("Luz");
+                let comercializadora = row.comercializadora_actual.as_deref().unwrap_or("Importado CSV");
+                let tarifa = row.tarifa_actual.as_deref().unwrap_or("Tarifa CSV");
+                let duracion = row.duracion_meses.unwrap_or(12);
+                let notas = row.notas.as_deref().unwrap_or("Importado automáticamente desde CSV");
+
+                insert_stmt.execute(rusqlite::params![
+                    row.cliente_id,
+                    tipo,
+                    row.cups.as_deref().map(str::trim),
+                    comercializadora,
+                    tarifa,
+                    row.fecha_firma.trim(),
+                    duracion,
+                    row.fecha_vencimiento.trim(),
+                    notas
+                ]).map_err(|e| e.to_string())?;
+
+                count += 1;
+            }
+        }
+
+        tx.commit().map_err(|e| format!("Error al confirmar transacción SQLite: {}", e))?;
+
+        if let Err(e) = self.persist_db() {
+            eprintln!("Advertencia al guardar base de datos cifrada tras importar renovaciones: {}", e);
+        }
+
+        Ok(count)
     }
 }
 

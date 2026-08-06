@@ -10,6 +10,11 @@ let recoveryDisplayEl = null;
 let loginFormEl = null;
 let recoverFormEl = null;
 
+let welcomeChoiceEl = null;
+let btnOnboardingNewSetup = null;
+let btnOnboardingRestoreBackup = null;
+let btnOnboardingBack = null;
+
 let currentRecoveryKey = "";
 
 export async function initAuthGuard(onUnlockedCallback) {
@@ -17,10 +22,15 @@ export async function initAuthGuard(onUnlockedCallback) {
   authTitleEl = document.getElementById('auth-title');
   authSubtitleEl = document.getElementById('auth-subtitle');
   authAlertEl = document.getElementById('auth-alert');
+  welcomeChoiceEl = document.getElementById('auth-onboarding-welcome');
   setupFormEl = document.getElementById('auth-form-setup');
   recoveryDisplayEl = document.getElementById('auth-recovery-display');
   loginFormEl = document.getElementById('auth-form-login');
   recoverFormEl = document.getElementById('auth-form-recover');
+
+  btnOnboardingNewSetup = document.getElementById('btn-onboarding-new-setup');
+  btnOnboardingRestoreBackup = document.getElementById('btn-onboarding-restore-backup');
+  btnOnboardingBack = document.getElementById('btn-onboarding-back');
 
   setupAuthEventListeners(onUnlockedCallback);
 
@@ -71,6 +81,7 @@ function showAlert(message, type = 'error') {
 
 function hideAllForms() {
   hideAlert();
+  if (welcomeChoiceEl) welcomeChoiceEl.classList.add('hidden');
   if (setupFormEl) setupFormEl.classList.add('hidden');
   if (recoveryDisplayEl) recoveryDisplayEl.classList.add('hidden');
   if (loginFormEl) loginFormEl.classList.add('hidden');
@@ -79,11 +90,29 @@ function hideAllForms() {
 
 function showSetupMode(isMigration = false) {
   hideAllForms();
-  authTitleEl.textContent = isMigration ? "Actualizar a Bóveda Cifrada" : "Configurar Contraseña Maestra";
-  authSubtitleEl.textContent = isMigration 
-    ? "Hemos detectado datos anteriores. Crea una Contraseña Maestra para cifrar tu base de datos y cumplir con el RGPD/LOPDGDD."
-    : "Establece la Contraseña Maestra para proteger la aplicación y tus copias de seguridad de forma cifrada.";
-  setupFormEl.classList.remove('hidden');
+  if (isMigration) {
+    authTitleEl.textContent = "Actualizar a Bóveda Cifrada";
+    authSubtitleEl.textContent = "Hemos detectado datos anteriores. Crea una Contraseña Maestra para cifrar tu base de datos y cumplir con el RGPD/LOPDGDD.";
+    if (setupFormEl) setupFormEl.classList.remove('hidden');
+    if (btnOnboardingBack) btnOnboardingBack.classList.add('hidden');
+  } else {
+    showWelcomeOnboardingMode();
+  }
+}
+
+function showWelcomeOnboardingMode() {
+  hideAllForms();
+  authTitleEl.textContent = "¡Bienvenido a Comparetica!";
+  authSubtitleEl.textContent = "Selecciona cómo deseas comenzar a configurar tu aplicación:";
+  if (welcomeChoiceEl) welcomeChoiceEl.classList.remove('hidden');
+}
+
+function showPasswordCreationMode() {
+  hideAllForms();
+  authTitleEl.textContent = "Configurar Contraseña Maestra";
+  authSubtitleEl.textContent = "Establece la Contraseña Maestra para proteger la aplicación y tus datos de forma cifrada.";
+  if (setupFormEl) setupFormEl.classList.remove('hidden');
+  if (btnOnboardingBack) btnOnboardingBack.classList.remove('hidden');
 }
 
 function showRecoveryDisplayMode(key) {
@@ -123,6 +152,58 @@ function showRecoverMode() {
 }
 
 function setupAuthEventListeners(onUnlockedCallback) {
+  const acceptEula = document.getElementById('auth-accept-eula');
+  if (acceptEula && btnOnboardingNewSetup) {
+    btnOnboardingNewSetup.disabled = !acceptEula.checked;
+    acceptEula.addEventListener('change', () => {
+      btnOnboardingNewSetup.disabled = !acceptEula.checked;
+    });
+  }
+
+  if (btnOnboardingNewSetup) {
+    btnOnboardingNewSetup.addEventListener('click', () => {
+      if (acceptEula && !acceptEula.checked) {
+        showAlert("Debes aceptar los términos de uso y el descargo de responsabilidad para continuar.");
+        return;
+      }
+      showPasswordCreationMode();
+    });
+  }
+
+  if (btnOnboardingBack) {
+    btnOnboardingBack.addEventListener('click', showWelcomeOnboardingMode);
+  }
+
+  if (btnOnboardingRestoreBackup) {
+    btnOnboardingRestoreBackup.addEventListener('click', async () => {
+      if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
+        showAlert("Las copias de seguridad solo se pueden restaurar en la app instalada (Tauri).");
+        return;
+      }
+
+      try {
+        btnOnboardingRestoreBackup.disabled = true;
+        const msg = await window.__TAURI__.core.invoke('import_backup');
+        localStorage.setItem('first_run_completed', 'true');
+
+        if (msg === "DEV_MODE") {
+          showAlert("Copia de seguridad restaurada con éxito. Recargando...", "success");
+          setTimeout(() => {
+            window.location.reload();
+          }, 1200);
+        } else {
+          showAlert(msg, "success");
+        }
+      } catch (error) {
+        if (error !== "Cancelado por el usuario") {
+          showAlert(`Error al importar copia: ${error}`);
+        }
+      } finally {
+        btnOnboardingRestoreBackup.disabled = false;
+      }
+    });
+  }
+
   // Toggle contraseña visible
   const toggleBtn = document.getElementById('toggle-login-password-visibility');
   const loginInput = document.getElementById('login-password');

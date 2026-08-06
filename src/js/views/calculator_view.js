@@ -1,7 +1,7 @@
 /* src/js/views/calculator_view.js */
 
 import { calculateLightBill, calculateGasBill } from '../calculator.js';
-import { getTarifasLuz, getTarifasGas, addComparativa, getClientes } from '../db.js';
+import { getTarifasLuz, getTarifasGas, addComparativa, getClientes, getComparativas, getPuntosSuministroAll } from '../db.js';
 import { generatePDFReport } from '../pdf.js';
 
 // Datos temporales de la última comparación realizada
@@ -56,14 +56,13 @@ export function initCalculatorView() {
     });
   }
 
-  // Autocompletado y auto-inyección de CUPS personalizado (Material 3)
+  // Autocompletado y auto-inyección de CUPS personalizado (Material 3 con soporte Multipunto)
   const calcClientNameInput = document.getElementById('calc-client-name');
   const calcClientCupsInput = document.getElementById('calc-client-cups');
   const autocompleteList = document.getElementById('clients-autocomplete-list');
 
   if (calcClientNameInput && autocompleteList) {
     let activeIndex = -1;
-    let currentFilteredClients = [];
 
     const closeAutocomplete = () => {
       autocompleteList.classList.remove('open');
@@ -72,21 +71,53 @@ export function initCalculatorView() {
     };
 
     const renderSuggestions = async () => {
-      const val = calcClientNameInput.value.trim();
+      const val = calcClientNameInput.value.trim().toLowerCase();
       if (val.length === 0) {
         closeAutocomplete();
         return;
       }
 
       try {
-        const allClients = await getClientes();
-        currentFilteredClients = allClients.filter(c => 
-          c.nombre_empresa.toLowerCase().includes(val.toLowerCase()) ||
-          c.cif.toLowerCase().includes(val.toLowerCase()) ||
-          (c.cups && c.cups.toLowerCase().includes(val.toLowerCase()))
-        );
+        const [allClients, allPuntos] = await Promise.all([
+          getClientes(),
+          getPuntosSuministroAll().catch(() => [])
+        ]);
 
-        if (currentFilteredClients.length === 0) {
+        const suggestions = [];
+
+        allClients.forEach(client => {
+          const nameMatch = client.nombre_empresa.toLowerCase().includes(val);
+          const cifMatch = client.cif.toLowerCase().includes(val);
+          const clientPuntos = allPuntos.filter(p => p.cliente_id === client.id);
+
+          if (clientPuntos.length > 0) {
+            clientPuntos.forEach(p => {
+              const cupsMatch = p.cups.toLowerCase().includes(val);
+              const aliasMatch = (p.direccion_alias || '').toLowerCase().includes(val);
+
+              if (nameMatch || cifMatch || cupsMatch || aliasMatch) {
+                suggestions.push({
+                  client,
+                  cups: p.cups,
+                  alias: p.direccion_alias || 'Principal',
+                  tipoEnergia: p.tipo_energia || 'LUZ'
+                });
+              }
+            });
+          } else {
+            const cupsMatch = client.cups && client.cups.toLowerCase().includes(val);
+            if (nameMatch || cifMatch || cupsMatch) {
+              suggestions.push({
+                client,
+                cups: client.cups || '',
+                alias: 'Principal',
+                tipoEnergia: 'LUZ'
+              });
+            }
+          }
+        });
+
+        if (suggestions.length === 0) {
           closeAutocomplete();
           return;
         }
@@ -94,17 +125,24 @@ export function initCalculatorView() {
         autocompleteList.innerHTML = '';
         activeIndex = -1;
 
-        currentFilteredClients.forEach((client, idx) => {
+        suggestions.forEach((sug, idx) => {
           const item = document.createElement('div');
           item.className = 'm3-autocomplete-item';
           item.setAttribute('data-index', idx);
+          item.style.display = 'flex';
+          item.style.justifyContent = 'space-between';
+          item.style.alignItems = 'center';
 
-          const nameStrong = document.createElement('strong');
-          nameStrong.innerText = client.nombre_empresa;
-          item.appendChild(nameStrong);
+          item.innerHTML = `
+            <div>
+              <strong>${escapeHtml(sug.client.nombre_empresa)}</strong>
+              <small class="text-muted" style="display: block; font-size: 11px;">${escapeHtml(sug.cups || 'Sin CUPS')} ${sug.alias ? `(${escapeHtml(sug.alias)})` : ''}</small>
+            </div>
+            <span class="m3-chip" style="font-size: 10px; height: 20px; padding: 0 6px;">${escapeHtml(sug.tipoEnergia)}</span>
+          `;
 
           item.addEventListener('click', () => {
-            selectClient(client);
+            selectClient(sug.client, sug.cups, sug.tipoEnergia);
           });
 
           autocompleteList.appendChild(item);
@@ -116,10 +154,15 @@ export function initCalculatorView() {
       }
     };
 
-    const selectClient = (client) => {
+    const selectClient = (client, cups = '', tipoEnergia = 'LUZ') => {
       calcClientNameInput.value = client.nombre_empresa;
-      if (client.cups && calcClientCupsInput) {
-        calcClientCupsInput.value = client.cups;
+      if (calcClientCupsInput) {
+        calcClientCupsInput.value = cups || client.cups || '';
+      }
+      const energySelect = document.getElementById('calc-energy-type');
+      if (energySelect && tipoEnergia) {
+        energySelect.value = tipoEnergia.toUpperCase();
+        energySelect.dispatchEvent(new Event('change'));
       }
       closeAutocomplete();
     };
@@ -814,13 +857,19 @@ async function saveComparisonToDb(item, type, buttonEl) {
     let comisionTotal = 0;
 
     if (type === 'LUZ') {
-      tarifaLuzId = item.tariff.id;
-      ahorroLuz = item.ahorro;
-      comisionTotal = item.tariff.resolvedComision !== undefined ? item.tariff.resolvedComision : item.tariff.comision;
+      tarifaLuzId = item.tariff?.id || null;
+      ahorroLuz = item.ahorro || 0;
+      comisionTotal = item.tariff?.resolvedComision !== undefined ? item.tariff.resolvedComision : (item.tariff?.comision || 0);
     } else if (type === 'GAS') {
-      tarifaGasId = item.tariff.id;
-      ahorroGas = item.ahorro;
-      comisionTotal = item.tariff.resolvedComision !== undefined ? item.tariff.resolvedComision : item.tariff.comision;
+      tarifaGasId = item.tariff?.id || null;
+      ahorroGas = item.ahorro || 0;
+      comisionTotal = item.tariff?.resolvedComision !== undefined ? item.tariff.resolvedComision : (item.tariff?.comision || 0);
+    } else if (type === 'DUAL') {
+      tarifaLuzId = item.tariffLuz?.id || item.lightTariff?.id || item.tariff?.id || null;
+      ahorroLuz = item.ahorroLuz || 0;
+      tarifaGasId = item.tariffGas?.id || item.gasTariff?.id || null;
+      ahorroGas = item.ahorroGas || 0;
+      comisionTotal = (item.comisionLuz || 0) + (item.comisionGas || 0);
     }
 
     await addComparativa(
@@ -841,14 +890,17 @@ async function saveComparisonToDb(item, type, buttonEl) {
     `;
     buttonEl.classList.add('m3-btn-tertiary');
     
+    window.showToast("Comparativa guardada correctamente en el historial.", "success");
+
     // Disparar evento para que la vista del historial se actualice
     const event = new CustomEvent('comparison-saved');
     window.dispatchEvent(event);
   } catch (error) {
     buttonEl.disabled = false;
     buttonEl.innerHTML = 'Guardar Comparativa';
-    window.showToast("Error al guardar la comparativa en el historial.", "error");
-    console.error(error);
+    const errMsg = error?.message || (typeof error === 'string' ? error : 'Error al guardar la comparativa');
+    window.showToast(`Error al guardar la comparativa en el historial: ${errMsg}`, "error");
+    console.error("Error al guardar comparativa:", error);
   }
 }
 
@@ -1024,5 +1076,149 @@ function showNoClientAlert() {
 
     overlay.classList.add('active');
   });
+}
+
+function setInputValue(id, val) {
+  const el = document.getElementById(id);
+  if (el && val !== undefined && val !== null && val !== '') {
+    el.value = val;
+  }
+}
+
+/**
+ * Precarga automáticamente los datos del cliente, CUPS, suministro y consumos anteriores de una renovación.
+ * @param {Object} ren Objeto de la renovación.
+ */
+export async function prefillCalculatorForRenewal(ren) {
+  if (!ren) return;
+
+  const nameInput = document.getElementById('calc-client-name');
+  const cupsInput = document.getElementById('calc-client-cups');
+  const energySelect = document.getElementById('calc-energy-type');
+  const formContainer = document.getElementById('calc-form-container');
+  const modifyBtn = document.getElementById('calc-modify-btn');
+
+  if (nameInput) nameInput.value = ren.cliente_nombre || '';
+  if (cupsInput) cupsInput.value = ren.cups || '';
+
+  if (energySelect) {
+    const rawType = (ren.tipo_energia || '').toUpperCase();
+    let targetType = 'LUZ';
+    if (rawType.includes('DUAL')) targetType = 'DUAL';
+    else if (rawType.includes('GAS')) targetType = 'GAS';
+    
+    energySelect.value = targetType;
+    energySelect.dispatchEvent(new Event('change'));
+  }
+
+  // Intentar recuperar los consumos anteriores de este cliente desde el historial
+  try {
+    const history = await getComparativas();
+    const match = history.find(c => 
+      (ren.cups && c.cliente_cups === ren.cups) || 
+      (c.cliente_nombre && ren.cliente_nombre && c.cliente_nombre.toLowerCase() === ren.cliente_nombre.toLowerCase())
+    );
+
+    if (match && match.datos_cliente_json) {
+      const parsed = typeof match.datos_cliente_json === 'string' ? JSON.parse(match.datos_cliente_json) : match.datos_cliente_json;
+      
+      // Precargar datos de luz
+      if (parsed.lightInput) {
+        const li = parsed.lightInput;
+        if (li.tariffType) {
+          const ltSelect = document.getElementById('calc-light-tariff-type');
+          if (ltSelect) {
+            ltSelect.value = li.tariffType;
+            ltSelect.dispatchEvent(new Event('change'));
+          }
+        }
+        setInputValue('calc-light-days', li.days);
+        setInputValue('calc-light-p1-pot', li.p1Pot);
+        setInputValue('calc-light-p2-pot', li.p2Pot);
+        setInputValue('calc-light-p3-pot', li.p3Pot);
+        setInputValue('calc-light-p4-pot', li.p4Pot);
+        setInputValue('calc-light-p5-pot', li.p5Pot);
+        setInputValue('calc-light-p6-pot', li.p6Pot);
+
+        setInputValue('calc-light-p1-cons', li.p1Cons);
+        setInputValue('calc-light-p2-cons', li.p2Cons);
+        setInputValue('calc-light-p3-cons', li.p3Cons);
+        setInputValue('calc-light-p4-cons', li.p4Cons);
+        setInputValue('calc-light-p5-cons', li.p5Cons);
+        setInputValue('calc-light-p6-cons', li.p6Cons);
+
+        setInputValue('calc-light-p1-pot-price', li.p1PotPrice);
+        setInputValue('calc-light-p2-pot-price', li.p2PotPrice);
+        setInputValue('calc-light-p1-ene-price', li.p1EnePrice);
+        setInputValue('calc-light-p2-ene-price', li.p2EnePrice);
+        setInputValue('calc-light-p3-ene-price', li.p3EnePrice);
+      }
+
+      // Precargar datos de gas
+      if (parsed.gasInput) {
+        const gi = parsed.gasInput;
+        if (gi.tariffType) {
+          const gtSelect = document.getElementById('calc-gas-tariff-type');
+          if (gtSelect) {
+            gtSelect.value = gi.tariffType;
+            gtSelect.dispatchEvent(new Event('change'));
+          }
+        }
+        setInputValue('calc-gas-days', gi.days);
+        setInputValue('calc-gas-annual-cons', gi.annualConsumption);
+        setInputValue('calc-gas-monthly-cons', gi.monthlyCons);
+        setInputValue('calc-gas-fixed-price', gi.fixedPrice);
+        setInputValue('calc-gas-variable-price', gi.variablePrice);
+      }
+    }
+  } catch (eHistory) {
+    console.warn("No se pudieron restaurar consumos anteriores del historial:", eHistory);
+  }
+
+  if (formContainer) {
+    formContainer.style.display = 'block';
+  }
+  if (modifyBtn) {
+    modifyBtn.style.display = 'none';
+  }
+
+  setTimeout(() => {
+    nameInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    nameInput?.focus();
+  }, 100);
+
+  window.showToast(`⚡ Datos de ${ren.cliente_nombre} autocompletados en el comparador.`, "success");
+}
+
+/**
+ * Precarga los datos de una comparativa rechazada por scoring en la calculadora y ejecuta la comparativa
+ * para mostrar el listado completo de ofertas alternativas.
+ * @param {Object} comp Objeto de la comparativa.
+ */
+export async function relaunchComparisonForScoring(comp) {
+  if (!comp) return;
+
+  // 1. Navegar a la sección del comparador
+  const navCalc = document.querySelector('[data-section="calculator"]');
+  if (navCalc) navCalc.click();
+
+  // 2. Usar prefillCalculatorForRenewal con el formato adecuado
+  const mockRen = {
+    cliente_nombre: comp.cliente_nombre,
+    cups: comp.cliente_cups,
+    tipo_energia: comp.tipo_energia
+  };
+
+  await prefillCalculatorForRenewal(mockRen);
+
+  // 3. Ejecutar cálculo para mostrar el listado completo de tarifas alternativas
+  setTimeout(() => {
+    const calcBtn = document.getElementById('calc-submit-btn');
+    if (calcBtn) {
+      calcBtn.click();
+    }
+  }, 200);
+
+  window.showToast(`Datos de ${comp.cliente_nombre || 'cliente'} cargados. Elige una tarifa alternativa del listado completo.`, "info");
 }
 

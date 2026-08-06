@@ -10,6 +10,7 @@ import { initHistoryView } from './views/history.js';
 import { initBackupView } from './views/backup.js';
 import { initWizard } from './views/wizard.js';
 import { initSettingsView, refreshCompanySettings } from './views/settings.js';
+import { initAgentsView, loadAgentsTable, ensureInitialAgentFlow } from './views/agents.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Inicializar sistema de temas (Claro / Oscuro)
@@ -47,10 +48,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Cargar datos en las vistas una vez desbloqueada la app
     await initHomeView();
+    const { initRenewalsView } = await import('./views/renewals.js');
+    await initAgentsView();
     await initClientsView();
     initCalculatorView();
     await initTariffsView();
     await initHistoryView();
+    await initRenewalsView();
     initBackupView();
     initPdfPreviewDialog();
     initWizard();
@@ -58,6 +62,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Alimentar selectores dinámicos
     await updateComercializadorasSelectors();
+
+    // Comprobar requerimiento del Comercial Principal (migración asistida)
+    await ensureInitialAgentFlow();
   });
 });
 
@@ -122,9 +129,11 @@ function initNavigation() {
   const navItems = [
     { btn: 'nav-home', section: 'section-home', title: 'Precio de la Energía (Hoy)' },
     { btn: 'nav-clients', section: 'section-clients', title: 'Gestión de Clientes' },
+    { btn: 'nav-agents', section: 'section-agents', title: 'Gestión de Agentes y Comerciales' },
     { btn: 'nav-calculator', section: 'section-calculator', title: 'Comparador de Tarifas' },
     { btn: 'nav-tariffs', section: 'section-tariffs', title: 'Gestión de Tarifas y Comisiones' },
     { btn: 'nav-history', section: 'section-history', title: 'Historial de Comparativas' },
+    { btn: 'nav-renewals', section: 'section-renewals', title: 'Gestión de Renovaciones y Vencimientos' },
     { btn: 'nav-backup', section: 'section-backup', title: 'Copia de Seguridad' },
     { btn: 'nav-settings', section: 'section-settings', title: 'Configuración de la Aplicación' }
   ];
@@ -169,10 +178,12 @@ function initNavigation() {
       }
 
       // Acciones especiales al cambiar de pestaña
-      if (item.btn === 'nav-clients') {
+      if (item.btn === 'nav-agents') {
+        await loadAgentsTable();
+      } else if (item.btn === 'nav-clients') {
         const clientsModule = await import('./views/clients.js');
         if (clientsModule && clientsModule.loadClientsTable) {
-          await clientsModule.loadClientsTable();
+          await clientsModule.loadClientsTable(1);
         }
       } else if (item.btn === 'nav-tariffs') {
         // Recargar listas CRUD por si hubo cambios
@@ -180,6 +191,16 @@ function initNavigation() {
       } else if (item.btn === 'nav-history') {
         // Disparar evento para refrescar historial
         window.dispatchEvent(new CustomEvent('comparison-saved'));
+      } else if (item.btn === 'nav-renewals') {
+        const renewalsModule = await import('./views/renewals.js');
+        if (renewalsModule && renewalsModule.refreshRenewals) {
+          await renewalsModule.refreshRenewals();
+        }
+      } else if (item.btn === 'nav-backup') {
+        const backupModule = await import('./views/backup.js');
+        if (backupModule && backupModule.loadBackupConfig) {
+          await backupModule.loadBackupConfig();
+        }
       } else if (item.btn === 'nav-settings') {
         // Recargar datos de la consultora por si se han actualizado
         await refreshCompanySettings();
@@ -422,7 +443,7 @@ export function initCustomSelects() {
 // Global click handler to close dropdowns when clicking outside
 if (!window._customSelectGlobalInitialized) {
   document.addEventListener('click', () => {
-    document.querySelectorAll('.m3-custom-select').forEach(cs => {
+    document.querySelectorAll('.m3-custom-select, .m3-custom-status-select, .m3-custom-contract-select').forEach(cs => {
       cs.classList.remove('open');
     });
   });

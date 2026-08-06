@@ -27,6 +27,68 @@
         <!-- Error / Success Alert Message -->
         <div id="auth-alert" class="auth-alert hidden"></div>
 
+        <!-- Mode 0: Onboarding Choice Welcome Screen -->
+        <div id="auth-onboarding-welcome" class="auth-form hidden">
+          <div class="m3-card m3-card-outlined" style="background-color: var(--color-surface-variant); padding: 14px 16px; margin-bottom: 16px; border: none; text-align: left;">
+            <h4 style="font-weight: 600; margin-bottom: 6px; font-size: 13px; color: var(--color-primary);">Lo que puedes hacer:</h4>
+            <ul style="margin-left: 20px; font-size: 12.5px; line-height: 1.5; color: var(--color-on-surface-variant); margin-bottom: 0;">
+              <li>Calcular estudios de ahorro energético combinados de luz y gas.</li>
+              <li>Gestionar comisiones de forma discreta (Modo Privado).</li>
+              <li>Generar y previsualizar reportes ejecutivos en PDF al instante.</li>
+              <li>Almacenar toda la información de forma local y 100% segura cifrada con AES-256-GCM.</li>
+            </ul>
+          </div>
+
+          <div class="m3-card m3-card-outlined" style="background-color: var(--color-surface-container-low); padding: 12px 14px; margin-bottom: 16px; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-sm); text-align: left;">
+            <h4 style="font-weight: 600; margin-bottom: 4px; font-size: 12px; color: var(--color-error);">Aviso Legal y Exención de Responsabilidad:</h4>
+            <p style="font-size: 11px; line-height: 1.45; color: var(--color-on-surface-variant); margin: 0; text-align: justify;">
+              Este software se proporciona "tal cual", sin garantías de ningún tipo respecto a la exactitud, actualización o ausencia de errores en sus cálculos o tarifas. El autor (MrTech0) no será responsable de reclamaciones, pérdidas financieras, perjuicios comerciales o cualquier otro daño directo o indirecto derivado del uso del programa. El usuario es responsable exclusivo de verificar la veracidad de los precios y condiciones directamente con las comercializadoras antes de emitir cualquier propuesta o firma de contratos.
+            </p>
+          </div>
+
+          <div style="margin-bottom: 16px; text-align: left; padding: 0 4px;">
+            <label class="m3-checkbox-container" for="auth-accept-eula" style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+              <input type="checkbox" id="auth-accept-eula" />
+              <span class="m3-checkbox-control" style="margin-top: 2px;"></span>
+              <span class="m3-checkbox-text" style="font-size: 12px; line-height: 1.4; color: var(--color-on-surface);">
+                He leído y acepto los Términos de Uso, el Descargo de Responsabilidad y confirmo que utilizaré esta herramienta conforme a la normativa de protección de datos (RGPD/LOPDGDD).
+              </span>
+            </label>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px;">
+            
+            <!-- Card 1: New Setup -->
+            <div style="background-color: var(--color-surface-variant); padding: 16px 14px; border-radius: var(--radius-md); border: 2px solid var(--color-outline-variant); display: flex; flex-direction: column; justify-content: space-between; text-align: center;">
+              <div>
+                <div style="font-size: 28px; margin-bottom: 6px;">🚀</div>
+                <h4 style="margin: 0 0 4px 0; color: var(--color-on-surface); font-size: 14.5px;">Configuración de Cero</h4>
+                <p style="font-size: 11.5px; color: var(--color-on-surface-variant); margin: 0 0 12px 0; line-height: 1.35;">
+                  Configura Comparetica por primera vez creando tu nueva Contraseña Maestra.
+                </p>
+              </div>
+              <button type="button" id="btn-onboarding-new-setup" class="m3-btn" style="width: 100%;" disabled>
+                <span>Comenzar Configuración</span>
+              </button>
+            </div>
+
+            <!-- Card 2: Restore Backup -->
+            <div style="background-color: var(--color-surface-variant); padding: 16px 14px; border-radius: var(--radius-md); border: 2px solid var(--color-outline-variant); display: flex; flex-direction: column; justify-content: space-between; text-align: center;">
+              <div>
+                <div style="font-size: 28px; margin-bottom: 6px;">📂</div>
+                <h4 style="margin: 0 0 4px 0; color: var(--color-on-surface); font-size: 14.5px;">Restaurar Copia</h4>
+                <p style="font-size: 11.5px; color: var(--color-on-surface-variant); margin: 0 0 12px 0; line-height: 1.35;">
+                  Importa una copia de seguridad (.db.enc o .db) de otra instalación.
+                </p>
+              </div>
+              <button type="button" id="btn-onboarding-restore-backup" class="m3-btn m3-btn-outlined" style="width: 100%;">
+                <span>Restaurar Copia</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
         <!-- Mode 1: Setup Master Password -->
         <form id="auth-form-setup" class="auth-form hidden">
           <div class="m3-field">
@@ -40,6 +102,11 @@
           <button type="submit" id="btn-setup-submit" class="m3-btn" style="width: 100%; margin-top: 8px;">
             <span>Crear Bóveda y Encriptar Datos</span>
           </button>
+          <div style="text-align: center; margin-top: 14px;">
+            <button type="button" id="btn-onboarding-back" class="auth-link-btn hidden">
+              ← Volver a la selección inicial
+            </button>
+          </div>
         </form>
 
         <!-- Mode 1.5: Recovery Key Onboarding Display -->
@@ -138,6 +205,11 @@
               <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 1.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V20h6v-3.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
               <span>Clientes</span>
             </button>
+            <button id="nav-agents" class="nav-item">
+              <!-- Icon: Badge / ID Card -->
+              <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-7-8c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm0-4.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5.67-1.5 1.5-1.5zm6 9.5c0-2-4-3.1-6-3.1s-6 1.1-6 3.1v.5h12v-.5z"/></svg>
+              <span>Agentes</span>
+            </button>
             <button id="nav-calculator" class="nav-item">
               <!-- Icon: Calculate / Dashboard -->
               <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-2.4-6.4l-2.6 2.6 2.6 2.6-1.4 1.4-2.6-2.6-2.6 2.6-1.4-1.4 2.6-2.6-2.6-2.6 1.4-1.4 2.6 2.6 2.6-2.6 1.4 1.4zM7 7h4v2H7V7zm0 4h4v2H7v-2zm7-4h3v2h-3V7zm0 4h3v2h-3v-2z"/></svg>
@@ -152,6 +224,12 @@
               <!-- Icon: History -->
               <svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
               <span>Historial</span>
+            </button>
+            <button id="nav-renewals" class="nav-item">
+              <!-- Icon: Calendar -->
+              <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z"/></svg>
+              <span>Renovaciones</span>
+              <span id="renewals-badge" class="m3-badge hidden" style="margin-left: auto; background-color: var(--color-error); color: white; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 700;">0</span>
             </button>
             <button id="nav-backup" class="nav-item">
               <!-- Icon: Backup Cloud -->
@@ -256,13 +334,18 @@
                 Crea, edita o elimina los datos de tus clientes (particulares y empresas). Los campos <strong>Nombre de la Empresa / Particular</strong> y <strong>CIF/DNI</strong> son obligatorios para poder registrar un cliente y realizar estudios comparativos de ahorro.
               </p>
 
-              <!-- Buscador de Clientes -->
-              <div class="m3-field" style="margin-bottom: 16px;">
-                <div style="position: relative; display: flex; align-items: center; width: 100%;">
+              <!-- Buscador y Filtros de Clientes -->
+              <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                <div style="position: relative; display: flex; align-items: center; flex: 1; min-width: 260px;">
                   <svg viewBox="0 0 24 24" style="position: absolute; left: 16px; width: 20px; height: 20px; fill: var(--color-on-surface-variant); pointer-events: none; opacity: 0.7;">
                     <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
                   </svg>
                   <input type="text" id="search-clients-input" class="m3-input" placeholder="Buscar cliente por nombre, CIF/DNI o CUPS..." style="padding-left: 48px;" />
+                </div>
+                <div style="width: 220px;">
+                  <select id="filter-client-agent" class="m3-input m3-select">
+                    <option value="">Todos los Agentes</option>
+                  </select>
                 </div>
               </div>
 
@@ -272,6 +355,7 @@
                     <tr>
                       <th>Empresa / Particular</th>
                       <th>CIF / DNI</th>
+                      <th>Agente Comercial</th>
                       <th>Representante</th>
                       <th>CUPS</th>
                       <th>Email</th>
@@ -281,6 +365,68 @@
                     </tr>
                   </thead>
                   <tbody id="table-clients-body">
+                    <!-- Inyectado dinámicamente -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Controles de Paginación de Clientes -->
+              <div id="clients-pagination" class="flex-row-center-between" style="margin-top: 16px; flex-wrap: wrap; gap: 12px; align-items: center;">
+                <div id="clients-pagination-info" class="text-muted" style="font-size: 13px;">
+                  Mostrando 0 - 0 de 0 clientes
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <button type="button" id="btn-prev-page-clients" class="m3-btn m3-btn-outlined" style="height: 36px; padding: 0 14px; font-size: 13px;" disabled>
+                    ‹ Anterior
+                  </button>
+                  <span id="clients-page-indicator" style="font-size: 13px; font-weight: 600; min-width: 100px; text-align: center; color: var(--color-on-surface);">Página 1 de 1</span>
+                  <button type="button" id="btn-next-page-clients" class="m3-btn m3-btn-outlined" style="height: 36px; padding: 0 14px; font-size: 13px;" disabled>
+                    Siguiente ›
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ==========================================
+               SECTION: AGENTS
+               ========================================== -->
+          <section id="section-agents" class="view-section">
+            <div class="m3-card margin-top-md">
+              <div class="flex-row-center-between" style="align-items: center; margin-bottom: 8px;">
+                <h2 class="m3-card-title" style="margin: 0;">Gestión de Agentes y Comerciales</h2>
+                <button id="open-agent-dialog-btn" class="m3-btn">
+                  <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:currentColor;margin-right:8px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                  Nuevo Agente
+                </button>
+              </div>
+              <p class="text-muted" style="font-size: 13px; line-height: 1.5; margin-bottom: 20px;">
+                Administra la plantilla de gestores comerciales de tu empresa. Cada cliente registrado en el sistema debe estar vinculado obligatoriamente a un agente comercial responsable.
+              </p>
+
+              <!-- Buscador de Agentes -->
+              <div class="m3-field" style="margin-bottom: 16px;">
+                <div style="position: relative; display: flex; align-items: center; width: 100%;">
+                  <svg viewBox="0 0 24 24" style="position: absolute; left: 16px; width: 20px; height: 20px; fill: var(--color-on-surface-variant); pointer-events: none; opacity: 0.7;">
+                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                  </svg>
+                  <input type="text" id="search-agents-input" class="m3-input" placeholder="Buscar agente por nombre, teléfono o email..." style="padding-left: 48px;" />
+                </div>
+              </div>
+
+              <div class="table-container">
+                <table class="m3-table" id="table-agents">
+                  <thead>
+                    <tr>
+                      <th>Nombre del Agente</th>
+                      <th>Teléfono</th>
+                      <th>Email</th>
+                      <th>Clientes Asignados</th>
+                      <th>Estado</th>
+                      <th style="text-align: right;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-agents-body">
                     <!-- Inyectado dinámicamente -->
                   </tbody>
                 </table>
@@ -789,20 +935,53 @@
             <div class="m3-card margin-top-md" style="margin-bottom: 16px;">
               <h2 class="m3-card-title" style="margin-top: 0; margin-bottom: 8px;">Historial de Comparativas</h2>
               <p class="text-muted" style="font-size: 13px; line-height: 1.5; margin-bottom: 16px;">
-                Consulta las comparativas generadas, realiza un seguimiento del estado de aceptación y descarga los reportes detallados en PDF.
+                Consulta las comparativas generadas, realiza el seguimiento del estado de aceptación, controla el cobro de comisiones y descarga los reportes detallados en PDF.
               </p>
-              <!-- Buscador de Comparativas -->
-              <div class="m3-field" style="margin-bottom: 0;">
-                <div style="position: relative; display: flex; align-items: center; width: 100%;">
-                  <svg viewBox="0 0 24 24" style="position: absolute; left: 16px; width: 20px; height: 20px; fill: var(--color-on-surface-variant); pointer-events: none; opacity: 0.7;">
+
+              <!-- Summary KPI Cards de Historial & Cobros -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid var(--color-primary);">
+                  <div style="font-size: 11px; color: var(--color-on-surface-variant); font-weight: 600;">TOTAL ESTUDIOS</div>
+                  <div id="history-kpi-total" style="font-size: 18px; font-weight: 700; color: var(--color-on-surface);">0</div>
+                </div>
+                <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #3b82f6;">
+                  <div style="font-size: 11px; color: #3b82f6; font-weight: 600;">ACEPTADAS</div>
+                  <div id="history-kpi-aceptadas" style="font-size: 18px; font-weight: 700; color: #3b82f6;">0</div>
+                </div>
+                <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #f59e0b;">
+                  <div style="font-size: 11px; color: #f59e0b; font-weight: 600;">🟡 PENDIENTE COBRO</div>
+                  <div id="history-kpi-pendientes" style="font-size: 18px; font-weight: 700; color: #f59e0b;" class="private-value">0,00 €</div>
+                </div>
+                <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #10b981;">
+                  <div style="font-size: 11px; color: #10b981; font-weight: 600;">✅ COBRADO REAL</div>
+                  <div id="history-kpi-cobradas" style="font-size: 18px; font-weight: 700; color: #10b981;" class="private-value">0,00 €</div>
+                </div>
+              </div>
+
+              <!-- Buscador y Filtros del Historial -->
+              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 0;">
+                <div style="flex: 1; min-width: 220px; position: relative;">
+                  <svg viewBox="0 0 24 24" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; fill: var(--color-on-surface-variant); pointer-events: none; opacity: 0.7;">
                     <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
                   </svg>
-                  <input type="text" id="search-history-input" class="m3-input" placeholder="Buscar comparativa por nombre de cliente o CUPS..." style="padding-left: 48px;" />
+                  <input type="text" id="search-history-input" class="m3-input" placeholder="Buscar comparativa por nombre o CUPS..." style="padding-left: 48px; width: 100%; box-sizing: border-box;" />
                 </div>
+                <select id="filter-history-estado" class="m3-input m3-select" style="width: 170px;">
+                  <option value="ALL">Todos los Estados</option>
+                  <option value="Aceptada">Aceptadas</option>
+                  <option value="Pendiente de aceptación">Pendientes</option>
+                  <option value="Rechazada">Rechazadas</option>
+                </select>
+                <select id="filter-history-cobro" class="m3-input m3-select" style="width: 170px;">
+                  <option value="ALL">Todos los Cobros</option>
+                  <option value="PENDIENTE">🟡 Pendientes de Cobro</option>
+                  <option value="COBRADO">✅ Cobrados</option>
+                </select>
               </div>
             </div>
 
-            <div class="table-container margin-top-none">
+            <!-- Tabla del Historial -->
+            <div class="table-container margin-top-md">
               <table class="m3-table" id="table-history">
                 <thead>
                   <tr>
@@ -811,8 +990,10 @@
                     <th>CUPS</th>
                     <th>Tipo</th>
                     <th>Ahorro Anual</th>
-                    <th>Estado</th>
+                    <th>Estado Comparativa</th>
+                    <th>Contrato</th>
                     <th class="private-value">Comisión Asesor</th>
+                    <th>Cobro Comisión</th>
                     <th style="text-align: right;">Acciones</th>
                   </tr>
                 </thead>
@@ -820,6 +1001,130 @@
                   <!-- Inyectado dinámicamente -->
                 </tbody>
               </table>
+            </div>
+          </section>
+
+          <!-- ==========================================
+               SECTION: RENEWALS
+               ========================================== -->
+          <section id="section-renewals" class="view-section">
+            <div class="m3-card margin-top-md" style="margin-bottom: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+                <div>
+                  <h2 class="m3-card-title" style="margin-top: 0; margin-bottom: 6px;">Gestión de Renovaciones y Vencimientos</h2>
+                  <p class="text-muted" style="font-size: 13px; line-height: 1.5; margin: 0;">
+                    Controla los vencimientos de contratos de tus clientes y prepara con antelación ofertas de renovación.
+                  </p>
+                </div>
+                <!-- Toggle View Mode: Lista vs Calendario -->
+                <div style="display: flex; gap: 4px; background-color: var(--color-surface-variant); padding: 4px; border-radius: var(--radius-md);">
+                  <button type="button" id="btn-renewals-view-list" class="m3-btn m3-btn-sm" style="font-size: 12.5px;">
+                    <span>📊 Vista Lista / CRM</span>
+                  </button>
+                  <button type="button" id="btn-renewals-view-calendar" class="m3-btn m3-btn-text m3-btn-sm" style="font-size: 12.5px;">
+                    <span>📅 Vista Calendario</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Summary KPI Cards -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 16px;">
+                <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid var(--color-primary);">
+                  <div style="font-size: 11px; color: var(--color-on-surface-variant); font-weight: 600;">TOTAL CONTRATOS</div>
+                  <div id="renewals-kpi-total" style="font-size: 18px; font-weight: 700; color: var(--color-on-surface);">0</div>
+                </div>
+                <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #ef4444;">
+                  <div style="font-size: 11px; color: #ef4444; font-weight: 600;">🔴 CRÍTICOS</div>
+                  <div id="renewals-kpi-critical" style="font-size: 18px; font-weight: 700; color: #ef4444;">0</div>
+                </div>
+                <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #f59e0b;">
+                  <div style="font-size: 11px; color: #f59e0b; font-weight: 600;">🟡 PRÓXIMOS</div>
+                  <div id="renewals-kpi-warning" style="font-size: 18px; font-weight: 700; color: #f59e0b;">0</div>
+                </div>
+                <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #3b82f6;">
+                  <div style="font-size: 11px; color: #3b82f6; font-weight: 600;">🔵 EN RADAR</div>
+                  <div id="renewals-kpi-radar" style="font-size: 18px; font-weight: 700; color: #3b82f6;">0</div>
+                </div>
+                <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #10b981;">
+                  <div style="font-size: 11px; color: #10b981; font-weight: 600;">✅ RENOVADOS</div>
+                  <div id="renewals-kpi-done" style="font-size: 18px; font-weight: 700; color: #10b981;">0</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- VISTA 1: LISTA / CRM -->
+            <div id="renewals-container-list">
+              <div class="m3-card" style="margin-bottom: 16px; padding: 12px 16px;">
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                  <div style="flex: 1; min-width: 220px; position: relative;">
+                    <input type="text" id="search-renewals-input" class="m3-input" placeholder="Buscar por cliente, CIF o CUPS..." style="width: 100%; box-sizing: border-box;" />
+                  </div>
+                  <select id="filter-renewals-status" class="m3-input m3-select" style="width: 160px;">
+                    <option value="ALL">Todos los Estados</option>
+                    <option value="CRITICAL">🔴 Críticos</option>
+                    <option value="WARNING">🟡 Próximos</option>
+                    <option value="RADAR">🔵 En Radar</option>
+                    <option value="DONE">✅ Renovados</option>
+                  </select>
+                  <button type="button" id="btn-open-add-renewal" class="m3-btn">
+                    <span>+ Añadir Renovación</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="table-container margin-top-none">
+                <table class="m3-table" id="table-renewals">
+                  <thead>
+                    <tr>
+                      <th>Cliente / CIF</th>
+                      <th>Suministro / CUPS</th>
+                      <th>Comercializadora & Tarifa</th>
+                      <th>Fecha Firma</th>
+                      <th>Vencimiento</th>
+                      <th>Días Restantes</th>
+                      <th>Estado</th>
+                      <th style="text-align: right;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="renewals-tbody">
+                    <!-- Inyectado dinámicamente -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Controles de Paginación de Renovaciones -->
+              <div id="renewals-pagination" class="flex-row-center-between" style="margin-top: 16px; flex-wrap: wrap; gap: 12px; align-items: center;">
+                <div id="renewals-pagination-info" class="text-muted" style="font-size: 13px;">
+                  Mostrando 0 - 0 de 0 renovaciones
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <button type="button" id="btn-prev-page-renewals" class="m3-btn m3-btn-outlined" style="height: 36px; padding: 0 14px; font-size: 13px;" disabled>
+                    ‹ Anterior
+                  </button>
+                  <span id="renewals-page-indicator" style="font-size: 13px; font-weight: 600; min-width: 100px; text-align: center; color: var(--color-on-surface);">Página 1 de 1</span>
+                  <button type="button" id="btn-next-page-renewals" class="m3-btn m3-btn-outlined" style="height: 36px; padding: 0 14px; font-size: 13px;" disabled>
+                    Siguiente ›
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- VISTA 2: CALENDARIO MENSUAL -->
+            <div id="renewals-container-calendar" class="hidden">
+              <div class="m3-card" style="margin-bottom: 16px; padding: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button type="button" id="btn-calendar-prev-month" class="m3-btn m3-btn-outlined m3-btn-sm">&lt; Mes Anterior</button>
+                    <button type="button" id="btn-calendar-today" class="m3-btn m3-btn-tonal m3-btn-sm">Hoy</button>
+                    <button type="button" id="btn-calendar-next-month" class="m3-btn m3-btn-outlined m3-btn-sm">Mes Siguiente &gt;</button>
+                  </div>
+                  <h3 id="calendar-month-year-title" style="margin: 0; color: var(--color-primary); font-size: 18px; font-weight: 700;">Julio 2026</h3>
+                </div>
+
+                <div id="renewals-calendar-grid" class="renewals-calendar-grid">
+                  <!-- Inyectado dinámicamente -->
+                </div>
+              </div>
             </div>
           </section>
 
@@ -986,6 +1291,17 @@
                     <button type="button" id="btn-csv-process-import" class="m3-btn" style="min-width: 200px;">
                       <span>Iniciar Importación Masiva</span>
                     </button>
+                  </div>
+
+                  <!-- PROGRESO DE IMPORTACIÓN MASIVA -->
+                  <div id="csv-progress-container" class="hidden" style="margin-top: 20px; background-color: var(--color-surface-variant); padding: 16px; border-radius: var(--radius-md); border-left: 4px solid var(--color-primary);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; font-weight: 600;">
+                      <span id="csv-progress-status" style="color: var(--color-primary);">Procesando importación...</span>
+                      <span id="csv-progress-percent" style="color: var(--color-on-surface);">0%</span>
+                    </div>
+                    <div style="background-color: var(--color-outline-variant); height: 8px; border-radius: 4px; overflow: hidden;">
+                      <div id="csv-progress-bar" style="background-color: var(--color-primary); height: 100%; width: 0%; transition: width 0.15s ease;"></div>
+                    </div>
                   </div>
                 </div>
 
@@ -1179,6 +1495,43 @@
 
             <!-- PANEL: PARÁMETROS -->
             <div id="panel-settings-params" class="tab-panel" style="display:none;">
+              <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Configuración de Umbrales de Renovación</h3>
+                <p class="text-muted" style="margin-bottom: 20px; font-size: 13px; line-height: 1.5;">
+                  Define con cuántos días de antelación deseas que la aplicación clasifique los contratos de tus clientes en los diferentes niveles de pre-aviso para tu consultoría.
+                </p>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                  <div class="m3-field" style="margin-bottom: 0;">
+                    <label class="m3-label" for="settings-renewal-critical-days">🔴 Días para Alerta Crítica *</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <input type="number" id="settings-renewal-critical-days" class="m3-input" min="1" max="180" value="30" style="width: 110px;" />
+                      <span class="text-muted" style="font-size: 13px;">días</span>
+                    </div>
+                  </div>
+
+                  <div class="m3-field" style="margin-bottom: 0;">
+                    <label class="m3-label" for="settings-renewal-warning-days">🟡 Días para Vencimiento Próximo *</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <input type="number" id="settings-renewal-warning-days" class="m3-input" min="1" max="365" value="60" style="width: 110px;" />
+                      <span class="text-muted" style="font-size: 13px;">días</span>
+                    </div>
+                  </div>
+
+                  <div class="m3-field" style="margin-bottom: 0;">
+                    <label class="m3-label" for="settings-renewal-radar-days">🔵 Días para En Radar *</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <input type="number" id="settings-renewal-radar-days" class="m3-input" min="1" max="365" value="90" style="width: 110px;" />
+                      <span class="text-muted" style="font-size: 13px;">días</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button type="button" id="btn-save-renewal-params" class="m3-btn">
+                  <span>Guardar Parámetros de Renovación</span>
+                </button>
+              </div>
+
               <div class="m3-card margin-top-md">
                 <h3 style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-outline); margin-bottom: 12px;">Retención legal de los datos</h3>
                 <p class="text-muted" style="margin-bottom: 16px; font-size: 13px; line-height: 1.6;">
@@ -1482,7 +1835,7 @@
 
       <!-- DIÁLOGO: NUEVO/EDITAR CLIENTE -->
       <div id="dialog-client" class="m3-dialog-overlay">
-        <div class="m3-dialog" style="max-width: 500px;">
+        <div class="m3-dialog" style="max-width: 680px; width: 100%;">
           <h3 class="m3-dialog-title" id="dialog-client-title">Registrar Cliente</h3>
           
           <form id="dialog-client-form">
@@ -1504,20 +1857,346 @@
                 <input type="text" id="dialog-client-rep" class="m3-input" placeholder="Ej. Carlos García" />
               </div>
               
-              <div class="m3-field">
-                <label class="m3-label" for="dialog-client-cups">CUPS (Código de Suministro)</label>
-                <input type="text" id="dialog-client-cups" class="m3-input" placeholder="Ej. ES0021..." />
+              <!-- PUNTOS DE SUMINISTRO (MULTIPUNTO / CUPS) -->
+              <div style="background-color: var(--color-surface-variant); padding: 12px 14px; border-radius: var(--radius-md); margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <div>
+                    <label class="m3-label" style="font-weight: 700; margin: 0; color: var(--color-on-surface); font-size: 13px;">Puntos de Suministro (CUPS)</label>
+                    <p class="text-muted" style="font-size: 11px; margin: 2px 0 0 0;">Asocia uno o varios CUPS a este cliente (ej. tienda, nave, oficina).</p>
+                  </div>
+                  <button type="button" id="btn-add-cups-row" class="m3-btn m3-btn-text m3-btn-sm" style="font-weight: 600; color: var(--color-primary); padding: 4px 8px;">
+                    + Añadir CUPS
+                  </button>
+                </div>
+                <div id="client-cups-container" style="display: flex; flex-direction: column; gap: 8px;">
+                  <!-- Inyectado dinámicamente -->
+                </div>
               </div>
               
               <div class="m3-field">
                 <label class="m3-label" for="dialog-client-email">Email de contacto</label>
                 <input type="email" id="dialog-client-email" class="m3-input" placeholder="Ej. correo@cliente.com" />
               </div>
+              
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-client-agent">Agente Comercial Responsable *</label>
+                <select id="dialog-client-agent" class="m3-input m3-select" required>
+                  <option value="">-- Seleccionar Agente Comercial --</option>
+                </select>
+              </div>
             </div>
             
             <div class="m3-dialog-actions">
               <button type="button" id="dialog-client-close" class="m3-btn m3-btn-outlined">Cancelar</button>
               <button type="submit" class="m3-btn">Guardar Cliente</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: GESTIÓN DE COBRO DE COMISIÓN -->
+      <div id="dialog-mark-cobro" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 480px; width: 100%;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div>
+              <h3 class="m3-dialog-title" style="margin: 0;">Gestión de Cobro de Comisión</h3>
+              <p id="dialog-cobro-subtitle" class="text-muted" style="font-size: 13px; margin-top: 4px; margin-bottom: 0;">
+                Cliente: <strong id="dialog-cobro-client" style="color: var(--color-on-surface);"></strong>
+              </p>
+            </div>
+            <button type="button" id="btn-close-cobro-dialog-x" class="m3-btn m3-btn-text m3-btn-sm" style="font-size: 18px; line-height: 1; padding: 4px 8px; color: var(--color-on-surface-variant);">✕</button>
+          </div>
+
+          <div style="background-color: var(--color-surface-variant); padding: 14px 16px; border-radius: var(--radius-md); margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span class="text-muted" style="font-size: 12.5px;">Importe Comisión Aprobada:</span>
+              <strong id="dialog-cobro-amount" class="private-value" style="font-size: 16px; color: var(--color-primary);">0,00 €</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="text-muted" style="font-size: 12.5px;">Estado Actual de Cobro:</span>
+              <span id="dialog-cobro-status-badge" class="status-select-trigger estado-pendiente" style="padding: 4px 10px; cursor: default;"><span>🟡 Pendiente</span></span>
+            </div>
+          </div>
+
+          <form id="form-mark-cobro">
+            <input type="hidden" id="dialog-cobro-id" value="" />
+            <div class="m3-field" style="margin-bottom: 20px;">
+              <label class="m3-label" for="dialog-cobro-date">Fecha de Liquidación / Cobro *</label>
+              <input type="date" id="dialog-cobro-date" class="m3-input" required />
+            </div>
+
+            <div class="m3-dialog-actions" style="display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
+              <button type="button" id="btn-cobro-mark-pending" class="m3-btn m3-btn-outlined" style="color: #f59e0b; border-color: #f59e0b;">
+                🟡 Revertir a Pendiente
+              </button>
+              <button type="submit" id="btn-cobro-confirm" class="m3-btn" style="background-color: #10b981; color: white;">
+                ✅ Confirmar Cobro
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: RECHAZO POR SCORING Y RE-COMPARACIÓN -->
+      <div id="dialog-scoring-rejection" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 520px; width: 100%;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div>
+              <h3 class="m3-dialog-title" style="margin: 0; color: #991b1b; display: flex; align-items: center; gap: 8px;">
+                <span>🚫</span> Rechazo por Scoring (Impago / Riesgo)
+              </h3>
+              <p id="dialog-scoring-subtitle" class="text-muted" style="font-size: 13px; margin-top: 4px; margin-bottom: 0;">
+                Cliente: <strong id="dialog-scoring-client" style="color: var(--color-on-surface);"></strong>
+              </p>
+            </div>
+            <button type="button" id="btn-close-scoring-dialog-x" class="m3-btn m3-btn-text m3-btn-sm" style="font-size: 18px; line-height: 1; padding: 4px 8px; color: var(--color-on-surface-variant);">✕</button>
+          </div>
+
+          <div style="background-color: #fef2f2; border: 1px solid #fca5a5; padding: 12px 14px; border-radius: var(--radius-md); margin-bottom: 16px;">
+            <p style="font-size: 12.5px; color: #991b1b; margin: 0; line-height: 1.4;">
+              El contrato ha sido rechazado por la comercializadora por scoring crediticio o deudas pendientes. Puedes registrar el motivo y abrir el listado completo de tarifas para seleccionar otra comercializadora alternativa.
+            </p>
+          </div>
+
+          <form id="form-scoring-rejection">
+            <input type="hidden" id="dialog-scoring-id" value="" />
+            <div class="m3-field" style="margin-bottom: 20px;">
+              <label class="m3-label" for="dialog-scoring-reason">Motivo / Notas del Rechazo (Opcional)</label>
+              <textarea id="dialog-scoring-reason" class="m3-input" rows="3" placeholder="Ej. Deuda previa en distribuidora, scoring negativo en ASNEF, o falta de aval."></textarea>
+            </div>
+
+            <div class="m3-dialog-actions" style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
+              <button type="button" id="btn-scoring-save-only" class="m3-btn m3-btn-outlined">
+                Guardar Rechazo
+              </button>
+              <button type="button" id="btn-scoring-recompare" class="m3-btn" style="background-color: var(--color-primary); color: white;">
+                ⚡ Ver Listado Completo de Ofertas
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: RENOVACIONES DEL DÍA (CALENDARIO) -->
+      <div id="dialog-calendar-day-renewals" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 680px; width: 100%;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div>
+              <h3 id="dialog-calendar-day-title" class="m3-dialog-title" style="margin: 0;">Renovaciones del Día</h3>
+              <p id="dialog-calendar-day-subtitle" class="text-muted" style="font-size: 13px; margin-top: 4px; margin-bottom: 0;">
+                Lista de vencimientos programados para esta fecha.
+              </p>
+            </div>
+            <button type="button" id="btn-close-calendar-day-dialog-x" class="m3-btn m3-btn-text m3-btn-sm" style="font-size: 18px; line-height: 1; padding: 4px 8px; color: var(--color-on-surface-variant);">✕</button>
+          </div>
+
+          <div class="table-container" style="max-height: 380px; overflow-y: auto; margin-top: 12px; margin-bottom: 16px;">
+            <table class="m3-table" style="font-size: 13px;">
+              <thead>
+                <tr>
+                  <th>Cliente / CIF</th>
+                  <th>Suministro / CUPS</th>
+                  <th>Estado</th>
+                  <th style="text-align: right;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="calendar-day-renewals-tbody">
+                <!-- Inyectado dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="m3-dialog-actions">
+            <button type="button" id="btn-close-calendar-day-dialog" class="m3-btn m3-btn-outlined">Cerrar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: NUEVO/EDITAR AGENTE -->
+      <div id="dialog-agent" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 500px;">
+          <h3 class="m3-dialog-title" id="dialog-agent-title">Registrar Agente Comercial</h3>
+          
+          <form id="dialog-agent-form">
+            <input type="hidden" id="dialog-agent-id" value="" />
+            
+            <div class="dialog-form-content">
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-agent-name">Nombre y Apellidos del Agente *</label>
+                <input type="text" id="dialog-agent-name" class="m3-input" placeholder="Ej. Juan Pérez García" required />
+              </div>
+              
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-agent-phone">Teléfono de contacto</label>
+                <input type="tel" id="dialog-agent-phone" class="m3-input" placeholder="Ej. 612345678" />
+              </div>
+              
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-agent-email">Email de contacto</label>
+                <input type="email" id="dialog-agent-email" class="m3-input" placeholder="Ej. juan.perez@consultoria.com" />
+              </div>
+            </div>
+            
+            <div class="m3-dialog-actions">
+              <button type="button" id="dialog-agent-close" class="m3-btn m3-btn-outlined">Cancelar</button>
+              <button type="submit" class="m3-btn">Guardar Agente</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: REASIGNAR CLIENTES DE AGENTE -->
+      <div id="dialog-reassign-agent" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 520px;">
+          <h3 class="m3-dialog-title">Reasignación de Clientes</h3>
+          <p id="dialog-reassign-desc" class="text-muted" style="font-size: 13px; margin-bottom: 16px;">
+            El agente seleccionado posee clientes vinculados. Para proceder, debes seleccionar a qué otro agente comercial deseas transferir estos clientes.
+          </p>
+          <form id="dialog-reassign-form">
+            <input type="hidden" id="dialog-reassign-old-agent-id" value="" />
+            <div class="m3-field">
+              <label class="m3-label" for="dialog-reassign-target-agent">Seleccionar Nuevo Agente Comercial *</label>
+              <select id="dialog-reassign-target-agent" class="m3-input m3-select" required></select>
+            </div>
+            <div class="m3-dialog-actions" style="margin-top: 24px;">
+              <button type="button" id="dialog-reassign-cancel" class="m3-btn m3-btn-outlined">Cancelar</button>
+              <button type="submit" class="m3-btn">Transferir Clientes y Continuar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: WIZARD DE CONFIGURACIÓN INICIAL (2 PASOS) -->
+      <div id="dialog-welcome-wizard" class="m3-dialog-overlay" style="z-index: 999998;">
+        <div class="m3-dialog" style="max-width: 640px;">
+          <!-- Encabezado con Indicador de Pasos -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--color-outline-variant);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="m3-chip" id="wizard-step-chip" style="font-weight: 700; background-color: var(--color-primary-container); color: var(--color-on-primary-container);">Paso 1 de 2</span>
+              <span style="font-size: 14px; font-weight: 600;" id="wizard-step-title">Datos de tu Consultora Energética</span>
+            </div>
+          </div>
+
+          <form id="wizard-form">
+            <!-- PASO 1: DATOS CORPORATIVOS DE LA CONSULTORA -->
+            <div id="wizard-step-1" class="wizard-step-container">
+              <p class="text-muted" style="font-size: 13px; margin-bottom: 16px; line-height: 1.4;">
+                Introduce la información corporativa. Estos datos e imagen se utilizarán para personalizar la cabecera y el pie de página de los informes PDF que entregues a tus clientes.
+              </p>
+
+              <div class="m3-field">
+                <label class="m3-label" for="wizard-company-name">Nombre de la Consultora *</label>
+                <input type="text" id="wizard-company-name" class="m3-input" placeholder="Ej. Ahorro Energético S.L." required />
+              </div>
+
+              <div class="m3-field">
+                <label class="m3-label" for="wizard-company-logo">Logotipo de la Empresa (Opcional)</label>
+                <input type="file" id="wizard-company-logo" class="m3-input" accept=".svg, .png, .jpg, .jpeg, .webp, .avif" style="padding-top: 10px; cursor: pointer;" />
+                <span class="text-muted" style="font-size: 11px; margin-top: 4px;">Formatos admitidos: SVG, PNG, JPG, WebP, AVIF.</span>
+              </div>
+
+              <div class="m3-field">
+                <label class="m3-label" for="wizard-company-street">Calle / Dirección</label>
+                <input type="text" id="wizard-company-street" class="m3-input" placeholder="Ej. Calle Mayor" />
+              </div>
+
+              <div class="m3-field-row" style="display: flex; gap: 12px;">
+                <div class="m3-field" style="flex: 1;">
+                  <label class="m3-label" for="wizard-company-number">Número</label>
+                  <input type="text" id="wizard-company-number" class="m3-input" placeholder="Ej. 12" />
+                </div>
+                <div class="m3-field" style="flex: 1;">
+                  <label class="m3-label" for="wizard-company-cp">Código Postal</label>
+                  <input type="text" id="wizard-company-cp" class="m3-input" placeholder="Ej. 28001" />
+                </div>
+              </div>
+
+              <div class="m3-field-row" style="display: flex; gap: 12px;">
+                <div class="m3-field" style="flex: 1;">
+                  <label class="m3-label" for="wizard-company-city">Ciudad</label>
+                  <input type="text" id="wizard-company-city" class="m3-input" placeholder="Ej. Madrid" />
+                </div>
+                <div class="m3-field" style="flex: 1;">
+                  <label class="m3-label" for="wizard-company-province">Provincia</label>
+                  <input type="text" id="wizard-company-province" class="m3-input" placeholder="Ej. Madrid" />
+                </div>
+              </div>
+
+              <div class="m3-field-row" style="display: flex; gap: 12px;">
+                <div class="m3-field" style="flex: 1;">
+                  <label class="m3-label" for="wizard-company-web">Página Web</label>
+                  <input type="url" id="wizard-company-web" class="m3-input" placeholder="Ej. https://misitio.com" />
+                </div>
+                <div class="m3-field" style="flex: 1;">
+                  <label class="m3-label" for="wizard-company-email">Email de Contacto</label>
+                  <input type="email" id="wizard-company-email" class="m3-input" placeholder="Ej. info@misitio.com" />
+                </div>
+              </div>
+
+              <div class="m3-field" style="max-width: 50%;">
+                <label class="m3-label" for="wizard-company-phone">Teléfono de Contacto</label>
+                <input type="tel" id="wizard-company-phone" class="m3-input" placeholder="Ej. +34 600 000 000" />
+              </div>
+
+              <div class="m3-dialog-actions" style="margin-top: 24px;">
+                <button type="button" id="wizard-next-step-btn" class="m3-btn" style="width: 100%;">Siguiente: Copias de Seguridad ➔</button>
+              </div>
+            </div>
+
+            <!-- PASO 2: CONFIGURACIÓN DE UBICACIÓN DE COPIAS DE SEGURIDAD -->
+            <div id="wizard-step-2" class="wizard-step-container" style="display: none;">
+              <p class="text-muted" style="font-size: 13px; margin-bottom: 16px; line-height: 1.4;">
+                Por defecto, las copias de seguridad automáticas se guardarán en la carpeta mostrada a continuación. Si deseas utilizar una ubicación diferente (como un disco externo), haz clic en <strong>Examinar...</strong> para elegir la carpeta contenedora donde crear <code>Comparetica_backups</code>.
+              </p>
+
+              <div class="m3-field" style="margin-bottom: 20px;">
+                <label class="m3-label" for="wizard-backup-path-input">Ruta Destino de Copias de Seguridad</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="wizard-backup-path-input" class="m3-input" readonly style="flex: 1; background-color: var(--color-surface-variant); font-family: monospace; font-size: 12px;" />
+                  <button type="button" id="wizard-backup-browse-btn" class="m3-btn-outline" style="white-space: nowrap;">📁 Examinar...</button>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button type="button" id="wizard-back-step-btn" class="m3-btn-outline" style="flex: 1;">⬅️ Atrás</button>
+                <button type="submit" id="wizard-submit-btn" class="m3-btn" style="flex: 2;">Finalizar Configuración 🚀</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: CONFIGURACIÓN INICIAL DEL AGENTE PRINCIPAL -->
+      <div id="dialog-initial-agent-setup" class="m3-dialog-overlay" style="z-index: 999999;">
+        <div class="m3-dialog" style="max-width: 520px;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <div style="background-color: var(--color-primary-container); color: var(--color-on-primary-container); padding: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+              <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:currentColor;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-7-8c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm0-4.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5.67-1.5 1.5-1.5zm6 9.5c0-2-4-3.1-6-3.1s-6 1.1-6 3.1v.5h12v-.5z"/></svg>
+            </div>
+            <div>
+              <h3 class="m3-dialog-title" style="margin: 0;">Configuración de Comercial Principal</h3>
+              <small class="text-muted">Requisito de vinculación 1 a 1 de clientes</small>
+            </div>
+          </div>
+          <p class="text-muted" style="font-size: 13px; line-height: 1.5; margin-bottom: 16px;">
+            Por favor, introduce los datos de tu <strong>Agente Comercial Principal</strong>. Todos los clientes registrados previamente en el sistema se asignarán automáticamente a este agente.
+          </p>
+
+          <form id="form-initial-agent-setup">
+            <div class="m3-field">
+              <label class="m3-label" for="initial-agent-name">Nombre y Apellidos del Comercial Principal *</label>
+              <input type="text" id="initial-agent-name" class="m3-input" placeholder="Ej. Juan Pérez García" required />
+            </div>
+            <div class="m3-field">
+              <label class="m3-label" for="initial-agent-phone">Teléfono de contacto</label>
+              <input type="tel" id="initial-agent-phone" class="m3-input" placeholder="Ej. 612345678" />
+            </div>
+            <div class="m3-field">
+              <label class="m3-label" for="initial-agent-email">Email de contacto</label>
+              <input type="email" id="initial-agent-email" class="m3-input" placeholder="Ej. comercial@empresa.com" />
+            </div>
+            <div class="m3-dialog-actions" style="margin-top: 24px;">
+              <button type="submit" class="m3-btn" style="width: 100%;">Guardar Comercial Principal y Asignar Clientes</button>
             </div>
           </form>
         </div>
@@ -1541,122 +2220,7 @@
       <!-- CONTENEDOR DE TOASTS -->
       <div id="toast-container"></div>
 
-      <!-- DIÁLOGO: ASISTENTE DE BIENVENIDA (WIZARD) -->
-      <div id="dialog-welcome-wizard" class="m3-dialog-overlay">
-        <div class="m3-dialog" style="max-width: 600px; padding: 32px;">
-          <!-- Paso 1: Bienvenida -->
-          <div id="wizard-step-1" class="wizard-step">
-            <div style="text-align: center; margin-bottom: 24px;">
-              <img src="assets/light-bulb.svg" style="width: 72px; height: 72px; margin: 0 auto 16px; display: block; border-radius: var(--radius-lg); box-shadow: var(--shadow-2);" alt="Comparetica Logo" />
-              <h2 class="m3-dialog-title" style="margin-bottom: 8px;">¡Bienvenido a Comparetica!</h2>
-              <p class="text-muted" style="font-size: 14px; line-height: 1.6; max-width: 460px; margin: 0 auto;">
-                Tu herramienta local para la optimización de costes de luz y gas. Realiza estudios B2B offline de forma ágil, precisa y confidencial.
-              </p>
-            </div>
-            
-            <div class="m3-card m3-card-outlined" style="background-color: var(--color-surface-variant); padding: 16px; margin-bottom: 24px; border: none;">
-              <h4 style="font-weight: 600; margin-bottom: 6px; font-size: 13px; color: var(--color-primary);">Lo que puedes hacer:</h4>
-              <ul style="margin-left: 20px; font-size: 13px; line-height: 1.6; color: var(--color-on-surface-variant);">
-                <li>Calcular estudios de ahorro energético combinados.</li>
-                <li>Gestionar comisiones de forma discreta (Modo Privado).</li>
-                <li>Generar y previsualizar reportes ejecutivos en PDF al instante.</li>
-                <li>Almacenar toda la información de forma local y 100% segura.</li>
-              </ul>
-            </div>
 
-            <div class="m3-card m3-card-outlined" style="background-color: var(--color-surface-container-low); padding: 12px; margin-bottom: 24px; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-sm);">
-              <h4 style="font-weight: 600; margin-bottom: 4px; font-size: 12px; color: var(--color-error);">Aviso Legal y Exención de Responsabilidad:</h4>
-              <p style="font-size: 11px; line-height: 1.5; color: var(--color-on-surface-variant); margin: 0; text-align: justify;">
-                Este software se proporciona "tal cual", sin garantías de ningún tipo respecto a la exactitud, actualización o ausencia de errores en sus cálculos o tarifas. El autor (MrTech0) no será responsable de reclamaciones, pérdidas financieras, perjuicios comerciales o cualquier otro daño directo o indirecto derivado del uso del programa. El usuario es responsable exclusivo de verificar la veracidad de los precios y condiciones directamente con las comercializadoras antes de emitir cualquier propuesta o firma de contratos.
-              </p>
-            </div>
-
-            <div style="margin-bottom: 24px; text-align: left; padding: 0 4px;">
-              <label class="m3-checkbox-container" for="wizard-accept-eula">
-                <input type="checkbox" id="wizard-accept-eula" />
-                <span class="m3-checkbox-control"></span>
-                <span class="m3-checkbox-text" style="font-size: 12px; line-height: 1.4; color: var(--color-on-surface);">
-                  He leído y acepto los Términos de Uso, el Descargo de Responsabilidad y confirmo que utilizaré esta herramienta conforme a la normativa de protección de datos (RGPD/LOPDGDD).
-                </span>
-              </label>
-            </div>
-
-            <div class="m3-dialog-actions" style="justify-content: space-between; align-items: center; width: 100%;">
-              <button type="button" id="wizard-restore-btn" class="m3-btn m3-btn-text" style="font-size: 13px;">Restaurar Copia de Seguridad</button>
-              <button type="button" id="wizard-next-btn" class="m3-btn" disabled>Comenzar Configuración</button>
-            </div>
-          </div>
-
-          <!-- Paso 2: Datos de la Consultora -->
-          <div id="wizard-step-2" class="wizard-step" style="display: none;">
-            <h3 class="m3-dialog-title" style="margin-bottom: 8px;">Datos de tu Consultora</h3>
-            <p class="text-muted" style="font-size: 13px; margin-bottom: 20px; line-height: 1.4;">
-              Estos datos se utilizarán para personalizar el pie de página e inyectar el logotipo en la cabecera de tus informes PDF.
-            </p>
-
-            <form id="wizard-form">
-              <div class="m3-field">
-                <label class="m3-label" for="wizard-company-name">Nombre de la Consultora *</label>
-                <input type="text" id="wizard-company-name" class="m3-input" placeholder="Ej. Ahorro Energético S.L." required />
-              </div>
-
-              <div class="m3-field">
-                <label class="m3-label" for="wizard-company-logo">Logotipo de la Empresa (Opcional)</label>
-                <input type="file" id="wizard-company-logo" class="m3-input" accept=".svg, .png, .jpg, .jpeg, .webp, .avif" style="padding-top: 10px; cursor: pointer;" />
-                <span class="text-muted" style="font-size: 11px; margin-top: 4px;">Formatos: SVG, PNG, JPG, WebP, AVIF. Si no se sube nada, se usará el icono de bombilla por defecto.</span>
-              </div>
-
-              <div class="m3-field">
-                <label class="m3-label" for="wizard-company-street">Calle</label>
-                <input type="text" id="wizard-company-street" class="m3-input" placeholder="Ej. Calle Mayor" />
-              </div>
-
-              <div class="m3-field-row">
-                <div class="m3-field">
-                  <label class="m3-label" for="wizard-company-number">Número</label>
-                  <input type="text" id="wizard-company-number" class="m3-input" placeholder="Ej. 12" />
-                </div>
-                <div class="m3-field">
-                  <label class="m3-label" for="wizard-company-cp">Código Postal</label>
-                  <input type="text" id="wizard-company-cp" class="m3-input" placeholder="Ej. 28001" />
-                </div>
-              </div>
-
-              <div class="m3-field-row">
-                <div class="m3-field">
-                  <label class="m3-label" for="wizard-company-city">Ciudad</label>
-                  <input type="text" id="wizard-company-city" class="m3-input" placeholder="Ej. Madrid" />
-                </div>
-                <div class="m3-field">
-                  <label class="m3-label" for="wizard-company-province">Provincia</label>
-                  <input type="text" id="wizard-company-province" class="m3-input" placeholder="Ej. Madrid" />
-                </div>
-              </div>
-
-              <div class="m3-field-row">
-                <div class="m3-field">
-                  <label class="m3-label" for="wizard-company-web">Página Web</label>
-                  <input type="url" id="wizard-company-web" class="m3-input" placeholder="Ej. https://misitio.com" />
-                </div>
-                <div class="m3-field">
-                  <label class="m3-label" for="wizard-company-email">Email de Contacto</label>
-                  <input type="email" id="wizard-company-email" class="m3-input" placeholder="Ej. info@misitio.com" />
-                </div>
-              </div>
-
-              <div class="m3-field" style="max-width: 50%;">
-                <label class="m3-label" for="wizard-company-phone">Teléfono de Contacto</label>
-                <input type="tel" id="wizard-company-phone" class="m3-input" placeholder="Ej. +34 600 000 000" />
-              </div>
-
-              <div class="m3-dialog-actions" style="margin-top: 24px;">
-                <button type="button" id="wizard-back-btn" class="m3-btn m3-btn-text">Atrás</button>
-                <button type="submit" class="m3-btn">Finalizar y Guardar</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
       <!-- DIÁLOGO: DOBLE CONFIRMACIÓN RESTABLECIMIENTO -->
       <div id="dialog-reset-confirm" class="m3-dialog-overlay">
         <div class="m3-dialog" style="border-left: 6px solid var(--color-error);">
@@ -1846,6 +2410,174 @@
         </div>
       </div>
 
+      <!-- DIÁLOGO: DETECCIÓN Y CONVERSIÓN DE CODIFICACIÓN CSV (WINDOWS-1252 / LATIN-1) -->
+      <div id="dialog-csv-encoding" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 520px;">
+          <h3 class="m3-dialog-title" style="color: var(--color-primary); display: flex; align-items: center; gap: 10px;">
+            <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: currentColor;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+            Codificación no UTF-8 Detectada
+          </h3>
+          <p id="dialog-csv-encoding-file" style="font-weight: 600; font-size: 13.5px; color: var(--color-primary); margin-top: 10px; margin-bottom: 12px;"></p>
+          <p style="margin-bottom: 16px; font-size: 13.5px; line-height: 1.5; color: var(--color-on-surface-variant);">
+            El archivo seleccionado está codificado en formato <strong>Windows-1252 / Latin-1</strong> (típico de exportaciones de Microsoft Excel en español).
+          </p>
+          <div style="background-color: var(--color-surface-variant); padding: 14px 16px; border-radius: var(--radius-sm); margin-bottom: 24px; border-left: 4px solid var(--color-primary); font-size: 13px; line-height: 1.5;">
+            Para prevenir que los caracteres especiales (<code>Ñ</code>, <code>ñ</code>, tildes, <code>º</code>) se corrompan, ¿deseas convertir el contenido a UTF-8 antes de continuar con la importación?
+          </div>
+          <div class="m3-dialog-actions" style="display: flex; gap: 8px; justify-content: flex-end;">
+            <button type="button" id="btn-csv-encoding-cancel" class="m3-btn m3-btn-text">Cancelar</button>
+            <button type="button" id="btn-csv-encoding-convert" class="m3-btn">Convertir a UTF-8 y Continuar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: ADVERTENCIA DE CODIFICACIÓN NO COMPATIBLE -->
+      <div id="dialog-csv-encoding-invalid" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 480px;">
+          <h3 class="m3-dialog-title" style="color: var(--color-error); display: flex; align-items: center; gap: 10px;">
+            <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: currentColor;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            Formato de Archivo No Compatible
+          </h3>
+          <p style="margin-top: 12px; margin-bottom: 20px; font-size: 13.5px; line-height: 1.5; color: var(--color-on-surface-variant);">
+            El archivo seleccionado utiliza una codificación no reconocida. Por favor, guarda el archivo en formato <strong>CSV UTF-8 (delimitado por comas)</strong> desde Microsoft Excel o LibreOffice antes de volver a intentarlo.
+          </p>
+          <div class="m3-dialog-actions" style="display: flex; justify-content: flex-end;">
+            <button type="button" id="btn-csv-encoding-invalid-close" class="m3-btn">Entendido</button>
+          </div>
+        </div>
+      <!-- DIÁLOGO: POP-UP DE PROGRAMACIÓN DE RENOVACIÓN DESDE EL HISTORIAL (AL ACEPTAR ESTUDIO) -->
+      <div id="dialog-create-renewal-from-history" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width: 540px; border-left: 6px solid var(--color-primary);">
+          <h3 class="m3-dialog-title" style="color: var(--color-primary); display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+            <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: currentColor;"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z"/></svg>
+            Programar Renovación en Calendario
+          </h3>
+          <p style="font-size: 13px; color: var(--color-on-surface-variant); margin-top: 0; margin-bottom: 16px; line-height: 1.4;">
+            Al marcar esta comparativa como <strong>Aceptada</strong>, se da por sentado la firma del contrato. Configura la renovación para recibir un aviso antes de que caduque.
+          </p>
+
+          <form id="form-renewal-from-history">
+            <div class="dialog-form-content">
+              <div style="background-color: var(--color-surface-variant); padding: 12px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 13px; line-height: 1.5;">
+                <div><strong>Cliente:</strong> <span id="hist-ren-client-name">-</span></div>
+                <div><strong>CUPS / Suministro:</strong> <span id="hist-ren-cups">-</span></div>
+                <div><strong>Contratado:</strong> <span id="hist-ren-offer">-</span></div>
+              </div>
+
+              <div class="m3-field-row">
+                <div class="m3-field">
+                  <label class="m3-label" for="hist-ren-date-start">Fecha de Firma / Inicio *</label>
+                  <input type="date" id="hist-ren-date-start" class="m3-input" required />
+                </div>
+                <div class="m3-field">
+                  <label class="m3-label" for="hist-ren-duration">Duración del Contrato</label>
+                  <select id="hist-ren-duration" class="m3-input m3-select">
+                    <option value="12" selected>12 meses (1 Año)</option>
+                    <option value="24">24 meses (2 Años)</option>
+                    <option value="36">36 meses (3 Años)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="m3-field">
+                <label class="m3-label" for="hist-ren-date-end">Fecha de Vencimiento Calculada *</label>
+                <input type="date" id="hist-ren-date-end" class="m3-input" required />
+              </div>
+
+              <div class="m3-field">
+                <label class="m3-label" for="hist-ren-notes">Notas / Observaciones de la Renovación (Opcional)</label>
+                <input type="text" id="hist-ren-notes" class="m3-input" placeholder="Ej. Revisar permanencia en octubre..." />
+              </div>
+            </div>
+
+            <div class="m3-dialog-actions" style="margin-top: 20px; display: flex; gap: 8px; justify-content: flex-end;">
+              <button type="button" id="btn-cancel-renewal-from-history" class="m3-btn m3-btn-text">Omitir</button>
+              <button type="submit" id="btn-save-renewal-from-history" class="m3-btn">Guardar Renovación</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- DIÁLOGO: FORMULARIO DE RENOVACIÓN MANUAL (CREAR / EDITAR) -->
+    <div id="dialog-renewal-form" class="m3-dialog-overlay">
+      <div class="m3-dialog" style="max-width: 540px;">
+        <h3 id="dialog-renewal-form-title" class="m3-dialog-title" style="color: var(--color-primary);">Nueva Renovación de Contrato</h3>
+        
+        <form id="form-renewal-manual" style="margin-top: 16px;">
+          <div class="dialog-form-content">
+            <input type="hidden" id="manual-ren-id" value="" />
+            
+            <div class="m3-field" style="position: relative;">
+              <label class="m3-label" for="manual-ren-client-search">Buscar Cliente Existente *</label>
+              <input type="text" id="manual-ren-client-search" class="m3-input" placeholder="🔍 Escribe nombre de empresa, particular o CIF..." autocomplete="off" required />
+              <input type="hidden" id="manual-ren-client-id" value="" />
+              <div id="manual-ren-client-suggestions" class="m3-autocomplete-suggestions" style="display:none; position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: var(--shadow-2);"></div>
+            </div>
+
+            <div class="m3-field-row">
+              <div class="m3-field">
+                <label class="m3-label" for="manual-ren-tipo">Tipo Suministro</label>
+                <select id="manual-ren-tipo" class="m3-input m3-select">
+                  <option value="Luz">Luz</option>
+                  <option value="Gas">Gas</option>
+                  <option value="Dual">Dual (Luz + Gas)</option>
+                </select>
+              </div>
+              <div class="m3-field">
+                <label class="m3-label" for="manual-ren-cups">CUPS (Opcional)</label>
+                <input type="text" id="manual-ren-cups" class="m3-input" placeholder="Ej. ES00..." />
+              </div>
+            </div>
+
+            <div class="m3-field-row">
+              <div class="m3-field" style="position: relative;">
+                <label class="m3-label" for="manual-ren-comercializadora">Comercializadora Actual</label>
+                <input type="text" id="manual-ren-comercializadora" class="m3-input" placeholder="🔍 Buscar comercializadora..." autocomplete="off" />
+                <div id="manual-ren-comercializadora-suggestions" class="m3-autocomplete-suggestions" style="display:none; position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: var(--shadow-2);"></div>
+              </div>
+              <div class="m3-field" style="position: relative;">
+                <label class="m3-label" for="manual-ren-tarifa">Tarifa Actual</label>
+                <input type="text" id="manual-ren-tarifa" class="m3-input" placeholder="🔍 Buscar tarifa..." autocomplete="off" />
+                <div id="manual-ren-tarifa-suggestions" class="m3-autocomplete-suggestions" style="display:none; position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: var(--shadow-2);"></div>
+              </div>
+            </div>
+
+            <div class="m3-field-row">
+              <div class="m3-field">
+                <label class="m3-label" for="manual-ren-date-start">Fecha Inicio Contrato / Firma *</label>
+                <input type="date" id="manual-ren-date-start" class="m3-input" required />
+              </div>
+              <div class="m3-field">
+                <label class="m3-label" for="manual-ren-duration">Duración del Contrato (meses) *</label>
+                <input type="number" id="manual-ren-duration" class="m3-input" value="12" min="1" max="99" step="1" placeholder="12" oninput="if(this.value.length > 2) this.value = this.value.slice(0, 2);" required />
+              </div>
+            </div>
+
+            <div class="m3-field">
+              <label class="m3-label" for="manual-ren-date-end">Fecha Vencimiento Contrato *</label>
+              <input type="date" id="manual-ren-date-end" class="m3-input" required />
+            </div>
+
+            <div style="background-color: var(--color-surface-variant); padding: 12px 14px; border-radius: var(--radius-md); margin-bottom: 16px; border-left: 4px solid var(--color-primary);">
+              <p style="margin: 0; font-size: 12px; line-height: 1.4; color: var(--color-on-surface-variant);">
+                <strong>🔔 Recordatorios Programados Automáticamente:</strong> Cada renovación activa los 3 niveles globales (🔵 Antelación, 🟡 Recomendado y 🔴 Urgente). Puedes modificar los días por defecto de estos avisos en <em>Configuración ➔ Parámetros</em>.
+              </p>
+            </div>
+
+            <div class="m3-field">
+              <label class="m3-label" for="manual-ren-notes">Notas / Observaciones de la Renovación</label>
+              <input type="text" id="manual-ren-notes" class="m3-input" placeholder="Ej. Avisar al cliente para enviarle propuesta..." />
+            </div>
+          </div>
+
+          <div class="m3-dialog-actions" style="margin-top: 20px; display: flex; gap: 8px; justify-content: flex-end;">
+            <button type="button" id="btn-cancel-renewal-manual" class="m3-btn m3-btn-text">Cancelar</button>
+            <button type="submit" id="btn-save-renewal-manual" class="m3-btn">Guardar Renovación</button>
+          </div>
+        </form>
+      </div>
     </div>
   </body>
 </html>

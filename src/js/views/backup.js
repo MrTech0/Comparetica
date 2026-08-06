@@ -1,5 +1,26 @@
 /* src/js/views/backup.js */
 
+// Cargar la configuración de copias de seguridad actual
+export async function loadBackupConfig() {
+  const dirInput = document.getElementById('backup-directory-input');
+  const retentionInput = document.getElementById('backup-retention-input');
+
+  if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+    try {
+      const currentDir = await window.__TAURI__.core.invoke('get_backup_directory');
+      if (dirInput) dirInput.value = currentDir;
+      
+      const currentDays = await window.__TAURI__.core.invoke('get_backup_retention');
+      if (retentionInput) retentionInput.value = currentDays;
+    } catch (err) {
+      console.error("Error al cargar la configuración de copias de seguridad:", err);
+    }
+  } else {
+    if (dirInput) dirInput.value = "Modo Navegador (Sin ruta local)";
+    if (retentionInput) retentionInput.value = 7;
+  }
+}
+
 export function initBackupView() {
   const exportBtn = document.getElementById('export-backup-btn');
   const importBtn = document.getElementById('import-backup-btn');
@@ -7,24 +28,6 @@ export function initBackupView() {
   const changeDirBtn = document.getElementById('change-backup-dir-btn');
   const resetDirBtn = document.getElementById('reset-backup-dir-btn');
   const retentionInput = document.getElementById('backup-retention-input');
-
-  // Cargar la configuración de copias de seguridad actual
-  async function loadBackupConfig() {
-    if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-      try {
-        const currentDir = await window.__TAURI__.core.invoke('get_backup_directory');
-        if (dirInput) dirInput.value = currentDir;
-        
-        const currentDays = await window.__TAURI__.core.invoke('get_backup_retention');
-        if (retentionInput) retentionInput.value = currentDays;
-      } catch (err) {
-        console.error("Error al cargar la configuración de copias de seguridad:", err);
-      }
-    } else {
-      if (dirInput) dirInput.value = "Modo Navegador (Sin ruta local)";
-      if (retentionInput) retentionInput.value = 7;
-    }
-  }
 
   loadBackupConfig();
 
@@ -38,9 +41,10 @@ export function initBackupView() {
 
       try {
         changeDirBtn.disabled = true;
-        const selectedPath = await window.__TAURI__.core.invoke('select_backup_directory');
-        const savedPath = await window.__TAURI__.core.invoke('set_backup_directory', { path: selectedPath });
+        const selectedParent = await window.__TAURI__.core.invoke('select_backup_directory');
+        const savedPath = await window.__TAURI__.core.invoke('setup_backup_directory', { parentPath: selectedParent });
         if (dirInput) dirInput.value = savedPath;
+        window.showToast("⚡ Ubicación de copias de seguridad actualizada a Comparetica_backups.", "success");
       } catch (error) {
         if (error !== "Cancelado por el usuario") {
           window.showToast(`Error al configurar el directorio: ${error}`, "error");
@@ -61,9 +65,9 @@ export function initBackupView() {
 
       try {
         resetDirBtn.disabled = true;
-        const savedPath = await window.__TAURI__.core.invoke('set_backup_directory', { path: "" });
+        const savedPath = await window.__TAURI__.core.invoke('setup_backup_directory', { parentPath: null });
         if (dirInput) dirInput.value = savedPath;
-        window.showToast("Ubicación de copia automática restablecida al directorio Home del usuario.", "success");
+        window.showToast("Ubicación de copia automática restablecida a la carpeta Comparetica_backups en la Home del usuario.", "success");
       } catch (error) {
         window.showToast(`Error al restablecer el directorio: ${error}`, "error");
       } finally {

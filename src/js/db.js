@@ -341,12 +341,13 @@ async function initSchema(db) {
         ahorro_gas_anual REAL DEFAULT 0.0,
         comision_total REAL DEFAULT 0.0,
         estado TEXT NOT NULL DEFAULT 'Pendiente de aceptación',
+        estado_cambiado_en TEXT,
         FOREIGN KEY (tarifa_luz_propuesta_id) REFERENCES tarifas_luz(id) ON DELETE SET NULL,
         FOREIGN KEY (tarifa_gas_propuesta_id) REFERENCES tarifas_gas(id) ON DELETE SET NULL
     );
   `);
 
-  // Migración dinámica para añadir columna 'estado' a la tabla 'comparativas' si no existe
+  // Migración dinámica para añadir columnas a la tabla 'comparativas' si no existen
   try {
     const columns = await db.select("PRAGMA table_info(comparativas);");
     const hasEstado = columns.some(c => c.name === 'estado');
@@ -359,8 +360,63 @@ async function initSchema(db) {
       await db.execute("ALTER TABLE comparativas ADD COLUMN estado_cambiado_en TEXT;");
       console.log("Migración completada: Columna 'estado_cambiado_en' añadida a 'comparativas'.");
     }
+    const hasAhorroGas = columns.some(c => c.name === 'ahorro_gas_anual');
+    if (!hasAhorroGas) {
+      await db.execute("ALTER TABLE comparativas ADD COLUMN ahorro_gas_anual REAL DEFAULT 0.0;");
+      console.log("Migración completada: Columna 'ahorro_gas_anual' añadida a 'comparativas'.");
+    }
+    const hasComisionTotal = columns.some(c => c.name === 'comision_total');
+    if (!hasComisionTotal) {
+      await db.execute("ALTER TABLE comparativas ADD COLUMN comision_total REAL DEFAULT 0.0;");
+      console.log("Migración completada: Columna 'comision_total' añadida a 'comparativas'.");
+    }
+    const hasEstadoCobro = columns.some(c => c.name === 'estado_cobro');
+    if (!hasEstadoCobro) {
+      await db.execute("ALTER TABLE comparativas ADD COLUMN estado_cobro TEXT NOT NULL DEFAULT 'Pendiente';");
+      console.log("Migración completada: Columna 'estado_cobro' añadida a 'comparativas'.");
+    }
+    const hasFechaCobro = columns.some(c => c.name === 'fecha_cobro');
+    if (!hasFechaCobro) {
+      await db.execute("ALTER TABLE comparativas ADD COLUMN fecha_cobro TEXT;");
+      console.log("Migración completada: Columna 'fecha_cobro' añadida a 'comparativas'.");
+    }
+    const hasEstadoContrato = columns.some(c => c.name === 'estado_contrato');
+    if (!hasEstadoContrato) {
+      await db.execute("ALTER TABLE comparativas ADD COLUMN estado_contrato TEXT NOT NULL DEFAULT 'Pendiente';");
+      console.log("Migración completada: Columna 'estado_contrato' añadida a 'comparativas'.");
+    }
+    const hasMotivoScoring = columns.some(c => c.name === 'motivo_rechazo_scoring');
+    if (!hasMotivoScoring) {
+      await db.execute("ALTER TABLE comparativas ADD COLUMN motivo_rechazo_scoring TEXT DEFAULT '';");
+      console.log("Migración completada: Columna 'motivo_rechazo_scoring' añadida a 'comparativas'.");
+    }
+
+    // Crear tabla 'puntos_suministro' si no existe
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS puntos_suministro (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cliente_id INTEGER NOT NULL,
+        cups TEXT NOT NULL,
+        direccion_alias TEXT,
+        tipo_energia TEXT DEFAULT 'LUZ',
+        notas TEXT,
+        creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Migración automática: Copiar CUPS de 'clientes' a 'puntos_suministro'
+    await db.execute(`
+      INSERT INTO puntos_suministro (cliente_id, cups, direccion_alias, tipo_energia)
+      SELECT c.id, c.cups, 'Principal', 'LUZ'
+      FROM clientes c
+      WHERE c.cups IS NOT NULL AND c.cups != ''
+        AND NOT EXISTS (
+            SELECT 1 FROM puntos_suministro ps WHERE ps.cliente_id = c.id AND ps.cups = c.cups
+        );
+    `);
   } catch (e) {
-    console.error("Error al migrar la tabla comparativas:", e);
+    console.error("Error al migrar tablas en initSchema:", e);
   }
 }
 
@@ -368,8 +424,8 @@ async function initSchema(db) {
  * Implementa una base de datos mockizada si el entorno no es Tauri (útil para pruebas básicas en navegador).
  */
 function createMockDb() {
-  console.warn("Usando base de datos mock local (en memoria/localStorage)");
   const mockStorage = {
+    clientes: JSON.parse(localStorage.getItem('mock_clientes') || '[]'),
     comercializadoras: JSON.parse(localStorage.getItem('mock_comercializadoras') || '[]'),
     tarifas_luz: JSON.parse(localStorage.getItem('mock_tarifas_luz') || '[]'),
     tarifas_gas: JSON.parse(localStorage.getItem('mock_tarifas_gas') || '[]'),
@@ -640,6 +696,35 @@ function createMockDb() {
         save();
         return { rowsAffected: 1 };
       }
+      if (query.includes("INSERT INTO renovaciones")) {
+        if (!mockStorage.renovaciones) mockStorage.renovaciones = [];
+        const id = mockStorage.renovaciones.length + 1;
+        mockStorage.renovaciones.push({
+          id,
+          cliente_id: params[0],
+          tipo_energia: params[1],
+          cups: params[2],
+          comercializadora_actual: params[3],
+          tarifa_actual: params[4],
+          fecha_firma: params[5],
+          duracion_meses: params[6],
+          fecha_vencimiento: params[7],
+          notas: params[8],
+          estado_renovacion: 'Pendiente',
+          creado_en: new Date().toISOString()
+        });
+        save();
+        return { lastInsertId: id, rowsAffected: 1 };
+      }
+      if (query.includes("UPDATE renovaciones")) {
+        if (mockStorage.renovaciones) {
+          const id = params[1];
+          const ren = mockStorage.renovaciones.find(r => r.id === id);
+          if (ren) ren.estado_renovacion = params[0];
+          save();
+        }
+        return { rowsAffected: 1 };
+      }
       return { lastInsertId: 0, rowsAffected: 0 };
     },
     async select(query, params = []) {
@@ -665,11 +750,62 @@ function createMockDb() {
           creado_en: t.creado_en || new Date().toISOString().replace('T', ' ').substring(0, 19)
         }));
       }
+      if (query.includes("FROM renovaciones")) {
+        const list = mockStorage.renovaciones || [];
+        return list.map(r => {
+          const client = (mockStorage.clientes || []).find(c => c.id === r.cliente_id) || {};
+          return {
+            ...r,
+            cliente_nombre: client.nombre_empresa || 'Cliente Mock',
+            cliente_cif: client.cif || ''
+          };
+        });
+      }
       if (query.includes("FROM comparativas")) {
         return mockStorage.comparativas;
       }
       if (query.includes("FROM clientes")) {
-        return mockStorage.clientes;
+        let clientsList = (mockStorage.clientes || []).map(c => {
+          const agent = (mockStorage.agentes || []).find(a => a.id === c.agente_id);
+          return {
+            ...c,
+            agente_nombre: agent ? agent.nombre : null
+          };
+        });
+
+        // Manejo de búsqueda en mock DB
+        if (query.includes("LIKE") && params && params.length > 0) {
+          const rawSearch = (params[0] || '').toString().replace(/%/g, '').toLowerCase();
+          if (rawSearch) {
+            clientsList = clientsList.filter(c =>
+              (c.nombre_empresa && c.nombre_empresa.toLowerCase().includes(rawSearch)) ||
+              (c.cif && c.cif.toLowerCase().includes(rawSearch)) ||
+              (c.cups && c.cups.toLowerCase().includes(rawSearch))
+            );
+          }
+        }
+
+        if (query.includes("COUNT(*)")) {
+          return [{ total: clientsList.length, "COUNT(*)": clientsList.length }];
+        }
+
+        // Ordenar alfabéticamente
+        clientsList.sort((a, b) => (a.nombre_empresa || '').localeCompare(b.nombre_empresa || ''));
+
+        // Paginación o límite
+        if (query.includes("LIMIT")) {
+          const limit = params[params.length - 2];
+          const offset = params[params.length - 1];
+          if (typeof limit === 'number' && typeof offset === 'number') {
+            clientsList = clientsList.slice(offset, offset + limit);
+          } else if (typeof offset === 'number') {
+            clientsList = clientsList.slice(offset);
+          } else if (typeof limit === 'number') {
+            clientsList = clientsList.slice(0, limit);
+          }
+        }
+
+        return clientsList;
       }
       return [];
     }
@@ -1021,8 +1157,8 @@ export async function clearAllTables() {
  */
 export async function getClientes() {
   const db = await getDb();
-  if (window.__TAURI__ && window.__TAURI__.sql) {
-    return await db.select(`
+  try {
+    const clients = await db.select(`
       SELECT c.*, 
              EXISTS (
                SELECT 1 FROM comparativas comp 
@@ -1031,17 +1167,132 @@ export async function getClientes() {
       FROM clientes c
       ORDER BY c.nombre_empresa ASC;
     `);
-  } else {
-    // Modo mock
-    const mockClients = await db.select("SELECT * FROM clientes;");
-    const mockComps = await db.select("SELECT * FROM comparativas;");
-    return mockClients.map(c => {
-      const tieneAceptada = mockComps.some(comp => comp.cliente_nombre === c.nombre_empresa && comp.estado === 'Aceptada');
-      return {
-        ...c,
-        tiene_aceptada: tieneAceptada ? 1 : 0
-      };
-    }).sort((a, b) => a.nombre_empresa.localeCompare(b.nombre_empresa));
+    return Array.isArray(clients) ? clients : [];
+  } catch (err) {
+    console.error("Error al obtener lista de clientes:", err);
+    return [];
+  }
+}
+
+/**
+ * Obtiene una página de clientes ordenados alfabéticamente con recuento total de registros y soporte de filtro.
+ * @param {number} page Número de página (1-based).
+ * @param {number} pageSize Tamaño de página (por defecto 25).
+ * @param {string} search Término opcional de búsqueda (nombre, CIF o CUPS).
+ * @returns {Promise<{clients: Array<Object>, totalCount: number, page: number, pageSize: number, totalPages: number}>}
+ */
+export async function getClientesPaginated(page = 1, pageSize = 25, search = '', agentId = null) {
+  const db = await getDb();
+  const validPage = Math.max(1, parseInt(page, 10) || 1);
+  const validPageSize = Math.max(1, parseInt(pageSize, 10) || 25);
+  const offset = (validPage - 1) * validPageSize;
+  const cleanSearch = (search || '').trim();
+
+  try {
+    let whereClauses = [];
+    let params = [];
+
+    if (cleanSearch.length > 0) {
+      whereClauses.push(`(c.nombre_empresa LIKE ? OR c.cif LIKE ? OR c.cups LIKE ?)`);
+      const pattern = `%${cleanSearch}%`;
+      params.push(pattern, pattern, pattern);
+    }
+
+    if (agentId !== null && agentId !== '' && !isNaN(parseInt(agentId, 10))) {
+      whereClauses.push(`c.agente_id = ?`);
+      params.push(parseInt(agentId, 10));
+    }
+
+    const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    // 1. Obtener recuento total
+    const countSql = `SELECT COUNT(*) AS total FROM clientes c ${whereClause};`;
+    const countRes = await db.select(countSql, params);
+    let totalCount = 0;
+    if (Array.isArray(countRes) && countRes.length > 0) {
+      totalCount = parseInt(countRes[0].total || countRes[0]['COUNT(*)'] || 0, 10) || 0;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(totalCount / validPageSize));
+
+    // 2. Obtener registros paginados incluyendo el nombre del agente comercial
+    const selectSql = `
+      SELECT c.*, a.nombre AS agente_nombre,
+             EXISTS (
+               SELECT 1 FROM comparativas comp 
+               WHERE comp.cliente_nombre = c.nombre_empresa AND comp.estado = 'Aceptada'
+             ) AS tiene_aceptada
+      FROM clientes c
+      LEFT JOIN agentes a ON c.agente_id = a.id
+      ${whereClause}
+      ORDER BY c.nombre_empresa ASC
+      LIMIT ? OFFSET ?;
+    `;
+    const queryParams = [...params, validPageSize, offset];
+    const clients = await db.select(selectSql, queryParams);
+
+    return {
+      clients: Array.isArray(clients) ? clients : [],
+      totalCount,
+      page: validPage,
+      pageSize: validPageSize,
+      totalPages
+    };
+  } catch (err) {
+    console.error("Error al obtener clientes paginados:", err);
+    return {
+      clients: [],
+      totalCount: 0,
+      page: validPage,
+      pageSize: validPageSize,
+      totalPages: 1
+    };
+  }
+}
+
+/**
+ * Obtiene los primeros N clientes para selectores desplegables sin sobrecargar la memoria del DOM.
+ * @param {number} limit Número máximo de clientes a recuperar.
+ */
+export async function getClientesForSelect(limit = 100) {
+  const db = await getDb();
+  try {
+    const clients = await db.select(`
+      SELECT id, nombre_empresa, cif, cups
+      FROM clientes
+      ORDER BY nombre_empresa ASC
+      LIMIT ?;
+    `, [limit]);
+    return Array.isArray(clients) ? clients : [];
+  } catch (err) {
+    console.error("Error al obtener clientes para selector:", err);
+    return [];
+  }
+}
+
+/**
+ * Busca clientes por nombre, CIF o CUPS con un límite estricto para evitar bloqueos del DOM.
+ * @param {string} term Término de búsqueda.
+ * @param {number} limit Límite máximo de resultados.
+ */
+export async function searchClientes(term, limit = 50) {
+  const db = await getDb();
+  if (!term || term.trim().length === 0) {
+    return await getClientesForSelect(limit);
+  }
+  try {
+    const pattern = `%${term.trim()}%`;
+    const clients = await db.select(`
+      SELECT id, nombre_empresa, cif, cups
+      FROM clientes
+      WHERE nombre_empresa LIKE ? OR cif LIKE ? OR cups LIKE ?
+      ORDER BY nombre_empresa ASC
+      LIMIT ?;
+    `, [pattern, pattern, pattern, limit]);
+    return Array.isArray(clients) ? clients : [];
+  } catch (err) {
+    console.error("Error al buscar clientes:", err);
+    return [];
   }
 }
 
@@ -1051,13 +1302,15 @@ export async function getClientes() {
  * @param {string} cif - DNI/CIF fiscal único.
  * @param {string} representante - Nombre del representante o contacto (opcional).
  * @param {string} cups - Código CUPS (opcional).
+ * @param {string} email - Correo electrónico de contacto (opcional).
+ * @param {number|null} agenteId - ID del agente comercial asignado.
  * @returns {Promise<Object>} Resultado de la inserción.
  */
-export async function addCliente(nombre, cif, representante, cups, email = null) {
+export async function addCliente(nombre, cif, representante, cups, email = null, agenteId = null) {
   const db = await getDb();
   return await db.execute(
-    "INSERT INTO clientes (nombre_empresa, cif, representante, cups, email) VALUES ($1, $2, $3, $4, $5);",
-    [nombre, cif, representante, cups, email]
+    "INSERT INTO clientes (nombre_empresa, cif, representante, cups, email, agente_id) VALUES ($1, $2, $3, $4, $5, $6);",
+    [nombre, cif, representante, cups, email, agenteId]
   );
 }
 
@@ -1069,14 +1322,129 @@ export async function addCliente(nombre, cif, representante, cups, email = null)
  * @param {string} representante - Nombre del representante (opcional).
  * @param {string} cups - Código CUPS (opcional).
  * @param {string} email - Correo electrónico de contacto (opcional).
+ * @param {number|null} agenteId - ID del agente comercial asignado.
  * @returns {Promise<Object>} Resultado de la actualización.
  */
-export async function updateCliente(id, nombre, cif, representante, cups, email = null) {
+export async function updateCliente(id, nombre, cif, representante, cups, email = null, agenteId = null) {
   const db = await getDb();
   return await db.execute(
-    "UPDATE clientes SET nombre_empresa = $1, cif = $2, representante = $3, cups = $4, email = $5 WHERE id = $6;",
-    [nombre, cif, representante, cups, email, id]
+    "UPDATE clientes SET nombre_empresa = $1, cif = $2, representante = $3, cups = $4, email = $5, agente_id = $6 WHERE id = $7;",
+    [nombre, cif, representante, cups, email, agenteId, id]
   );
+}
+
+// --- Gestión de Agentes / Comerciales ---
+
+/**
+ * Obtiene la lista completa de agentes con el recuento de clientes asociados.
+ * @param {boolean} onlyActive Si es true, retorna sólo los agentes activos.
+ * @returns {Promise<Array<Object>>} Lista de agentes.
+ */
+export async function getAgentes(onlyActive = false) {
+  const db = await getDb();
+  try {
+    const where = onlyActive ? "WHERE a.activo = 1" : "";
+    const agents = await db.select(`
+      SELECT a.*, 
+             (SELECT COUNT(*) FROM clientes c WHERE c.agente_id = a.id) AS num_clientes
+      FROM agentes a
+      ${where}
+      ORDER BY a.nombre ASC;
+    `);
+    return Array.isArray(agents) ? agents : [];
+  } catch (err) {
+    console.error("Error al obtener lista de agentes:", err);
+    return [];
+  }
+}
+
+/**
+ * Registra un nuevo agente/comercial.
+ * @param {string} nombre Nombre y apellidos del agente.
+ * @param {string|null} telefono Teléfono de contacto.
+ * @param {string|null} email Email de contacto.
+ */
+export async function addAgente(nombre, telefono = null, email = null) {
+  const db = await getDb();
+  return await db.execute(
+    "INSERT INTO agentes (nombre, telefono, email, activo) VALUES ($1, $2, $3, 1);",
+    [nombre, telefono, email]
+  );
+}
+
+/**
+ * Actualiza la información de un agente existente.
+ */
+export async function updateAgente(id, nombre, telefono = null, email = null) {
+  const db = await getDb();
+  return await db.execute(
+    "UPDATE agentes SET nombre = $1, telefono = $2, email = $3 WHERE id = $4;",
+    [nombre, telefono, email, id]
+  );
+}
+
+/**
+ * Cambia el estado activo/inactivo de un agente.
+ */
+export async function toggleAgenteEstado(id, activo) {
+  const db = await getDb();
+  return await db.execute(
+    "UPDATE agentes SET activo = $1 WHERE id = $2;",
+    [activo ? 1 : 0, id]
+  );
+}
+
+/**
+ * Reasigna en lote todos los clientes de un agente a otro agente de destino.
+ */
+export async function reassignAgenteClientes(oldAgentId, newAgentId) {
+  const db = await getDb();
+  if (oldAgentId === null || oldAgentId === undefined || oldAgentId === '') {
+    return await db.execute(
+      "UPDATE clientes SET agente_id = $1 WHERE agente_id IS NULL;",
+      [newAgentId]
+    );
+  }
+  return await db.execute(
+    "UPDATE clientes SET agente_id = $1 WHERE agente_id = $2 OR agente_id IS NULL;",
+    [newAgentId, oldAgentId]
+  );
+}
+
+/**
+ * Elimina un agente si no tiene clientes asignados.
+ */
+export async function deleteAgente(id) {
+  const db = await getDb();
+  const countRes = await db.select("SELECT COUNT(*) AS total FROM clientes WHERE agente_id = $1;", [id]);
+  const total = countRes && countRes[0] ? (countRes[0].total || countRes[0]['COUNT(*)'] || 0) : 0;
+  if (total > 0) {
+    throw new Error(`TIENE_CLIENTES_ASIGNADOS:${total}`);
+  }
+  return await db.execute("DELETE FROM agentes WHERE id = $1;", [id]);
+}
+
+/**
+ * Comprueba el estado de configuración de agentes para la migración asistida del Agente Principal.
+ */
+export async function checkAgenteSetupStatus() {
+  const db = await getDb();
+  try {
+    const agents = await db.select("SELECT id, nombre FROM agentes WHERE activo = 1 ORDER BY id ASC;");
+    const countAgents = Array.isArray(agents) ? agents.length : 0;
+    
+    const unassignedRes = await db.select("SELECT COUNT(*) AS total FROM clientes WHERE agente_id IS NULL;");
+    const unassignedCount = unassignedRes && unassignedRes[0] ? (unassignedRes[0].total || unassignedRes[0]['COUNT(*)'] || 0) : 0;
+
+    return {
+      hasAgents: countAgents > 0,
+      agents: Array.isArray(agents) ? agents : [],
+      unassignedCount
+    };
+  } catch (err) {
+    console.error("Error al comprobar estado de agentes:", err);
+    return { hasAgents: false, agents: [], unassignedCount: 0 };
+  }
 }
 
 export async function deleteCliente(id) {
@@ -1155,6 +1523,108 @@ export async function updateComparativaEstado(id, nuevoEstado) {
   return await db.execute(
     "UPDATE comparativas SET estado = $1, estado_cambiado_en = $2 WHERE id = $3;",
     [nuevoEstado, cambiadoEn, id]
+  );
+}
+
+/**
+ * Actualiza el estado de tramitación del contrato de una comparativa y el motivo de rechazo por scoring si aplica.
+ * @param {number} id - ID de la comparativa.
+ * @param {string} estadoContrato - 'Pendiente', 'En trámite', 'Firmado y Activado' o 'Rechazado por Scoring'.
+ * @param {string} [motivoRechazoScoring=''] - Motivo opcional del rechazo por scoring.
+ * @returns {Promise<Object>} Resultado de la actualización.
+ */
+export async function updateComparativaContrato(id, estadoContrato, motivoRechazoScoring = '') {
+  const db = await getDb();
+  return await db.execute(
+    "UPDATE comparativas SET estado_contrato = $1, motivo_rechazo_scoring = $2 WHERE id = $3;",
+    [estadoContrato, motivoRechazoScoring || '', id]
+  );
+}
+
+/**
+ * Obtiene todos los puntos de suministro registrados para un cliente específico.
+ * @param {number} clienteId - ID del cliente.
+ * @returns {Promise<Array<Object>>} Listado de puntos de suministro.
+ */
+export async function getPuntosSuministroByCliente(clienteId) {
+  const db = await getDb();
+  if (window.__TAURI__ && window.__TAURI__.sql) {
+    return await db.select(
+      "SELECT * FROM puntos_suministro WHERE cliente_id = $1 ORDER BY id ASC;",
+      [clienteId]
+    );
+  } else {
+    const mockPuntos = JSON.parse(localStorage.getItem('mock_puntos_suministro') || '[]');
+    return mockPuntos.filter(p => p.cliente_id === clienteId);
+  }
+}
+
+/**
+ * Obtiene todos los puntos de suministro registrados en el sistema.
+ * @returns {Promise<Array<Object>>} Listado completo de puntos de suministro.
+ */
+export async function getPuntosSuministroAll() {
+  const db = await getDb();
+  if (window.__TAURI__ && window.__TAURI__.sql) {
+    return await db.select("SELECT ps.*, c.nombre_empresa as cliente_nombre FROM puntos_suministro ps JOIN clientes c ON ps.cliente_id = c.id ORDER BY ps.id ASC;");
+  } else {
+    return JSON.parse(localStorage.getItem('mock_puntos_suministro') || '[]');
+  }
+}
+
+/**
+ * Registra o sincroniza la lista completa de puntos de suministro para un cliente.
+ * @param {number} clienteId - ID del cliente.
+ * @param {Array<Object>} puntosArray - Lista de objetos { cups, direccionAlias, tipoEnergia, notas }.
+ */
+export async function syncPuntosSuministroCliente(clienteId, puntosArray) {
+  const db = await getDb();
+  if (window.__TAURI__ && window.__TAURI__.sql) {
+    // 1. Eliminar puntos actuales del cliente
+    await db.execute("DELETE FROM puntos_suministro WHERE cliente_id = $1;", [clienteId]);
+
+    // 2. Insertar los puntos actualizados
+    for (const p of puntosArray) {
+      if (p.cups && p.cups.trim() !== '') {
+        await db.execute(
+          `INSERT INTO puntos_suministro (cliente_id, cups, direccion_alias, tipo_energia, notas)
+           VALUES ($1, $2, $3, $4, $5);`,
+          [clienteId, p.cups.trim().toUpperCase(), p.direccionAlias || 'Principal', p.tipoEnergia || 'LUZ', p.notas || '']
+        );
+      }
+    }
+  } else {
+    let mockPuntos = JSON.parse(localStorage.getItem('mock_puntos_suministro') || '[]');
+    mockPuntos = mockPuntos.filter(p => p.cliente_id !== clienteId);
+    
+    puntosArray.forEach((p, idx) => {
+      if (p.cups && p.cups.trim() !== '') {
+        mockPuntos.push({
+          id: Date.now() + idx,
+          cliente_id: clienteId,
+          cups: p.cups.trim().toUpperCase(),
+          direccion_alias: p.direccionAlias || 'Principal',
+          tipo_energia: p.tipoEnergia || 'LUZ',
+          notas: p.notas || ''
+        });
+      }
+    });
+    localStorage.setItem('mock_puntos_suministro', JSON.stringify(mockPuntos));
+  }
+}
+
+/**
+ * Actualiza el estado de cobro de una comparativa.
+ * @param {number} id - ID de la comparativa.
+ * @param {string} estadoCobro - 'Pendiente' o 'Cobrado'.
+ * @param {string|null} fechaCobro - Fecha de cobro (YYYY-MM-DD o ISO string).
+ * @returns {Promise<Object>} Resultado de la actualización.
+ */
+export async function updateComparativaCobro(id, estadoCobro, fechaCobro = null) {
+  const db = await getDb();
+  return await db.execute(
+    "UPDATE comparativas SET estado_cobro = $1, fecha_cobro = $2 WHERE id = $3;",
+    [estadoCobro, fechaCobro, id]
   );
 }
 
@@ -1252,37 +1722,24 @@ export async function getSqliteVersion() {
  * Garantiza compatibilidad dinámica si en el futuro se añaden nuevas columnas.
  */
 export async function getClientesSchemaColumns() {
-  const db = await getDb();
-  if (window.__TAURI__) {
-    try {
-      const columnsInfo = await db.select("PRAGMA table_info(clientes);");
-      return columnsInfo
-        .filter(col => col.name !== 'id' && col.name !== 'creado_en')
-        .map(col => ({
-          name: col.name,
-          type: col.type,
-          notnull: col.notnull === 1,
-          label: getHumanLabelForColumn(col.name)
-        }));
-    } catch (e) {
-      console.error("Error al obtener columnas de clientes via PRAGMA:", e);
-    }
-  }
-
-  // Fallback por defecto si no es Tauri o falla PRAGMA
-  return [
+  const baseCols = [
     { name: 'nombre_empresa', type: 'TEXT', notnull: true, label: 'Nombre / Empresa *' },
     { name: 'cif', type: 'TEXT', notnull: true, label: 'CIF / DNI / NIF *' },
+    { name: 'agente_nombre', type: 'TEXT', notnull: false, label: 'Agente / Comercial' },
     { name: 'representante', type: 'TEXT', notnull: false, label: 'Representante' },
     { name: 'cups', type: 'TEXT', notnull: false, label: 'CUPS' },
-    { name: 'email', type: 'TEXT', notnull: false, label: 'Email de Contacto' }
+    { name: 'email', type: 'TEXT', notnull: false, label: 'Email de Contacto' },
+    { name: 'fecha_firma', type: 'TEXT', notnull: false, label: 'Fecha Firma Contrato (Opcional - Renovación)' },
+    { name: 'fecha_vencimiento', type: 'TEXT', notnull: false, label: 'Fecha Vencimiento Contrato (Opcional - Renovación)' }
   ];
+  return baseCols;
 }
 
 function getHumanLabelForColumn(columnName) {
   const labels = {
     nombre_empresa: 'Nombre / Empresa *',
     cif: 'CIF / DNI / NIF *',
+    agente_nombre: 'Agente / Comercial',
     representante: 'Representante',
     cups: 'CUPS',
     email: 'Email de Contacto'
@@ -1300,7 +1757,47 @@ function getHumanLabelForColumn(columnName) {
  * @param {boolean} updateExisting Si es true, actualiza los campos si el CIF ya existe; si es false, los omite.
  */
 export async function importClientesBatch(rows, updateExisting = false) {
-  const db = await getDb();
+  // Pre-procesar mapeo de agente_nombre a agente_id
+  const agentsList = await getAgentes(false);
+  const agentMap = new Map();
+  agentsList.forEach(a => agentMap.set(a.nombre.toLowerCase().trim(), a.id));
+
+  let defaultAgentId = agentsList.find(a => a.activo === 1)?.id || null;
+
+  for (const row of rows) {
+    if (row.agente_nombre && typeof row.agente_nombre === 'string' && row.agente_nombre.trim().length > 0) {
+      const cleanAgentName = row.agente_nombre.trim();
+      const key = cleanAgentName.toLowerCase();
+      if (agentMap.has(key)) {
+        row.agente_id = agentMap.get(key);
+      } else {
+        // Crear agente automáticamente si no existe en el catálogo
+        try {
+          const res = await addAgente(cleanAgentName);
+          const newId = res && res.lastInsertId ? res.lastInsertId : null;
+          if (newId) {
+            agentMap.set(key, newId);
+            row.agente_id = newId;
+            if (!defaultAgentId) defaultAgentId = newId;
+          }
+        } catch (e) {
+          console.error("Error al crear agente automático durante importación:", e);
+        }
+      }
+    }
+    
+    if (!row.agente_id && defaultAgentId) {
+      row.agente_id = defaultAgentId;
+    }
+  }
+
+  if (window.__TAURI__) {
+    const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
+    const [added, updated, skipped] = await invoke('db_import_clientes_batch', { rows, updateExisting });
+    return { added, updated, skipped, errors: [] };
+  }
+
+  // Fallback Mock DB (desarrollo sin Tauri)
   let added = 0;
   let updated = 0;
   let skipped = 0;
@@ -1380,4 +1877,31 @@ export async function importClientesBatch(rows, updateExisting = false) {
   }
 
   return { added, updated, skipped, errors };
+}
+
+/**
+ * Importa en lote renovaciones asociadas a clientes.
+ * @param {Array<Object>} rows Arreglo de objetos con datos de renovación.
+ * @returns {Promise<number>} Número de renovaciones insertadas.
+ */
+export async function importRenovacionesBatch(rows) {
+  if (!rows || rows.length === 0) return 0;
+
+  if (window.__TAURI__) {
+    const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
+    return await invoke('db_import_renovaciones_batch', { rows });
+  }
+
+  let count = 0;
+  if (!mockStorage.renovaciones) mockStorage.renovaciones = [];
+
+  for (const r of rows) {
+    mockStorage.renovaciones.push({
+      id: mockStorage.renovaciones.length + 1,
+      ...r,
+      creado_en: new Date().toISOString()
+    });
+    count++;
+  }
+  return count;
 }

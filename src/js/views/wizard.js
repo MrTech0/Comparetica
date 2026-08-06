@@ -1,15 +1,109 @@
 /* src/js/views/wizard.js */
+import { loadBackupConfig } from './backup.js';
 
-export function initWizard() {
+export async function initWizard() {
   const wizardOverlay = document.getElementById('dialog-welcome-wizard');
-  const step1 = document.getElementById('wizard-step-1');
-  const step2 = document.getElementById('wizard-step-2');
-  const nextBtn = document.getElementById('wizard-next-btn');
-  const backBtn = document.getElementById('wizard-back-btn');
-  const restoreBtn = document.getElementById('wizard-restore-btn');
   const form = document.getElementById('wizard-form');
 
+  const step1 = document.getElementById('wizard-step-1');
+  const step2 = document.getElementById('wizard-step-2');
+  const stepChip = document.getElementById('wizard-step-chip');
+  const stepTitle = document.getElementById('wizard-step-title');
+
+  const nextBtn = document.getElementById('wizard-next-step-btn');
+  const backBtn = document.getElementById('wizard-back-step-btn');
+  const browseBtn = document.getElementById('wizard-backup-browse-btn');
+  const pathInput = document.getElementById('wizard-backup-path-input');
+
   if (!wizardOverlay) return;
+
+  // Cargar ruta por defecto al iniciar
+  let defaultBackupPath = '';
+  let customSelectedParent = '';
+
+  if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+    try {
+      defaultBackupPath = await window.__TAURI__.core.invoke('get_default_backup_path');
+    } catch (err) {
+      console.error("Error al obtener ruta por defecto:", err);
+    }
+  } else {
+    defaultBackupPath = "C:\\Users\\Usuario\\Comparetica_backups";
+  }
+
+  if (pathInput) pathInput.value = defaultBackupPath;
+
+  // Evento "Examinar..." para opción personalizada
+  if (browseBtn) {
+    browseBtn.addEventListener('click', async () => {
+      if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
+        window.showToast("La selección de carpetas solo está disponible en la versión de escritorio.", "info");
+        return;
+      }
+
+      try {
+        const selectedParent = await window.__TAURI__.core.invoke('select_backup_directory');
+        if (selectedParent) {
+          customSelectedParent = selectedParent;
+          if (pathInput) pathInput.value = `${selectedParent}\\Comparetica_backups`;
+        }
+      } catch (err) {
+        if (err !== "Cancelado por el usuario") {
+          window.showToast(`Error al seleccionar carpeta: ${err}`, "error");
+        }
+      }
+    });
+  }
+
+  // Transición Paso 1 -> Paso 2
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      const name = document.getElementById('wizard-company-name').value.trim();
+      const email = document.getElementById('wizard-company-email').value.trim();
+      const phone = document.getElementById('wizard-company-phone').value.trim();
+
+      if (!name) {
+        window.showToast("El Nombre de la Consultora es obligatorio.", "error");
+        document.getElementById('wizard-company-name').focus();
+        return;
+      }
+
+      if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          window.showToast("El formato del correo electrónico no es válido.", "error");
+          return;
+        }
+      }
+
+      if (phone) {
+        const phoneRegex = /^\+?[0-9\s\-]{9,15}$/;
+        if (!phoneRegex.test(phone)) {
+          window.showToast("El formato del teléfono no es válido (debe tener entre 9 y 15 dígitos).", "error");
+          return;
+        }
+      }
+
+      if (step1 && step2) {
+        step1.style.display = 'none';
+        step2.style.display = 'block';
+        if (stepChip) stepChip.textContent = 'Paso 2 de 2';
+        if (stepTitle) stepTitle.textContent = 'Ubicación de Copias de Seguridad';
+      }
+    });
+  }
+
+  // Transición Paso 2 -> Paso 1
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      if (step1 && step2) {
+        step2.style.display = 'none';
+        step1.style.display = 'block';
+        if (stepChip) stepChip.textContent = 'Paso 1 de 2';
+        if (stepTitle) stepTitle.textContent = 'Datos de tu Consultora Energética';
+      }
+    });
+  }
 
   // Comprobar si es el primer arranque
   const isFirstRunCompleted = localStorage.getItem('first_run_completed');
@@ -17,79 +111,7 @@ export function initWizard() {
     wizardOverlay.classList.add('active');
   }
 
-  // Evento de restauración de copia de seguridad en el arranque
-  if (restoreBtn) {
-    restoreBtn.addEventListener('click', async () => {
-      if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
-        window.showToast("Las copias de seguridad nativas solo están disponibles ejecutando la aplicación de escritorio (Tauri).", "info");
-        return;
-      }
-
-      const confirmRestore = await window.showConfirm(
-        "¿Estás seguro de que deseas restaurar una copia de seguridad?\n\n" +
-        "Esta acción eliminará de forma permanente TODOS tus datos locales actuales y los reemplazará por los del archivo de copia de seguridad.\n\n" +
-        "La aplicación se REINICIARÁ automáticamente tras completarse la importación.",
-        "Restaurar Copia de Seguridad"
-      );
-
-      if (!confirmRestore) return;
-
-      try {
-        restoreBtn.disabled = true;
-        restoreBtn.innerText = "Restaurando...";
-
-        const msg = await window.__TAURI__.core.invoke('import_backup');
-        // Marcamos el primer arranque como completado para evitar que el wizard vuelva a salir tras reiniciar
-        localStorage.setItem('first_run_completed', 'true');
-        
-        if (msg === "DEV_MODE") {
-          window.showToast("Copia de seguridad restaurada. Recargando aplicación...", "success");
-          setTimeout(() => {
-            window.location.reload();
-          }, 1500);
-        } else {
-          window.showToast(msg, "success");
-        }
-      } catch (error) {
-        if (error !== "Cancelado por el usuario") {
-          window.showToast(`Error al importar la copia de seguridad: ${error}`, "error");
-        }
-      } finally {
-        restoreBtn.disabled = false;
-        restoreBtn.innerText = "Restaurar Copia de Seguridad";
-      }
-    });
-  }
-
-  // Habilitar/deshabilitar botón Siguiente según aceptación de EULA
-  const acceptEulaCheckbox = document.getElementById('wizard-accept-eula');
-  if (acceptEulaCheckbox && nextBtn) {
-    nextBtn.disabled = !acceptEulaCheckbox.checked;
-    acceptEulaCheckbox.addEventListener('change', () => {
-      nextBtn.disabled = !acceptEulaCheckbox.checked;
-    });
-  }
-
-  // Eventos de navegación entre pasos
-  if (nextBtn && step1 && step2) {
-    nextBtn.addEventListener('click', () => {
-      if (acceptEulaCheckbox && !acceptEulaCheckbox.checked) {
-        window.showToast("Debe aceptar los términos de uso y descargo de responsabilidad para continuar.", "warning");
-        return;
-      }
-      step1.style.display = 'none';
-      step2.style.display = 'block';
-    });
-  }
-
-  if (backBtn && step1 && step2) {
-    backBtn.addEventListener('click', () => {
-      step2.style.display = 'none';
-      step1.style.display = 'block';
-    });
-  }
-
-  // Envío del formulario
+  // Envío final del formulario (Paso 2 Submit)
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -105,24 +127,6 @@ export function initWizard() {
       const phone = document.getElementById('wizard-company-phone').value.trim();
       const logoInput = document.getElementById('wizard-company-logo');
 
-      // Validaciones de email y teléfono si se han rellenado
-      if (email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          window.showToast("El formato del correo electrónico no es válido.", "error");
-          return;
-        }
-      }
-
-      if (phone) {
-        // Permitir dígitos, espacios, guiones y un prefijo '+' inicial
-        const phoneRegex = /^\+?[0-9\s\-]{9,15}$/;
-        if (!phoneRegex.test(phone)) {
-          window.showToast("El formato del teléfono no es válido (debe tener entre 9 y 15 dígitos).", "error");
-          return;
-        }
-      }
-
       const configData = {
         consultora_nombre: name,
         consultora_calle: street,
@@ -136,13 +140,22 @@ export function initWizard() {
       };
 
       try {
-        const submitBtn = form.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.innerText = "Guardando...";
+        const submitBtn = document.getElementById('wizard-submit-btn');
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerText = "Configurando...";
+        }
 
         // 1. Guardar Configuración de Texto
         if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
           await window.__TAURI__.core.invoke('save_company_config', { config: configData });
+
+          // Configurar directorio de copias de seguridad (renombrando existente si corresponde)
+          const parentArg = customSelectedParent ? customSelectedParent : null;
+          await window.__TAURI__.core.invoke('setup_backup_directory', { parentPath: parentArg });
+
+          // Refrescar inmediatamente la vista de backup
+          await loadBackupConfig();
         } else {
           // Modo mock
           localStorage.setItem('company_config', JSON.stringify(configData));
@@ -158,27 +171,31 @@ export function initWizard() {
           if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
             await window.__TAURI__.core.invoke('save_company_logo', { base64Data, extension });
           } else {
-            // Modo mock: guardar data URI en localStorage
             localStorage.setItem('company_logo', `data:image/${extension === 'svg' ? 'svg+xml' : extension};base64,${base64Data}`);
           }
-        } else {
-          // Si no se subió nada y estamos en modo de edición/re-guardado, podemos limpiar el logo si es necesario,
-          // pero como es opcional y es la primera instalación, simplemente no guardamos logotipo y se usará el por defecto.
         }
 
         // Finalizar primer inicio
         localStorage.setItem('first_run_completed', 'true');
         wizardOverlay.classList.remove('active');
-        window.showToast("Configuración guardada correctamente. ¡Bienvenido!", "success");
+        window.showToast("Configuración inicial completada correctamente.", "success");
+
+        // Disparar la comprobación del Comercial Principal
+        try {
+          const { ensureInitialAgentFlow } = await import('./agents.js');
+          await ensureInitialAgentFlow();
+        } catch (errAgent) {
+          console.error("Error al iniciar flujo de agente principal:", errAgent);
+        }
 
       } catch (error) {
         console.error("Error al guardar la configuración inicial:", error);
-        window.showToast("Error al guardar los datos de configuración.", "error");
+        window.showToast(`Error al guardar la configuración: ${error}`, "error");
       } finally {
-        const submitBtn = form.querySelector('button[type="submit"]');
+        const submitBtn = document.getElementById('wizard-submit-btn');
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.innerText = "Finalizar y Guardar";
+          submitBtn.innerText = "Finalizar Configuración 🚀";
         }
       }
     });

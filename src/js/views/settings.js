@@ -11,6 +11,7 @@ export function initSettingsView() {
   setupSecuritySettings();
   setupCleanup();
   setupUpdates();
+  setupRenewalParamsSettings();
 }
 
 // --- Pestañas de Configuración ---
@@ -692,6 +693,34 @@ async function loadAboutInfo() {
     if (nodeVersionEl) nodeVersionEl.textContent = 'v18.16.0 (Simulado)';
     if (rustVersionEl) rustVersionEl.textContent = 'rustc 1.75.0 (Simulado)';
     if (tauriVersionEl) tauriVersionEl.textContent = '2.0.0 (Simulado)';
+  }
+}
+
+function setupRenewalParamsSettings() {
+  const critInput = document.getElementById('settings-renewal-critical-days');
+  const warnInput = document.getElementById('settings-renewal-warning-days');
+  const radInput = document.getElementById('settings-renewal-radar-days');
+  const btnSave = document.getElementById('btn-save-renewal-params');
+
+  if (critInput) critInput.value = localStorage.getItem('renewal_critical_days') || '30';
+  if (warnInput) warnInput.value = localStorage.getItem('renewal_warning_days') || '60';
+  if (radInput) radInput.value = localStorage.getItem('renewal_radar_days') || '90';
+
+  if (btnSave) {
+    btnSave.addEventListener('click', async () => {
+      const critVal = parseInt(critInput?.value || '30', 10);
+      const warnVal = parseInt(warnInput?.value || '60', 10);
+      const radVal = parseInt(radInput?.value || '90', 10);
+
+      localStorage.setItem('renewal_critical_days', critVal.toString());
+      localStorage.setItem('renewal_warning_days', warnVal.toString());
+      localStorage.setItem('renewal_radar_days', radVal.toString());
+
+      window.showToast("Parámetros y umbrales de renovación guardados con éxito.", "success");
+
+      const { refreshRenewals } = await import('./renewals.js');
+      await refreshRenewals();
+    });
   }
 }
 

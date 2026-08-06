@@ -67,6 +67,25 @@ fn db_change_password(state: tauri::State<'_, db::SharedDbState>, current_passwo
 }
 
 #[tauri::command]
+fn db_import_clientes_batch(
+    state: tauri::State<'_, db::SharedDbState>,
+    rows: Vec<db::ClienteImportRow>,
+    update_existing: bool
+) -> Result<(usize, usize, usize), String> {
+    let mut db_state = state.lock().map_err(|e| e.to_string())?;
+    db_state.import_clientes_batch(rows, update_existing)
+}
+
+#[tauri::command]
+fn db_import_renovaciones_batch(
+    state: tauri::State<'_, db::SharedDbState>,
+    rows: Vec<db::RenovacionImportRow>
+) -> Result<usize, String> {
+    let mut db_state = state.lock().map_err(|e| e.to_string())?;
+    db_state.import_renovaciones_batch(rows)
+}
+
+#[tauri::command]
 fn db_select(state: tauri::State<'_, db::SharedDbState>, query: String, params: Option<Vec<serde_json::Value>>) -> Result<Vec<serde_json::Value>, String> {
     let db_state = state.lock().map_err(|e| e.to_string())?;
     db_state.select(&query, params.unwrap_or_default())
@@ -191,6 +210,9 @@ pub fn run() {
 
                 let db_state = db::DbState::new(app_data_dir);
                 app.manage(std::sync::Arc::new(std::sync::Mutex::new(db_state)));
+
+                // Migrar copias de seguridad de usuarios existentes a Comparetica_backups si es necesario
+                migrate_existing_backups_if_needed(&app.handle());
             }
             Ok(())
         })
@@ -210,9 +232,13 @@ pub fn run() {
             save_pdf, 
             export_backup, 
             import_backup,
+            db_import_clientes_batch,
+            db_import_renovaciones_batch,
             get_backup_directory,
             set_backup_directory,
             select_backup_directory,
+            setup_backup_directory,
+            get_default_backup_path,
             get_backup_retention,
             set_backup_retention,
             save_company_logo,
@@ -250,9 +276,8 @@ fn perform_auto_backup(app_handle: &tauri::AppHandle) {
         return; // No hay base de datos cifrada aún para guardar
     }
 
-    // Carpeta de copias de seguridad por defecto: home_dir
     let mut backup_dir = match app_handle.path().home_dir() {
-        Ok(dir) => dir,
+        Ok(dir) => dir.join("Comparetica_backups"),
         Err(_) => return,
     };
 
@@ -265,15 +290,17 @@ fn perform_auto_backup(app_handle: &tauri::AppHandle) {
             if let Ok(config) = serde_json::from_str::<serde_json::Value>(&config_str) {
                 if let Some(custom_path) = config.get("backup_dir").and_then(|v| v.as_str()) {
                     let custom_dir = std::path::PathBuf::from(custom_path);
-                    if custom_dir.exists() && custom_dir.is_dir() {
-                        backup_dir = custom_dir;
-                    }
+                    backup_dir = custom_dir;
                 }
                 if let Some(days) = config.get("retention_days").and_then(|v| v.as_u64()) {
                     retention_days = days as u32;
                 }
             }
         }
+    }
+
+    if !backup_dir.exists() {
+        let _ = std::fs::create_dir_all(&backup_dir);
     }
 
     let now = chrono::Local::now();
@@ -315,6 +342,146 @@ fn perform_auto_backup(app_handle: &tauri::AppHandle) {
     }
 }
 
+fn ensure_backup_folder_setup(parent_dir: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    let target_dir = parent_dir.join("Comparetica_backups");
+    if target_dir.exists() {
+        let now = chrono::Local::now();
+        let timestamp = now.format("%Y_%m_%d_%H_%M_%S").to_string();
+        let old_folder_name = format!("old_{}_Comparetica_backups", timestamp);
+        let old_path = parent_dir.join(&old_folder_name);
+        if let Err(e) = std::fs::rename(&target_dir, &old_path) {
+            eprintln!("Advertencia al renombrar carpeta previa de copias de seguridad: {}", e);
+        }
+    }
+    std::fs::create_dir_all(&target_dir).map_err(|e| format!("No se pudo crear la carpeta de copias de seguridad: {}", e))?;
+    Ok(target_dir)
+}
+
+fn migrate_existing_backups_if_needed(app_handle: &tauri::AppHandle) {
+    use tauri::Manager;
+    let app_data_dir = match app_handle.path().app_data_dir() {
+        Ok(dir) => dir,
+        Err(_) => return,
+    };
+    let home_dir = match app_handle.path().home_dir() {
+        Ok(dir) => dir,
+        Err(_) => return,
+    };
+
+    let config_path = app_data_dir.join("config.json");
+    let mut config = if config_path.exists() {
+        if let Ok(config_str) = std::fs::read_to_string(&config_path) {
+            serde_json::from_str::<serde_json::Value>(&config_str).unwrap_or_else(|_| serde_json::Value::Object(serde_json::Map::new()))
+        } else {
+            serde_json::Value::Object(serde_json::Map::new())
+        }
+    } else {
+        serde_json::Value::Object(serde_json::Map::new())
+    };
+
+    let already_migrated = config.get("backups_migrated_v2").and_then(|v| v.as_bool()).unwrap_or(false);
+    if already_migrated {
+        return;
+    }
+
+    let existing_custom_path = config.get("backup_dir").and_then(|v| v.as_str()).map(|s| s.to_string());
+    
+    let target_dir = match existing_custom_path {
+        Some(ref p) => {
+            let pbuf = std::path::PathBuf::from(p);
+            if pbuf.file_name().and_then(|f| f.to_str()) == Some("Comparetica_backups") {
+                if !pbuf.exists() {
+                    let _ = std::fs::create_dir_all(&pbuf);
+                }
+                pbuf
+            } else {
+                match ensure_backup_folder_setup(&pbuf) {
+                    Ok(dir) => dir,
+                    Err(_) => home_dir.join("Comparetica_backups"),
+                }
+            }
+        },
+        None => {
+            match ensure_backup_folder_setup(&home_dir) {
+                Ok(dir) => dir,
+                Err(_) => home_dir.join("Comparetica_backups"),
+            }
+        }
+    };
+
+    // Mover copias de seguridad existentes en la raíz del usuario a la carpeta Comparetica_backups
+    if let Ok(entries) = std::fs::read_dir(&home_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
+                    if (filename.starts_with("comparetica_auto_backup_") || filename.starts_with("comparetica_backup_")) && (filename.ends_with(".bak") || filename.ends_with(".db")) {
+                        let new_location = target_dir.join(filename);
+                        if !new_location.exists() {
+                            let _ = std::fs::rename(&path, &new_location);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(obj) = config.as_object_mut() {
+        obj.insert("backup_dir".to_string(), serde_json::Value::String(target_dir.to_string_lossy().to_string()));
+        obj.insert("backups_migrated_v2".to_string(), serde_json::Value::Bool(true));
+    }
+
+    if let Ok(config_str) = serde_json::to_string_pretty(&config) {
+        let _ = std::fs::create_dir_all(&app_data_dir);
+        let _ = std::fs::write(&config_path, config_str);
+    }
+}
+
+#[tauri::command]
+fn setup_backup_directory(app_handle: tauri::AppHandle, parent_path: Option<String>) -> Result<String, String> {
+    use tauri::Manager;
+    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let home_dir = app_handle.path().home_dir().map_err(|e| e.to_string())?;
+
+    let parent_dir = match parent_path {
+        Some(ref p) if !p.trim().is_empty() => std::path::PathBuf::from(p),
+        _ => home_dir.clone(),
+    };
+
+    if !parent_dir.exists() || !parent_dir.is_dir() {
+        return Err("La carpeta seleccionada no existe o no es un directorio válido.".to_string());
+    }
+
+    let target_backup_dir = ensure_backup_folder_setup(&parent_dir)?;
+    let path_str = target_backup_dir.to_string_lossy().to_string();
+
+    let config_path = app_data_dir.join("config.json");
+    let mut config = if config_path.exists() {
+        let config_str = std::fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
+        serde_json::from_str(&config_str).unwrap_or_else(|_| serde_json::Value::Object(serde_json::Map::new()))
+    } else {
+        serde_json::Value::Object(serde_json::Map::new())
+    };
+
+    if let Some(obj) = config.as_object_mut() {
+        obj.insert("backup_dir".to_string(), serde_json::Value::String(path_str.clone()));
+        obj.insert("backups_migrated_v2".to_string(), serde_json::Value::Bool(true));
+    }
+
+    let config_str = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    let _ = std::fs::create_dir_all(&app_data_dir);
+    std::fs::write(&config_path, config_str).map_err(|e| e.to_string())?;
+
+    Ok(path_str)
+}
+
+#[tauri::command]
+fn get_default_backup_path(app_handle: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    let home_dir = app_handle.path().home_dir().map_err(|e| e.to_string())?;
+    Ok(home_dir.join("Comparetica_backups").to_string_lossy().to_string())
+}
+
 #[tauri::command]
 fn get_backup_directory(app_handle: tauri::AppHandle) -> Result<String, String> {
     use tauri::Manager;
@@ -325,13 +492,20 @@ fn get_backup_directory(app_handle: tauri::AppHandle) -> Result<String, String> 
         let config_str = std::fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
         if let Ok(config) = serde_json::from_str::<serde_json::Value>(&config_str) {
             if let Some(custom_path) = config.get("backup_dir").and_then(|v| v.as_str()) {
-                return Ok(custom_path.to_string());
+                let pbuf = std::path::PathBuf::from(custom_path);
+                if pbuf.exists() {
+                    return Ok(custom_path.to_string());
+                }
             }
         }
     }
 
     let home_dir = app_handle.path().home_dir().map_err(|e| e.to_string())?;
-    Ok(home_dir.to_string_lossy().to_string())
+    let default_dir = home_dir.join("Comparetica_backups");
+    if !default_dir.exists() {
+        let _ = std::fs::create_dir_all(&default_dir);
+    }
+    Ok(default_dir.to_string_lossy().to_string())
 }
 
 #[tauri::command]
