@@ -785,3 +785,146 @@ fn params_to_rusqlite(params: &[Value]) -> Vec<Box<dyn rusqlite::ToSql>> {
         }
     }).collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn setup_test_dir(test_name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let random_suffix: u64 = rand::random();
+        let path = std::env::temp_dir().join(format!("comparetica_test_{}_{}_{}", test_name, nanos, random_suffix));
+        let _ = fs::create_dir_all(&path);
+        path
+    }
+
+    #[test]
+    fn test_vault_and_login_lifecycle() {
+        let dir = setup_test_dir("vault_and_login_lifecycle");
+
+        let mut db = DbState::new(dir.clone());
+        let recovery_key = db.setup_master_password("PasswordSegura123").expect("Setup master password failed");
+
+        // Verifies recovery key starts with "RC-"
+        assert!(recovery_key.starts_with("RC-"), "Recovery key must start with RC-");
+
+        // Verifies status is initialized and unlocked
+        let status = db.get_status().expect("get_status failed");
+        assert!(status.is_initialized, "Expected vault to be initialized");
+        assert!(status.is_unlocked, "Expected vault to be unlocked");
+
+        drop(db);
+
+        // Recreates a new DbState on the same directory (simulating app restart)
+        let mut db_restarted = DbState::new(dir.clone());
+
+        // Verifies status before login is initialized but NOT unlocked
+        let status_before = db_restarted.get_status().expect("get_status failed");
+        assert!(status_before.is_initialized, "Expected vault to remain initialized");
+        assert!(!status_before.is_unlocked, "Expected vault to be locked before login");
+
+        // Verifies login with a wrong password fails (is_err())
+        assert!(db_restarted.login("ContrasenaIncorrecta123").is_err(), "Login with wrong password should fail");
+        let status_after_wrong = db_restarted.get_status().expect("get_status failed");
+        assert!(!status_after_wrong.is_unlocked, "Expected vault to stay locked after failed login");
+
+        // Verifies login with the correct password succeeds and unlocks the DB
+        assert!(db_restarted.login("PasswordSegura123").is_ok(), "Login with correct password should succeed");
+        let status_after_correct = db_restarted.get_status().expect("get_status failed");
+        assert!(status_after_correct.is_unlocked, "Expected vault to be unlocked after successful login");
+
+        drop(db_restarted);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_recovery_key_flow() {
+        let dir = setup_test_dir("recovery_key_flow");
+
+        // Sets up master password and gets initial recovery key
+        let mut db = DbState::new(dir.clone());
+        let initial_recovery_key = db.setup_master_password("PasswordSegura123").expect("Setup master password failed");
+        assert!(initial_recovery_key.starts_with("RC-"), "Recovery key must start with RC-");
+
+        drop(db);
+
+        // Recreates DbState and calls recover_access with the original recovery key and a new password ("NuevaPassword456")
+        let mut db_recovered = DbState::new(dir.clone());
+        let new_recovery_key = db_recovered.recover_access(&initial_recovery_key, "NuevaPassword456")
+            .expect("recover_access failed");
+
+        // Asserts that a new recovery key is returned and is different from the original
+        assert!(new_recovery_key.starts_with("RC-"), "New recovery key must start with RC-");
+        assert_ne!(new_recovery_key, initial_recovery_key, "New recovery key must differ from the original key");
+
+        drop(db_recovered);
+
+        // Asserts that the original recovery key can no longer be used (rotation / invalidation)
+        let mut db_verify = DbState::new(dir.clone());
+        let old_recovery_attempt = db_verify.recover_access(&initial_recovery_key, "TerceraPassword789");
+        assert!(old_recovery_attempt.is_err(), "Old recovery key must be invalidated");
+
+        // Old password must also fail
+        assert!(db_verify.login("PasswordSegura123").is_err(), "Old master password must fail");
+
+        // Asserts that login with the new password succeeds
+        let new_login_result = db_verify.login("NuevaPassword456");
+        assert!(new_login_result.is_ok(), "Login with new password must succeed");
+        let status = db_verify.get_status().expect("get_status failed");
+        assert!(status.is_unlocked, "Database should be unlocked after login with new password");
+
+        drop(db_verify);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_persistence_roundtrip_integrity() {
+        let dir = setup_test_dir("persistence_roundtrip_integrity");
+
+        // Sets up master password
+        let mut db = DbState::new(dir.clone());
+        let _recovery = db.setup_master_password("PasswordSegura123").expect("Setup master password failed");
+
+        // Executes an INSERT query:
+        // INSERT INTO comercializadoras (nombre) VALUES (?); with param Comercializadora Test S.L.
+        // Asserts rowsAffected == 1
+        let insert_res = db.execute(
+            "INSERT INTO comercializadoras (nombre) VALUES (?);",
+            vec![serde_json::json!("Comercializadora Test S.L.")]
+        ).expect("INSERT into comercializadoras failed");
+
+        let rows_affected = insert_res.get("rowsAffected")
+            .and_then(|v| v.as_i64())
+            .expect("rowsAffected must be an integer");
+        assert_eq!(rows_affected, 1, "Expected exactly 1 row affected");
+
+        drop(db);
+
+        // Simulates app restart: recreates DbState on same dir, logs in with master password
+        let mut db_restart = DbState::new(dir.clone());
+        db_restart.login("PasswordSegura123").expect("Login after restart failed");
+
+        // Executes SELECT query:
+        // SELECT nombre FROM comercializadoras WHERE nombre = ?; with param Comercializadora Test S.L.
+        // Asserts 1 row returned and nombre matches
+        let select_res = db_restart.select(
+            "SELECT nombre FROM comercializadoras WHERE nombre = ?;",
+            vec![serde_json::json!("Comercializadora Test S.L.")]
+        ).expect("SELECT from comercializadoras failed");
+
+        assert_eq!(select_res.len(), 1, "Expected exactly 1 record returned");
+        let returned_nombre = select_res[0].get("nombre")
+            .and_then(|v| v.as_str())
+            .expect("nombre should be a string");
+        assert_eq!(returned_nombre, "Comercializadora Test S.L.");
+
+        drop(db_restart);
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
