@@ -171,16 +171,24 @@ impl DbState {
             let enc_bytes = fs::read(&enc_path).map_err(|e| e.to_string())?;
             let db_bytes = decrypt_aes_gcm(&mdk, &general_purpose::STANDARD.encode(enc_bytes))?;
             
-            let temp_db = self.app_data_dir.join("temp_decrypted.db");
-            fs::write(&temp_db, &db_bytes).map_err(|e| e.to_string())?;
-            
-            let disk_conn = Connection::open(&temp_db).map_err(|e| e.to_string())?;
-            {
-                let backup = rusqlite::backup::Backup::new(&disk_conn, &mut conn).map_err(|e| e.to_string())?;
-                backup.run_to_completion(5, std::time::Duration::from_millis(10), None).map_err(|e| e.to_string())?;
-            }
-            drop(disk_conn);
-            let _ = fs::remove_file(temp_db);
+            let owned_data = {
+                let sz = db_bytes.len();
+                let ptr = unsafe { rusqlite::ffi::sqlite3_malloc64(sz as u64) as *mut u8 };
+                if ptr.is_null() && sz > 0 {
+                    return Err("Error de memoria al deserializar SQLite".to_string());
+                }
+                if !ptr.is_null() {
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(db_bytes.as_ptr(), ptr, sz);
+                    }
+                }
+                let non_null = std::ptr::NonNull::new(ptr)
+                    .ok_or_else(|| "Puntero nulo al deserializar SQLite".to_string())?;
+                unsafe { rusqlite::serialize::OwnedData::from_raw_nonnull(non_null, sz) }
+            };
+
+            conn.deserialize(rusqlite::DatabaseName::Main, owned_data, false)
+                .map_err(|e| format!("Error al deserializar base de datos en memoria: {}", e))?;
         } else if legacy_path.exists() {
             // Migrar base de datos legacy en texto plano
             let disk_conn = Connection::open(&legacy_path).map_err(|e| e.to_string())?;
@@ -210,20 +218,8 @@ impl DbState {
             None => return Ok(()),
         };
 
-        let temp_db = self.app_data_dir.join("temp_persist.db");
-        if temp_db.exists() {
-            let _ = fs::remove_file(&temp_db);
-        }
-
-        let mut disk_conn = Connection::open(&temp_db).map_err(|e| e.to_string())?;
-        {
-            let backup = rusqlite::backup::Backup::new(conn, &mut disk_conn).map_err(|e| e.to_string())?;
-            backup.run_to_completion(5, std::time::Duration::from_millis(10), None).map_err(|e| e.to_string())?;
-        }
-        drop(disk_conn);
-
-        let db_bytes = fs::read(&temp_db).map_err(|e| e.to_string())?;
-        let _ = fs::remove_file(&temp_db);
+        let db_bytes = conn.serialize(rusqlite::DatabaseName::Main)
+            .map_err(|e| format!("Error al serializar base de datos desde memoria: {}", e))?;
 
         let enc_str = encrypt_aes_gcm(mdk, &db_bytes)?;
         let enc_bytes = general_purpose::STANDARD.decode(enc_str).map_err(|e| e.to_string())?;
