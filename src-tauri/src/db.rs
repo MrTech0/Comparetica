@@ -624,6 +624,14 @@ impl DbState {
               );
         ", []).map_err(|e| e.to_string())?;
 
+        conn.execute("
+            CREATE TABLE IF NOT EXISTS ajustes (
+                clave TEXT PRIMARY KEY,
+                valor TEXT NOT NULL,
+                actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        ", []).map_err(|e| e.to_string())?;
+
         Ok(())
     }
 
@@ -1025,5 +1033,46 @@ mod tests {
 
         let _ = fs::remove_dir_all(test_dir);
         let _ = fs::remove_dir_all(empty_test_dir);
+    }
+
+    #[test]
+    fn test_ajustes_table_lifecycle_and_persistence() {
+        let test_id = Uuid::new_v4().to_string();
+        let test_dir = std::env::temp_dir().join(format!("comparetica_test_ajustes_{}", test_id));
+        let _ = fs::create_dir_all(&test_dir);
+
+        let mut state = DbState::new_with_dir(test_dir.clone());
+        let pwd = "Password123!";
+        let _rec = state.setup_master_password(pwd).unwrap();
+
+        // 1. Insertar y actualizar ajustes
+        let insert_res = state.execute(
+            "INSERT INTO ajustes (clave, valor) VALUES ('company_config', '{\"nombre\":\"Test S.L.\"}');",
+            vec![]
+        );
+        assert!(insert_res.is_ok(), "Debe permitir insertar en la tabla ajustes");
+
+        let rows = state.select("SELECT valor FROM ajustes WHERE clave = 'company_config';", vec![]).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].get("valor").unwrap().as_str(), Some("{\"nombre\":\"Test S.L.\"}"));
+
+        // 2. Probar persistencia y recuperación tras reinicio de estado
+        let vault = state.load_vault().unwrap().unwrap();
+        let salt_p = general_purpose::STANDARD.decode(&vault.salt_password).unwrap();
+        let key_p = derive_key(pwd, &salt_p).unwrap();
+        let mdk_bytes = decrypt_aes_gcm(&key_p, &vault.encrypted_mdk_password).unwrap();
+        let mut mdk = [0u8; 32];
+        mdk.copy_from_slice(&mdk_bytes);
+
+        drop(state);
+
+        let mut restarted_state = DbState::new_with_dir(test_dir.clone());
+        restarted_state.open_db(mdk).unwrap();
+
+        let recovered_rows = restarted_state.select("SELECT valor FROM ajustes WHERE clave = 'company_config';", vec![]).unwrap();
+        assert_eq!(recovered_rows.len(), 1);
+        assert_eq!(recovered_rows[0].get("valor").unwrap().as_str(), Some("{\"nombre\":\"Test S.L.\"}"));
+
+        let _ = fs::remove_dir_all(test_dir);
     }
 }
