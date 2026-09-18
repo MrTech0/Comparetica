@@ -2,9 +2,13 @@ import { getComparativas, deleteComparativa, updateComparativaEstado, updateComp
 import { generatePDFReport } from '../pdf.js';
 import { openNewRenewalDialogFromHistory } from './renewals.js';
 import { relaunchComparisonForScoring } from './calculator_view.js';
+import { invoke } from '../ipc.js';
+import { showToast, showConfirm } from '../ui.js';
+import { onAppEvent, APP_EVENTS } from '../events.js';
 
 let activeLockTimers = [];
 let isCobroDialogInitialized = false;
+let unsubComparisonSaved = null;
 
 function clearActiveLockTimers() {
   activeLockTimers.forEach(timer => clearTimeout(timer));
@@ -41,8 +45,10 @@ export async function initHistoryView() {
   await loadHistoryTable();
 
   // Escuchar cuando se guarde una nueva comparativa para refrescar la lista automáticamente
-  window.removeEventListener('comparison-saved', refreshHistory);
-  window.addEventListener('comparison-saved', refreshHistory);
+  if (unsubComparisonSaved) {
+    unsubComparisonSaved();
+  }
+  unsubComparisonSaved = onAppEvent(APP_EVENTS.COMPARISON_SAVED, refreshHistory);
 }
 
 async function refreshHistory() {
@@ -330,12 +336,12 @@ function applyHistoryFilter() {
     // Evento de envío de email
     tr.querySelector('.btn-email-history').addEventListener('click', async () => {
       if (!c.cliente_email) {
-        window.showToast("El cliente no tiene un correo de contacto configurado en su ficha.", "error");
+        showToast("El cliente no tiene un correo de contacto configurado en su ficha.", "error");
         return;
       }
       
       try {
-        window.showToast("Generando reporte y preparando correo electrónico...", "info");
+        showToast("Generando reporte y preparando correo electrónico...", "info");
         
         const reportData = getReportDataForRecord(c);
         
@@ -349,23 +355,23 @@ function applyHistoryFilter() {
         const safeClientName = c.cliente_nombre.toLowerCase().replace(/[^a-z0-9]/g, '_');
         const pdfFilename = `comparativa_${safeClientName}.pdf`;
 
-        if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-          await window.__TAURI__.core.invoke('send_email', {
+        if (typeof window !== 'undefined' && window.__TAURI__) {
+          await invoke('send_email', {
             to: c.cliente_email,
             subject: `Estudio Comparativo de Energía - ${c.cliente_nombre}`,
             body: `Estimado/a cliente de ${c.cliente_nombre},\n\nAdjunto a este correo electrónico encontrará el informe detallado de su estudio comparativo de energía realizado con Comparetica.\n\nAtentamente,\nEquipo de Asesoría Energética`,
             pdfBase64: pdfBase64,
             filename: pdfFilename
           });
-          window.showToast("✅ Correo electrónico enviado correctamente con el PDF adjunto.", "success");
+          showToast("✅ Correo electrónico enviado correctamente con el PDF adjunto.", "success");
         } else {
           // Fallback para pruebas en navegador sin Tauri (abre mailto simple sin adjunto)
           const mailtoUrl = `mailto:${encodeURIComponent(c.cliente_email)}?subject=${encodeURIComponent(`Estudio Comparativo - ${c.cliente_nombre}`)}&body=${encodeURIComponent(`Estimado cliente,\n\nAdjuntamos el informe comparativo.`)}`;
           window.open(mailtoUrl, '_blank');
-          window.showToast("Cliente de correo abierto para enviar el estudio.", "info");
+          showToast("Cliente de correo abierto para enviar el estudio.", "info");
         }
       } catch (err) {
-        window.showToast("Error al preparar el envío por correo: " + err, "error");
+        showToast("Error al preparar el envío por correo: " + err, "error");
         console.error(err);
       }
     });
@@ -378,7 +384,7 @@ function applyHistoryFilter() {
         await showLegalRetentionCompWarning();
         return;
       }
-      if (await window.showConfirm(`¿Está seguro de eliminar del historial la comparativa de ${c.cliente_nombre}?`, "Eliminar Comparativa")) {
+      if (await showConfirm(`¿Está seguro de eliminar del historial la comparativa de ${c.cliente_nombre}?`, "Eliminar Comparativa")) {
         await deleteComparativa(c.id);
         await loadHistoryTable();
       }
@@ -450,7 +456,7 @@ function applyHistoryFilter() {
               customSelect.setAttribute('title', 'El estado ya no se puede modificar al haber transcurrido el tiempo límite de cambio.');
               trigger.style.cursor = 'not-allowed';
               trigger.style.opacity = '0.75';
-              window.showToast(`El estado de la comparativa de ${c.cliente_nombre} ha quedado fijado de forma definitiva.`, "info");
+              showToast(`El estado de la comparativa de ${c.cliente_nombre} ha quedado fijado de forma definitiva.`, "info");
             }, 60000); // 60 segundos
             customSelect._lockTimer = timer;
             activeLockTimers.push(timer);
@@ -459,7 +465,7 @@ function applyHistoryFilter() {
           }
           
           customSelect.classList.remove('open');
-          window.showToast("Estado de la comparativa actualizado correctamente.", "success");
+          showToast("Estado de la comparativa actualizado correctamente.", "success");
           
           // Recargar tabla de clientes si es necesario para refrescar su Tipo Cliente
           const clientsSection = document.getElementById('section-clients');
@@ -469,7 +475,7 @@ function applyHistoryFilter() {
             await loadClientsTable();
           }
         } catch (err) {
-          window.showToast("Error al actualizar el estado.", "error");
+          showToast("Error al actualizar el estado.", "error");
           console.error(err);
         }
       });
@@ -499,7 +505,7 @@ function applyHistoryFilter() {
             openScoringRejectionDialog(c);
           } else {
             await updateComparativaContrato(c.id, targetValue, '');
-            window.showToast(`Estado de contrato actualizado a: ${targetValue}`, "success");
+            showToast(`Estado de contrato actualizado a: ${targetValue}`, "success");
             
             if (targetValue === 'Firmado y Activado') {
               openNewRenewalDialogFromHistory(c);
@@ -545,7 +551,7 @@ function openScoringRejectionDialog(c) {
       const reason = reasonEl ? reasonEl.value.trim() : '';
       await updateComparativaContrato(c.id, 'Rechazado por Scoring', reason);
       closeDialog();
-      window.showToast("Contrato marcado como Rechazado por Scoring.", "info");
+      showToast("Contrato marcado como Rechazado por Scoring.", "info");
       await loadHistoryTable();
     };
   }
@@ -659,7 +665,7 @@ async function reprintPDF(record, previewMode = false) {
     const reportData = getReportDataForRecord(record);
     await generatePDFReport(reportData, previewMode);
   } catch (error) {
-    window.showToast("Error al regenerar el reporte PDF.", "error");
+    showToast("Error al regenerar el reporte PDF.", "error");
     console.error(error);
   }
 }
@@ -764,7 +770,7 @@ export function promptRenewalFromHistory(comparativa) {
         }
 
         if (!clientId) {
-          window.showToast("No se encontró la ficha del cliente en la base de datos.", "error");
+          showToast("No se encontró la ficha del cliente en la base de datos.", "error");
           dialog.classList.remove('active');
           return;
         }
@@ -782,7 +788,7 @@ export function promptRenewalFromHistory(comparativa) {
         }
 
         dialog.classList.remove('active');
-        window.showToast("✅ Renovación programada con éxito en el calendario.", "success");
+        showToast("✅ Renovación programada con éxito en el calendario.", "success");
 
         const { refreshRenewals } = await import('./renewals.js');
         await refreshRenewals();
@@ -834,7 +840,7 @@ function openCobroDialog(c) {
 function setupCobroDialog() {
   if (isCobroDialogInitialized) return;
   isCobroDialogInitialized = true;
-
+  
   const dialog = document.getElementById('dialog-mark-cobro');
   const closeBtnX = document.getElementById('btn-close-cobro-dialog-x');
   const form = document.getElementById('form-mark-cobro');
@@ -860,11 +866,11 @@ function setupCobroDialog() {
       try {
         await updateComparativaCobro(id, 'Cobrado', fecha);
         dialog.classList.remove('active');
-        window.showToast("✅ Comisión marcada como COBRADA.", "success");
+        showToast("✅ Comisión marcada como COBRADA.", "success");
         await refreshHistory();
       } catch (err) {
         console.error("Error al actualizar estado de cobro:", err);
-        window.showToast("Error al registrar el cobro.", "error");
+        showToast("Error al registrar el cobro.", "error");
       }
     };
   }
@@ -877,11 +883,11 @@ function setupCobroDialog() {
       try {
         await updateComparativaCobro(id, 'Pendiente', null);
         dialog.classList.remove('active');
-        window.showToast("🟡 Estado de cobro cambiado a PENDIENTE.", "info");
+        showToast("🟡 Estado de cobro cambiado a PENDIENTE.", "info");
         await refreshHistory();
       } catch (err) {
         console.error("Error al actualizar estado de cobro:", err);
-        window.showToast("Error al actualizar estado de cobro.", "error");
+        showToast("Error al actualizar estado de cobro.", "error");
       }
     };
   }

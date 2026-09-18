@@ -13,6 +13,7 @@ import {
   updateTarifaGas,
 } from '../db.js';
 import { M3DateRangePicker } from '../components/date_range_picker.js';
+import { showToast, showConfirm } from '../ui.js';
 
 let lightDatePicker = null;
 let gasDatePicker = null;
@@ -79,11 +80,7 @@ function setupComercializadoras() {
       // Actualizar selectores en diálogos
       await updateComercializadorasSelectors();
     } catch (error) {
-      if (window.showToast) {
-        window.showToast("Error al guardar la comercializadora. Asegúrese de que el nombre sea único.", "error");
-      } else {
-        alert("Error al guardar la comercializadora. Asegúrese de que el nombre sea único.");
-      }
+      showToast("Error al guardar la comercializadora. Asegúrese de que el nombre sea único.", "error");
       console.error(error);
     }
   });
@@ -121,7 +118,7 @@ async function loadComercializadoras() {
     tbody.querySelectorAll('.btn-delete').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = parseInt(btn.dataset.id);
-        if (await window.showConfirm("¿Está seguro de eliminar esta comercializadora? Se borrarán todas sus tarifas asociadas.", "Eliminar Comercializadora")) {
+        if (await showConfirm("¿Está seguro de eliminar esta comercializadora? Se borrarán todas sus tarifas asociadas.", "Eliminar Comercializadora")) {
           await deleteComercializadora(id);
           await loadComercializadoras();
           await loadTarifasLuz();
@@ -176,7 +173,7 @@ function setupTarifasLuz() {
   openBtn.addEventListener('click', async () => {
     const coms = await getComercializadoras();
     if (!coms || coms.length === 0) {
-      window.showToast("No se puede registrar una tarifa porque no hay ninguna comercializadora creada. Por favor, cree una comercializadora primero.", "warning");
+      showToast("No se puede registrar una tarifa porque no hay ninguna comercializadora creada. Por favor, cree una comercializadora primero.", "warning");
       return;
     }
     document.getElementById('dialog-light-title').innerText = "Registrar Tarifa Luz";
@@ -212,7 +209,7 @@ function setupTarifasLuz() {
     const id = document.getElementById('dialog-light-id').value;
     const comercializadoraId = parseInt(document.getElementById('dialog-light-com').value);
     if (isNaN(comercializadoraId) || !comercializadoraId) {
-      window.showToast("No se puede guardar la tarifa porque no hay ninguna comercializadora seleccionada.", "error");
+      showToast("No se puede guardar la tarifa porque no hay ninguna comercializadora seleccionada.", "error");
       return;
     }
     const nombre = document.getElementById('dialog-light-name').value.trim();
@@ -258,11 +255,7 @@ function setupTarifasLuz() {
       dialog.classList.remove('active');
       await loadTarifasLuz();
     } catch (error) {
-      if (window.showToast) {
-        window.showToast("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.", "error");
-      } else {
-        alert("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.");
-      }
+      showToast("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.", "error");
       console.error(error);
     }
   });
@@ -469,7 +462,7 @@ async function loadTarifasLuz() {
     tbody.querySelectorAll('.btn-delete').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = parseInt(btn.dataset.id);
-        if (await window.showConfirm("¿Está seguro de eliminar esta tarifa de luz?", "Eliminar Tarifa de Luz")) {
+        if (await showConfirm("¿Está seguro de eliminar esta tarifa de luz?", "Eliminar Tarifa de Luz")) {
           await deleteTarifaLuz(id);
           await loadTarifasLuz();
         }
@@ -494,7 +487,7 @@ function setupTarifasGas() {
   openBtn.addEventListener('click', async () => {
     const coms = await getComercializadoras();
     if (!coms || coms.length === 0) {
-      window.showToast("No se puede registrar una tarifa porque no hay ninguna comercializadora creada. Por favor, cree una comercializadora primero.", "warning");
+      showToast("No se puede registrar una tarifa porque no hay ninguna comercializadora creada. Por favor, cree una comercializadora primero.", "warning");
       return;
     }
     document.getElementById('dialog-gas-title').innerText = "Registrar Tarifa Gas";
@@ -524,7 +517,7 @@ function setupTarifasGas() {
     const id = document.getElementById('dialog-gas-id').value;
     const comercializadoraId = parseInt(document.getElementById('dialog-gas-com').value);
     if (isNaN(comercializadoraId) || !comercializadoraId) {
-      window.showToast("No se puede guardar la tarifa porque no hay ninguna comercializadora seleccionada.", "error");
+      showToast("No se puede guardar la tarifa porque no hay ninguna comercializadora seleccionada.", "error");
       return;
     }
     const nombre = document.getElementById('dialog-gas-name').value.trim();
@@ -544,11 +537,7 @@ function setupTarifasGas() {
       dialog.classList.remove('active');
       await loadTarifasGas();
     } catch (error) {
-      if (window.showToast) {
-        window.showToast("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.", "error");
-      } else {
-        alert("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.");
-      }
+      showToast("Error al guardar la tarifa. Verifique que no exista una con el mismo nombre para esa comercializadora.", "error");
       console.error(error);
     }
   });
@@ -681,7 +670,7 @@ async function loadTarifasGas() {
     tbody.querySelectorAll('.btn-delete').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = parseInt(btn.dataset.id);
-        if (await window.showConfirm("¿Está seguro de eliminar esta tarifa de gas?", "Eliminar Tarifa de Gas")) {
+        if (await showConfirm("¿Está seguro de eliminar esta tarifa de gas?", "Eliminar Tarifa de Gas")) {
           await deleteTarifaGas(id);
           await loadTarifasGas();
         }

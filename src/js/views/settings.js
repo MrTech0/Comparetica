@@ -13,6 +13,8 @@ import {
   saveRenewalThresholds
 } from '../db.js';
 import { initCsvImporter } from '../csv_importer.js';
+import { invoke } from '../ipc.js';
+import { showToast, showConfirm } from '../ui.js';
 
 export async function initSettingsView() {
   setupTabs();
@@ -103,7 +105,7 @@ function setupAppearance() {
         }
       });
 
-      window.showToast(`Paleta de color cambiada a: ${btn.innerText.trim()}`, "success");
+      showToast(`Paleta de color cambiada a: ${btn.innerText.trim()}`, "success");
     });
   });
 }
@@ -128,12 +130,12 @@ function setupSecuritySettings() {
     const confirmPass = document.getElementById('settings-new-password-confirm').value;
 
     if (newPass.length < 6) {
-      window.showToast("La nueva contraseña debe tener al menos 6 caracteres.", "error");
+      showToast("La nueva contraseña debe tener al menos 6 caracteres.", "error");
       return;
     }
 
     if (newPass !== confirmPass) {
-      window.showToast("La nueva contraseña y la confirmación no coinciden.", "error");
+      showToast("La nueva contraseña y la confirmación no coinciden.", "error");
       return;
     }
 
@@ -153,9 +155,9 @@ function setupSecuritySettings() {
       if (displayKeyInput) displayKeyInput.value = newRecoveryKey;
       if (dialog) dialog.classList.add('active');
 
-      window.showToast("¡Contraseña Maestra actualizada y nueva clave generada!", "success");
+      showToast("¡Contraseña Maestra actualizada y nueva clave generada!", "success");
     } catch (err) {
-      window.showToast("Error al cambiar la contraseña. Verifica tu contraseña actual.", "error");
+      showToast("Error al cambiar la contraseña. Verifica tu contraseña actual.", "error");
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -168,7 +170,7 @@ function setupSecuritySettings() {
     btnCopy.addEventListener('click', () => {
       if (latestNewKey) {
         navigator.clipboard.writeText(latestNewKey);
-        window.showToast("¡Nueva clave de recuperación copiada al portapapeles!", "success");
+        showToast("¡Nueva clave de recuperación copiada al portapapeles!", "success");
       }
     });
   }
@@ -210,25 +212,24 @@ function setupSecuritySettings() {
         doc.text("Fecha de actualización: " + new Date().toLocaleString('es-ES'), 15, 110);
         doc.text("Comparetica - Sistema de Cifrado de Datos B2B", 15, 116);
 
-        if (window.__TAURI__) {
+        if (typeof window !== 'undefined' && window.__TAURI__) {
           const pdfDataUri = doc.output('datauristring');
           const base64Data = pdfDataUri.split(',')[1];
-          const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
 
           try {
             const savedPath = await invoke('save_pdf', {
               filename: "Comparetica_NUEVA_Clave_Recuperacion.pdf",
               base64Data: base64Data
             });
-            window.showToast(`📄 PDF de nueva clave guardado en: ${savedPath}`, 'success');
+            showToast(`📄 PDF de nueva clave guardado en: ${savedPath}`, 'success');
           } catch (err) {
             if (err !== "Cancelado por el usuario") {
-              window.showToast(`Error al guardar PDF: ${err}`, 'error');
+              showToast(`Error al guardar PDF: ${err}`, 'error');
             }
           }
         } else {
           doc.save("Comparetica_NUEVA_Clave_Recuperacion.pdf");
-          window.showToast("📄 PDF descargado con éxito.", "success");
+          showToast("📄 PDF descargado con éxito.", "success");
         }
       }
     });
@@ -303,21 +304,25 @@ function setupCleanup() {
 
       // 3. Ejecutar comando Rust (borrar config y logos)
       let msg = "";
-      if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-        msg = await window.__TAURI__.core.invoke('factory_reset');
+      if (typeof window !== 'undefined' && window.__TAURI__) {
+        try {
+          msg = await invoke('factory_reset');
+        } catch (e) {
+          console.error(e);
+        }
       }
 
       // 4. Mostrar Toast y Recargar o Reiniciar
       if (msg === "DEV_MODE") {
-        window.showToast("Aplicación restablecida con éxito. Recargando...", "success");
+        showToast("Aplicación restablecida con éxito. Recargando...", "success");
         setTimeout(() => {
           window.location.reload();
         }, 1500);
       } else if (msg) {
-        window.showToast(msg, "success");
+        showToast(msg, "success");
         // El proceso nativo se reiniciará automáticamente, no necesitamos hacer reload()
       } else {
-        window.showToast("Aplicación restablecida con éxito. Recargando...", "success");
+        showToast("Aplicación restablecida con éxito. Recargando...", "success");
         setTimeout(() => {
           window.location.reload();
         }, 1500);
@@ -326,7 +331,7 @@ function setupCleanup() {
       console.error("Error al restablecer la aplicación:", error);
       submitBtn.disabled = false;
       submitBtn.innerText = "Sí, borrar todo";
-      window.showToast("Error al inicializar la aplicación.", "error");
+      showToast("Error al inicializar la aplicación.", "error");
       confirmModal2.classList.remove('active');
     }
   });
@@ -362,7 +367,7 @@ async function setupCompanySettings() {
     if (email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
-        window.showToast("El formato del correo electrónico no es válido.", "error");
+        showToast("El formato del correo electrónico no es válido.", "error");
         return;
       }
     }
@@ -370,7 +375,7 @@ async function setupCompanySettings() {
     if (phone) {
       const phoneRegex = /^\+?[0-9\s\-]{9,15}$/;
       if (!phoneRegex.test(phone)) {
-        window.showToast("El formato del teléfono no es válido (debe tener entre 9 y 15 dígitos).", "error");
+        showToast("El formato del teléfono no es válido (debe tener entre 9 y 15 dígitos).", "error");
         return;
       }
     }
@@ -404,21 +409,21 @@ async function setupCompanySettings() {
 
         await saveCompanyLogo(dataUri);
 
-        if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+        if (typeof window !== 'undefined' && window.__TAURI__) {
           try {
-            await window.__TAURI__.core.invoke('save_company_logo', { base64Data, extension });
+            await invoke('save_company_logo', { base64Data, extension });
           } catch (errLogo) {
             console.warn("No se pudo invocar save_company_logo en backend:", errLogo);
           }
         }
       }
 
-      window.showToast("Configuración de la consultora guardada correctamente.", "success");
+      showToast("Configuración de la consultora guardada correctamente.", "success");
       await loadSettings(); // Refrescar vista previa
 
     } catch (error) {
       console.error("Error al guardar la configuración de la consultora:", error);
-      window.showToast("Error al guardar los datos de configuración.", "error");
+      showToast("Error al guardar los datos de configuración.", "error");
     } finally {
       const submitBtn = form.querySelector('button[type="submit"]');
       if (submitBtn) {
@@ -431,7 +436,7 @@ async function setupCompanySettings() {
   // Limpiar logotipo personalizado
   if (clearLogoBtn) {
     clearLogoBtn.addEventListener('click', async () => {
-      if (!await window.showConfirm("¿Estás seguro de que deseas eliminar tu logotipo personalizado y usar la bombilla por defecto?", "Borrar Logotipo Personalizado")) {
+      if (!await showConfirm("¿Estás seguro de que deseas eliminar tu logotipo personalizado y usar la bombilla por defecto?", "Borrar Logotipo Personalizado")) {
         return;
       }
 
@@ -439,11 +444,11 @@ async function setupCompanySettings() {
         await deleteCompanyLogo();
         
         logoInput.value = ''; // Limpiar input file
-        window.showToast("Logotipo eliminado con éxito. Ahora se usará el icono por defecto.", "success");
+        showToast("Logotipo eliminado con éxito. Ahora se usará el icono por defecto.", "success");
         await loadSettings(); // Refrescar vista previa
       } catch (error) {
         console.error("Error al eliminar el logotipo:", error);
-        window.showToast("Error al eliminar el logotipo personalizado.", "error");
+        showToast("Error al eliminar el logotipo personalizado.", "error");
       }
     });
   }
@@ -590,7 +595,7 @@ function setupUpdates() {
     const updater = window.__TAURI__ ? (window.__TAURI__.updater || window.__TAURI__.plugin?.updater || window.__TAURI__.pluginUpdater) : null;
     if (!updater) {
       if (manual) {
-        window.showToast("El servicio de actualizaciones solo está disponible dentro de la aplicación instalada.", "info");
+        showToast("El servicio de actualizaciones solo está disponible dentro de la aplicación instalada.", "info");
       }
       return;
     }
@@ -645,16 +650,16 @@ function setupUpdates() {
               }
             });
 
-            window.showToast("Instalación completada. Reiniciando...", "success");
+            showToast("Instalación completada. Reiniciando...", "success");
             setTimeout(async () => {
-              if (window.__TAURI__ && window.__TAURI__.core) {
-                await window.__TAURI__.core.invoke('restart_app');
+              if (typeof window !== 'undefined' && window.__TAURI__) {
+                await invoke('restart_app');
               }
             }, 1500);
 
           } catch (err) {
             console.error(err);
-            window.showToast("Error al instalar la actualización.", "error");
+            showToast("Error al instalar la actualización.", "error");
             statusTitle.textContent = "Error de Instalación";
             statusTitle.style.color = "var(--color-error)";
             statusDesc.textContent = err.toString();
@@ -674,8 +679,8 @@ function setupUpdates() {
       }
     } catch (error) {
       console.error(error);
-      if (window.__TAURI__ && window.__TAURI__.core) {
-        window.__TAURI__.core.invoke('log_frontend_error', { error: `Manual check error: ${error.message || error.toString()}` }).catch(err => console.error(err));
+      if (typeof window !== 'undefined' && window.__TAURI__) {
+        invoke('log_frontend_error', { error: `Manual check error: ${error.message || error.toString()}` }).catch(err => console.error(err));
       }
       statusTitle.textContent = "Error de Conexión";
       statusTitle.style.color = "var(--color-error)";
@@ -702,9 +707,9 @@ async function loadAboutInfo() {
   const sqliteVersion = await getSqliteVersion();
   if (sqliteVersionEl) sqliteVersionEl.textContent = sqliteVersion;
 
-  if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+  if (typeof window !== 'undefined' && window.__TAURI__) {
     try {
-      const info = await window.__TAURI__.core.invoke('get_about_info');
+      const info = await invoke('get_about_info');
       if (appVersionEl) appVersionEl.textContent = info.app_version || 'Desconocida';
       if (nodeVersionEl) nodeVersionEl.textContent = info.node_version || 'No instalado';
       if (rustVersionEl) rustVersionEl.textContent = info.rust_version || 'No instalado';
@@ -748,7 +753,7 @@ async function setupRenewalParamsSettings() {
 
       await saveRenewalThresholds({ critical: critVal, warning: warnVal, radar: radVal });
 
-      window.showToast("Parámetros y umbrales de renovación guardados con éxito.", "success");
+      showToast("Parámetros y umbrales de renovación guardados con éxito.", "success");
 
       const { refreshRenewals } = await import('./renewals.js');
       await refreshRenewals();

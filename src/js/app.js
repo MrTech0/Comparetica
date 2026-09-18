@@ -2,6 +2,7 @@
 
 import { getDb, purgeOldData } from './db.js';
 import { initAuthGuard } from './auth.js';
+import { invoke } from './ipc.js';
 import { initHomeView } from './views/home.js';
 import { initCalculatorView } from './views/calculator_view.js';
 import { initClientsView } from './views/clients.js';
@@ -446,9 +447,7 @@ async function initStartupUpdateCheck() {
           await update.downloadAndInstall();
           showToast("Actualización instalada con éxito. Reiniciando...", "success");
           setTimeout(async () => {
-            if (window.__TAURI__ && window.__TAURI__.core) {
-              await window.__TAURI__.core.invoke('restart_app');
-            }
+            await invoke('restart_app');
           }, 1500);
         } catch (err) {
           console.error(err);

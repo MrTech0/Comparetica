@@ -9,6 +9,7 @@ import {
   reassignAgenteClientes,
   checkAgenteSetupStatus
 } from '../db.js';
+import { showToast, showConfirm } from '../ui.js';
 
 let cachedAgents = [];
 let agentToDeleteId = null;
@@ -64,7 +65,7 @@ function setupFormSubmit() {
     const email = document.getElementById('dialog-agent-email').value.trim() || null;
 
     if (!nombre) {
-      window.showToast("El nombre del agente comercial es obligatorio.", "error");
+      showToast("El nombre del agente comercial es obligatorio.", "error");
       return;
     }
 
@@ -77,10 +78,10 @@ function setupFormSubmit() {
 
       if (id) {
         await updateAgente(parseInt(id, 10), nombre, telefono, email);
-        window.showToast("Agente comercial actualizado correctamente.", "success");
+        showToast("Agente comercial actualizado correctamente.", "success");
       } else {
         await addAgente(nombre, telefono, email);
-        window.showToast("Agente comercial registrado correctamente.", "success");
+        showToast("Agente comercial registrado correctamente.", "success");
       }
 
       dialog.classList.remove('active');
@@ -88,7 +89,7 @@ function setupFormSubmit() {
       await loadAgentsTable();
     } catch (err) {
       console.error("Error al guardar agente:", err);
-      window.showToast(`Error al guardar agente: ${err.message || err}`, "error");
+      showToast(`Error al guardar agente: ${err.message || err}`, "error");
     } finally {
       const submitBtn = form.querySelector('button[type="submit"]');
       if (submitBtn) {
@@ -117,26 +118,26 @@ function setupReassignForm() {
     const targetAgentId = parseInt(document.getElementById('dialog-reassign-target-agent').value, 10);
 
     if (!targetAgentId || isNaN(targetAgentId)) {
-      window.showToast("Debes seleccionar un agente comercial de destino.", "error");
+      showToast("Debes seleccionar un agente comercial de destino.", "error");
       return;
     }
 
     if (oldAgentId === targetAgentId) {
-      window.showToast("El agente de destino no puede ser el mismo agente a eliminar.", "error");
+      showToast("El agente de destino no puede ser el mismo agente a eliminar.", "error");
       return;
     }
 
     try {
       await reassignAgenteClientes(oldAgentId, targetAgentId);
       await deleteAgente(oldAgentId);
-      window.showToast("Clientes transferidos y agente eliminado correctamente.", "success");
+      showToast("Clientes transferidos y agente eliminado correctamente.", "success");
 
       dialog.classList.remove('active');
       agentToDeleteId = null;
       await loadAgentsTable();
     } catch (err) {
       console.error("Error al reasignar y eliminar agente:", err);
-      window.showToast(`Error al reasignar clientes: ${err.message || err}`, "error");
+      showToast(`Error al reasignar clientes: ${err.message || err}`, "error");
     }
   });
 }
@@ -234,7 +235,7 @@ function renderAgentsTable() {
       const agent = cachedAgents.find(a => a.id === id);
       
       const actionText = active ? "desactivar" : "activar";
-      const confirm = await window.showConfirm(
+      const confirm = await showConfirm(
         `¿Está seguro de ${actionText} al agente comercial "${agent?.nombre || ''}"?`,
         `${active ? 'Desactivar' : 'Activar'} Agente`
       );
@@ -242,10 +243,10 @@ function renderAgentsTable() {
       if (confirm) {
         try {
           await toggleAgenteEstado(id, !active);
-          window.showToast(`Agente ${active ? 'desactivado' : 'activado'} correctamente.`, "success");
+          showToast(`Agente ${active ? 'desactivado' : 'activado'} correctamente.`, "success");
           await loadAgentsTable();
         } catch (err) {
-          window.showToast(`Error al cambiar estado: ${err.message || err}`, "error");
+          showToast(`Error al cambiar estado: ${err.message || err}`, "error");
         }
       }
     });
@@ -257,7 +258,7 @@ function renderAgentsTable() {
       const id = parseInt(btn.getAttribute('data-id'), 10);
       const name = btn.getAttribute('data-name');
 
-      const confirmDelete = await window.showConfirm(
+      const confirmDelete = await showConfirm(
         `¿Está seguro de eliminar al agente comercial "${name}"?`,
         "Eliminar Agente"
       );
@@ -265,14 +266,14 @@ function renderAgentsTable() {
       if (confirmDelete) {
         try {
           await deleteAgente(id);
-          window.showToast("Agente comercial eliminado correctamente.", "success");
+          showToast("Agente comercial eliminado correctamente.", "success");
           await loadAgentsTable();
         } catch (err) {
           if (err.message && err.message.startsWith("TIENE_CLIENTES_ASIGNADOS")) {
             const count = err.message.split(":")[1] || "varios";
             openReassignDialog(id, name, count);
           } else {
-            window.showToast(`Error al eliminar agente: ${err.message || err}`, "error");
+            showToast(`Error al eliminar agente: ${err.message || err}`, "error");
           }
         }
       }
@@ -347,7 +348,7 @@ export async function ensureInitialAgentFlow() {
       const email = document.getElementById('initial-agent-email').value.trim() || null;
 
       if (!name) {
-        window.showToast("El nombre del comercial principal es obligatorio.", "error");
+        showToast("El nombre del comercial principal es obligatorio.", "error");
         return;
       }
 
@@ -365,17 +366,12 @@ export async function ensureInitialAgentFlow() {
         // 2. Asignar todos los clientes sin agente a este nuevo agente
         await reassignAgenteClientes(null, newAgentId);
 
-        window.showToast("Agente comercial principal configurado correctamente.", "success");
+        showToast("Agente comercial principal configurado correctamente.", "success");
         dialog.classList.remove('active');
         form.reset();
-
-        // Recargar vistas relevantes
-        if (typeof window.reloadCurrentView === 'function') {
-          window.reloadCurrentView();
-        }
       } catch (err) {
         console.error("Error al configurar agente principal:", err);
-        window.showToast(`Error al configurar agente principal: ${err.message || err}`, "error");
+        showToast(`Error al configurar agente principal: ${err.message || err}`, "error");
       } finally {
         const submitBtn = form.querySelector('button[type="submit"]');
         if (submitBtn) {

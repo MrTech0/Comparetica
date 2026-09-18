@@ -3,6 +3,8 @@
 import { calculateLightBill, calculateGasBill } from '../calculator.js';
 import { getTarifasLuz, getTarifasGas, addComparativa, getClientes, getComparativas, getPuntosSuministroAll } from '../db.js';
 import { generatePDFReport } from '../pdf.js';
+import { showToast } from '../ui.js';
+import { emitAppEvent, APP_EVENTS } from '../events.js';
 
 // Datos temporales de la última comparación realizada
 let lastComparisonData = {
@@ -332,7 +334,7 @@ function setupCalcFormSubmit() {
 
     const consentCheckbox = document.getElementById('calc-client-consent');
     if (consentCheckbox && !consentCheckbox.checked) {
-      window.showToast("Debe confirmar que dispone del consentimiento explícito del cliente para poder continuar.", "warning");
+      showToast("Debe confirmar que dispone del consentimiento explícito del cliente para poder continuar.", "warning");
       return;
     }
 
@@ -890,16 +892,15 @@ async function saveComparisonToDb(item, type, buttonEl) {
     `;
     buttonEl.classList.add('m3-btn-tertiary');
     
-    window.showToast("Comparativa guardada correctamente en el historial.", "success");
+    showToast("Comparativa guardada correctamente en el historial.", "success");
 
     // Disparar evento para que la vista del historial se actualice
-    const event = new CustomEvent('comparison-saved');
-    window.dispatchEvent(event);
+    emitAppEvent(APP_EVENTS.COMPARISON_SAVED);
   } catch (error) {
     buttonEl.disabled = false;
     buttonEl.innerHTML = 'Guardar Comparativa';
     const errMsg = error?.message || (typeof error === 'string' ? error : 'Error al guardar la comparativa');
-    window.showToast(`Error al guardar la comparativa en el historial: ${errMsg}`, "error");
+    showToast(`Error al guardar la comparativa en el historial: ${errMsg}`, "error");
     console.error("Error al guardar comparativa:", error);
   }
 }
@@ -923,7 +924,7 @@ async function exportPDF(item, type, previewMode = false) {
     await generatePDFReport(reportData, previewMode);
   } catch (e) {
     console.error(e);
-    window.showToast("Error al generar el PDF.", "error");
+    showToast("Error al generar el PDF.", "error");
   }
 }
 
@@ -1187,7 +1188,7 @@ export async function prefillCalculatorForRenewal(ren) {
     nameInput?.focus();
   }, 100);
 
-  window.showToast(`⚡ Datos de ${ren.cliente_nombre} autocompletados en el comparador.`, "success");
+  showToast(`⚡ Datos de ${ren.cliente_nombre} autocompletados en el comparador.`, "success");
 }
 
 /**
@@ -1219,6 +1220,6 @@ export async function relaunchComparisonForScoring(comp) {
     }
   }, 200);
 
-  window.showToast(`Datos de ${comp.cliente_nombre || 'cliente'} cargados. Elige una tarifa alternativa del listado completo.`, "info");
+  showToast(`Datos de ${comp.cliente_nombre || 'cliente'} cargados. Elige una tarifa alternativa del listado completo.`, "info");
 }
 

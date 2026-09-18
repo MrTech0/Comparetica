@@ -9,6 +9,7 @@ import {
   getTarifasGas,
   getRenewalThresholds
 } from '../db.js';
+import { showToast, showConfirm } from '../ui.js';
 
 let currentViewMode = 'list'; // 'list' | 'calendar'
 let currentCalendarDate = new Date();
@@ -966,7 +967,7 @@ async function saveManualRenewal() {
     const clientSearchVal = document.getElementById('manual-ren-client-search')?.value.trim();
 
     if (!clientIdVal) {
-      window.showToast("Por favor, selecciona un cliente existente haciendo clic en las sugerencias desplegadas.", "error");
+      showToast("Por favor, selecciona un cliente existente haciendo clic en las sugerencias desplegadas.", "error");
       return;
     }
 
@@ -980,7 +981,7 @@ async function saveManualRenewal() {
     const duracion_meses = parseInt(duracionRaw || '12', 10);
 
     if (isNaN(duracion_meses) || duracion_meses < 1 || duracion_meses > 99) {
-      window.showToast("La duración del contrato debe ser un número entero de 1 a 99 meses (máximo 2 dígitos).", "error");
+      showToast("La duración del contrato debe ser un número entero de 1 a 99 meses (máximo 2 dígitos).", "error");
       return;
     }
 
@@ -1010,16 +1011,16 @@ async function saveManualRenewal() {
     `, [cliente_id, tipo_energia, cups, comercializadora_actual, tarifa_actual, fecha_firma, duracion_meses, fecha_vencimiento, fecha_aviso_personalizada, notas]);
 
     document.getElementById('dialog-renewal-form')?.classList.remove('active');
-    window.showToast("Renovación de contrato registrada con éxito.", "success");
+    showToast("Renovación de contrato registrada con éxito.", "success");
     await refreshRenewals();
   } catch (err) {
     console.error("Error al guardar renovación manual:", err);
-    window.showToast("Error al guardar la renovación de contrato.", "error");
+    showToast("Error al guardar la renovación de contrato.", "error");
   }
 }
 
 async function markRenewalDone(renId) {
-  const confirmDone = await window.showConfirm(
+  const confirmDone = await showConfirm(
     "¿Deseas marcar esta renovación como COMPLETADA?\n\nEl contrato pasará a estado 'Renovado' y quedará archivado.",
     "Marcar Renovado"
   );
@@ -1028,7 +1029,7 @@ async function markRenewalDone(renId) {
   const db = await getDb();
   await db.execute(`UPDATE renovaciones SET estado_renovacion = 'Renovado' WHERE id = ?;`, [renId]);
 
-  window.showToast("Contrato marcado como Renovado con éxito.", "success");
+  showToast("Contrato marcado como Renovado con éxito.", "success");
   await refreshRenewals();
 }
 

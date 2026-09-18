@@ -1,4 +1,5 @@
 import { getClientesPaginated, addCliente, updateCliente, deleteCliente, getAgentes, getPuntosSuministroByCliente, syncPuntosSuministroCliente } from '../db.js';
+import { showToast, showConfirm } from '../ui.js';
 
 let currentClientPage = 1;
 const CLIENT_PAGE_SIZE = 25;
@@ -186,12 +187,12 @@ function setupFormSubmit() {
     const primaryCups = puntosData.length > 0 ? puntosData[0].cups : '';
 
     if (!agenteId || isNaN(agenteId)) {
-      window.showToast("Error: Debes seleccionar un agente comercial para el cliente.", "error");
+      showToast("Error: Debes seleccionar un agente comercial para el cliente.", "error");
       return;
     }
 
     if (!isValidSpanishId(cif)) {
-      window.showToast("Error: El DNI / CIF introducido no es un documento válido.", "error");
+      showToast("Error: El DNI / CIF introducido no es un documento válido.", "error");
       return;
     }
 
@@ -205,7 +206,7 @@ function setupFormSubmit() {
         const clientId = parseInt(id, 10);
         await updateCliente(clientId, nombre, cif, representante, primaryCups, email, agenteId);
         await syncPuntosSuministroCliente(clientId, puntosData);
-        window.showToast("Cliente y sus puntos de suministro actualizados.", "success");
+        showToast("Cliente y sus puntos de suministro actualizados.", "success");
         await loadClientsTable(currentClientPage);
       } else {
         // Registrar nuevo
@@ -220,7 +221,7 @@ function setupFormSubmit() {
         if (newClientId) {
           await syncPuntosSuministroCliente(newClientId, puntosData);
         }
-        window.showToast("Cliente y sus puntos de suministro registrados.", "success");
+        showToast("Cliente y sus puntos de suministro registrados.", "success");
         await loadClientsTable(1);
       }
 
@@ -229,9 +230,9 @@ function setupFormSubmit() {
     } catch (err) {
       console.error(err);
       if (err.message && err.message.includes("UNIQUE constraint failed")) {
-        window.showToast("Error: Ya existe un cliente registrado con ese DNI / CIF.", "error");
+        showToast("Error: Ya existe un cliente registrado con ese DNI / CIF.", "error");
       } else {
-        window.showToast(`Error al guardar cliente: ${err.message || err}`, "error");
+        showToast(`Error al guardar cliente: ${err.message || err}`, "error");
       }
     } finally {
       const submitBtn = form.querySelector('button[type="submit"]');
@@ -401,7 +402,7 @@ function renderClientsTableRows(clients, query) {
       const id = parseInt(btn.getAttribute('data-id'), 10);
       const name = btn.getAttribute('data-name');
       
-      const confirmDelete = await window.showConfirm(
+      const confirmDelete = await showConfirm(
         `¿Está seguro de eliminar al cliente "${name}"?\n\nEsta acción no se puede deshacer y eliminará automáticamente todas sus comparativas pendientes y rechazadas.`,
         "Eliminar Cliente"
       );
@@ -409,7 +410,7 @@ function renderClientsTableRows(clients, query) {
       if (confirmDelete) {
         try {
           await deleteCliente(id);
-          window.showToast("Cliente y sus datos asociados eliminados correctamente.", "success");
+          showToast("Cliente y sus datos asociados eliminados correctamente.", "success");
           
           // Si era el único en la página actual y no estamos en página 1, retroceder una página
           if (currentLoadedClients.length === 1 && currentClientPage > 1) {
@@ -420,7 +421,7 @@ function renderClientsTableRows(clients, query) {
           if (e.message === "OBLIGACION_LEGAL_RETENCION") {
             showLegalRetentionWarning();
           } else {
-            window.showToast(`Error al eliminar cliente: ${e.message || e}`, "error");
+            showToast(`Error al eliminar cliente: ${e.message || e}`, "error");
           }
         }
       }
