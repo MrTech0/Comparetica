@@ -1,6 +1,7 @@
 import test, { describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { invoke, listen } from '../src/js/ipc.js';
+import { APP_EVENTS, emitAppEvent, onAppEvent } from '../src/js/events.js';
 
 describe('Tauri IPC Module (src/js/ipc.js)', () => {
   const originalWindow = globalThis.window;
@@ -124,3 +125,163 @@ describe('Tauri IPC Module (src/js/ipc.js)', () => {
     });
   });
 });
+
+describe('Application Event Bus Module (src/js/events.js)', () => {
+  const originalWindow = globalThis.window;
+
+  afterEach(() => {
+    if (originalWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = originalWindow;
+    }
+  });
+
+  describe('APP_EVENTS catalog', () => {
+    test('es un objeto congelado (Object.isFrozen)', () => {
+      assert.strictEqual(Object.isFrozen(APP_EVENTS), true);
+    });
+
+    test('contiene todos los eventos de dominio esperados con sus nombres canónicos', () => {
+      assert.deepStrictEqual(APP_EVENTS, {
+        COMPARISON_SAVED: 'comparison-saved',
+        CLIENTS_UPDATED: 'clients-updated',
+        AGENTS_UPDATED: 'agents-updated',
+        TARIFFS_UPDATED: 'tariffs-updated',
+        SETTINGS_UPDATED: 'settings-updated'
+      });
+    });
+
+    test('no permite mutación de valores ni adición de nuevas propiedades', () => {
+      assert.throws(() => {
+        APP_EVENTS.COMPARISON_SAVED = 'modified';
+      }, TypeError);
+      assert.throws(() => {
+        APP_EVENTS.NEW_EVENT = 'new-event';
+      }, TypeError);
+    });
+  });
+
+  describe('emitAppEvent()', () => {
+    test('emite un CustomEvent en window con el nombre y payload provistos', () => {
+      let dispatchedEvent = null;
+      globalThis.window = {
+        dispatchEvent: (event) => {
+          dispatchedEvent = event;
+          return true;
+        }
+      };
+
+      const payload = { comparisonId: 'comp-123', total: 45.67 };
+      emitAppEvent(APP_EVENTS.COMPARISON_SAVED, payload);
+
+      assert.ok(dispatchedEvent instanceof CustomEvent);
+      assert.strictEqual(dispatchedEvent.type, 'comparison-saved');
+      assert.deepStrictEqual(dispatchedEvent.detail, payload);
+    });
+
+    test('emite un CustomEvent con detail = null cuando no se pasa payload', () => {
+      let dispatchedEvent = null;
+      globalThis.window = {
+        dispatchEvent: (event) => {
+          dispatchedEvent = event;
+          return true;
+        }
+      };
+
+      emitAppEvent(APP_EVENTS.SETTINGS_UPDATED);
+
+      assert.ok(dispatchedEvent instanceof CustomEvent);
+      assert.strictEqual(dispatchedEvent.type, 'settings-updated');
+      assert.strictEqual(dispatchedEvent.detail, null);
+    });
+
+    test('no lanza error si window es undefined', () => {
+      delete globalThis.window;
+      assert.doesNotThrow(() => {
+        emitAppEvent(APP_EVENTS.CLIENTS_UPDATED, { count: 5 });
+      });
+    });
+
+    test('no lanza error si window existe pero dispatchEvent no es una función', () => {
+      globalThis.window = {};
+      assert.doesNotThrow(() => {
+        emitAppEvent(APP_EVENTS.AGENTS_UPDATED);
+      });
+    });
+  });
+
+  describe('onAppEvent()', () => {
+    test('suscribe un handler en window y lo desuscribe al invocar la función devuelta', () => {
+      let addedEvent = null;
+      let addedHandler = null;
+      let removedEvent = null;
+      let removedHandler = null;
+
+      globalThis.window = {
+        addEventListener: (event, handler) => {
+          addedEvent = event;
+          addedHandler = handler;
+        },
+        removeEventListener: (event, handler) => {
+          removedEvent = event;
+          removedHandler = handler;
+        }
+      };
+
+      const handler = (e) => {};
+      const unsubscribe = onAppEvent(APP_EVENTS.TARIFFS_UPDATED, handler);
+
+      assert.strictEqual(addedEvent, 'tariffs-updated');
+      assert.strictEqual(addedHandler, handler);
+      assert.strictEqual(typeof unsubscribe, 'function');
+
+      unsubscribe();
+
+      assert.strictEqual(removedEvent, 'tariffs-updated');
+      assert.strictEqual(removedHandler, handler);
+    });
+
+    test('retorna función no-op sin lanzar error cuando window es undefined', () => {
+      delete globalThis.window;
+      let unsubscribe;
+      assert.doesNotThrow(() => {
+        unsubscribe = onAppEvent(APP_EVENTS.CLIENTS_UPDATED, () => {});
+      });
+      assert.strictEqual(typeof unsubscribe, 'function');
+      assert.doesNotThrow(() => unsubscribe());
+    });
+
+    test('retorna función no-op sin lanzar error cuando addEventListener no está disponible', () => {
+      globalThis.window = {};
+      let unsubscribe;
+      assert.doesNotThrow(() => {
+        unsubscribe = onAppEvent(APP_EVENTS.CLIENTS_UPDATED, () => {});
+      });
+      assert.strictEqual(typeof unsubscribe, 'function');
+      assert.doesNotThrow(() => unsubscribe());
+    });
+
+    test('flujo completo de broadcasting y desuscripción con EventTarget real', () => {
+      const bus = new EventTarget();
+      globalThis.window = bus;
+
+      const received = [];
+      const handler = (event) => {
+        received.push(event.detail);
+      };
+
+      const unsubscribe = onAppEvent(APP_EVENTS.COMPARISON_SAVED, handler);
+
+      emitAppEvent(APP_EVENTS.COMPARISON_SAVED, { id: 1 });
+      emitAppEvent(APP_EVENTS.COMPARISON_SAVED, { id: 2 });
+      assert.deepStrictEqual(received, [{ id: 1 }, { id: 2 }]);
+
+      unsubscribe();
+
+      emitAppEvent(APP_EVENTS.COMPARISON_SAVED, { id: 3 });
+      assert.deepStrictEqual(received, [{ id: 1 }, { id: 2 }]);
+    });
+  });
+});
+
