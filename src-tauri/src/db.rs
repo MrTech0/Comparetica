@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use base64::{Engine as _, engine::general_purpose};
@@ -165,11 +166,25 @@ impl DbState {
         let enc_path = self.enc_db_path();
         let legacy_path = self.legacy_db_path();
 
+        let tmp_path = enc_path.with_extension("enc.tmp");
+        if tmp_path.exists() {
+            let _ = fs::remove_file(&tmp_path);
+        }
+
         let mut conn = Connection::open_in_memory().map_err(|e| e.to_string())?;
 
         if enc_path.exists() {
+            let meta = fs::metadata(&enc_path).map_err(|e| e.to_string())?;
+            if meta.len() == 0 {
+                return Err("El archivo de base de datos cifrada existe pero está vacío (0 bytes).".to_string());
+            }
+
             let enc_bytes = fs::read(&enc_path).map_err(|e| e.to_string())?;
             let db_bytes = decrypt_aes_gcm(&mdk, &general_purpose::STANDARD.encode(enc_bytes))?;
+
+            if db_bytes.is_empty() {
+                return Err("El contenido descifrado de la base de datos está vacío.".to_string());
+            }
             
             let owned_data = {
                 let sz = db_bytes.len();
@@ -224,7 +239,22 @@ impl DbState {
         let enc_str = encrypt_aes_gcm(mdk, &db_bytes)?;
         let enc_bytes = general_purpose::STANDARD.decode(enc_str).map_err(|e| e.to_string())?;
         
-        fs::write(self.enc_db_path(), enc_bytes).map_err(|e| e.to_string())?;
+        let final_path = self.enc_db_path();
+        let tmp_path = final_path.with_extension("enc.tmp");
+
+        // Escritura forzada y sincronizada en archivo temporal adyacente
+        {
+            let mut file = fs::File::create(&tmp_path).map_err(|e| format!("Error al crear archivo temporal de persistencia: {}", e))?;
+            file.write_all(&enc_bytes).map_err(|e| format!("Error al escribir datos cifrados temporales: {}", e))?;
+            file.sync_all().map_err(|e| format!("Error al sincronizar datos a disco: {}", e))?;
+        }
+
+        // Reemplazo atómico a nivel de sistema de archivos
+        if let Err(e) = fs::rename(&tmp_path, &final_path) {
+            let _ = fs::remove_file(&tmp_path);
+            return Err(format!("Error en reemplazo atómico de base de datos cifrada: {}", e));
+        }
+
         Ok(())
     }
 
