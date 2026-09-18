@@ -461,9 +461,7 @@ async function initStartupUpdateCheck() {
     }
   } catch (error) {
     console.error("Error al comprobar actualizaciones al iniciar:", error);
-    if (window.__TAURI__ && window.__TAURI__.core) {
-      window.__TAURI__.core.invoke('log_frontend_error', { error: `Startup check error: ${error.message || error.toString()}` }).catch(err => console.error(err));
-    }
+    invoke('log_frontend_error', { error: `Startup check error: ${error.message || error.toString()}` }).catch(err => console.error(err));
   }
 }
 
