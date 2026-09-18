@@ -16,7 +16,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://apidatos.ree.es https://raw.githubusercontent.com https://github.com; img-src 'self' data: asset:; frame-src 'self' blob:;"
     }
   },
   "bundle": {
