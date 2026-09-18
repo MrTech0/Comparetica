@@ -1,5 +1,7 @@
 /* src/js/pdf.js */
 import { getCompanyConfig, getCompanyLogo } from './db.js';
+import { invoke } from './ipc.js';
+import { showToast } from './ui.js';
 
 /**
  * Solicita una contraseña para proteger el PDF exportado mediante un diálogo modal.
@@ -71,11 +73,7 @@ export async function generatePDFReport(data, previewMode = false, returnBase64 
 
   const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
   if (!jsPDFClass) {
-    if (window.showToast) {
-      window.showToast("Error: No se ha cargado la librería jsPDF. No se puede generar el reporte.", "error");
-    } else {
-      alert("Error: No se ha cargado la librería jsPDF. No se puede generar el reporte.");
-    }
+    showToast("Error: No se ha cargado la librería jsPDF. No se puede generar el reporte.", "error");
     return;
   }
 
@@ -557,11 +555,7 @@ export async function generatePDFReport(data, previewMode = false, returnBase64 
       }
     } catch (e) {
       console.error("Error al previsualizar el PDF:", e);
-      if (window.showToast) {
-        window.showToast("Error al previsualizar el reporte.", "error");
-      } else {
-        alert("Error al previsualizar el reporte.");
-      }
+      showToast("Error al previsualizar el reporte.", "error");
     }
     return;
   }
@@ -574,17 +568,16 @@ export async function generatePDFReport(data, previewMode = false, returnBase64 
   const safeClientName = data.clientName.toLowerCase().replace(/[^a-z0-9]/g, '_');
   const filename = `comparativa_${safeClientName}.pdf`;
 
-  if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+  if (typeof window !== 'undefined' && window.__TAURI__) {
     const pdfBase64 = doc.output('datauristring').split(',')[1];
-    window.__TAURI__.core.invoke('save_pdf', { filename, base64Data: pdfBase64 })
-      .then(path => {
-        console.log(`Archivo PDF guardado correctamente en: ${path}`);
-      })
-      .catch(err => {
-        if (err !== "Cancelado por el usuario") {
-          window.showToast("Error al guardar el PDF: " + err, "error");
-        }
-      });
+    try {
+      const path = await invoke('save_pdf', { filename, base64Data: pdfBase64 });
+      console.log(`Archivo PDF guardado correctamente en: ${path}`);
+    } catch (err) {
+      if (err !== "Cancelado por el usuario") {
+        showToast("Error al guardar el PDF: " + err, "error");
+      }
+    }
   } else {
     doc.save(filename);
   }

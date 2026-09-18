@@ -1,4 +1,5 @@
 // src/js/db.js
+import { invoke } from './ipc.js';
 
 let dbInstance = null;
 
@@ -6,7 +7,6 @@ let dbInstance = null;
  * Comprueba el estado de inicialización y desbloqueo de la base de datos cifrada.
  */
 export async function checkDbStatus() {
-  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   return await invoke('db_check_status');
 }
 
@@ -14,7 +14,6 @@ export async function checkDbStatus() {
  * Configura por primera vez la Contraseña Maestra y devuelve la Clave de Recuperación.
  */
 export async function setupMasterPassword(password) {
-  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   return await invoke('db_setup_master_password', { password });
 }
 
@@ -22,7 +21,6 @@ export async function setupMasterPassword(password) {
  * Desbloquea la base de datos cifrada mediante la Contraseña Maestra.
  */
 export async function loginDb(password) {
-  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   return await invoke('db_login', { password });
 }
 
@@ -30,7 +28,6 @@ export async function loginDb(password) {
  * Recupera el acceso a la base de datos con la Clave de Recuperación y establece una nueva contraseña.
  */
 export async function recoverDbAccess(recoveryKey, newPassword) {
-  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   return await invoke('db_recover_access', { recoveryKey, newPassword });
 }
 
@@ -38,7 +35,6 @@ export async function recoverDbAccess(recoveryKey, newPassword) {
  * Cambia la contraseña maestra de la bóveda.
  */
 export async function changeMasterPassword(currentPassword, newPassword) {
-  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   return await invoke('db_change_password', { currentPassword, newPassword });
 }
 
@@ -48,12 +44,6 @@ export async function changeMasterPassword(currentPassword, newPassword) {
  */
 export async function getDb() {
   if (dbInstance) return dbInstance;
-
-  if (!window.__TAURI__) {
-    throw new Error("Comparetica debe ejecutarse en el entorno de escritorio nativo (Tauri).");
-  }
-
-  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
 
   dbInstance = {
     async select(query, params = []) {
@@ -923,7 +913,6 @@ export async function importClientesBatch(rows, updateExisting = false) {
     }
   }
 
-  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   const [added, updated, skipped] = await invoke('db_import_clientes_batch', { rows, updateExisting });
   return { added, updated, skipped, errors: [] };
 }
@@ -936,7 +925,6 @@ export async function importClientesBatch(rows, updateExisting = false) {
 export async function importRenovacionesBatch(rows) {
   if (!rows || rows.length === 0) return 0;
 
-  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   return await invoke('db_import_renovaciones_batch', { rows });
 }
 
@@ -994,15 +982,15 @@ export async function getCompanyConfig() {
       } catch (e) {
         console.error("Error al migrar company_config desde localStorage:", e);
       }
-    } else if (window.__TAURI__ && window.__TAURI__.core) {
+    } else {
       try {
-        const rustConfig = await window.__TAURI__.core.invoke('get_company_config');
+        const rustConfig = await invoke('get_company_config');
         if (rustConfig && Object.keys(rustConfig).length > 0) {
           config = rustConfig;
           await setAjuste('company_config', config);
         }
       } catch (err) {
-        console.warn("Error al obtener company_config desde Rust:", err);
+        console.warn("Error al obtener company_config desde backend:", err);
       }
     }
   }
@@ -1014,15 +1002,15 @@ export async function getCompanyConfig() {
  */
 export async function saveCompanyConfig(configData) {
   await setAjuste('company_config', configData);
-  if (window.__TAURI__ && window.__TAURI__.core) {
-    try {
-      await window.__TAURI__.core.invoke('save_company_config', { config: configData });
-    } catch (err) {
-      console.warn("No se pudo invocar save_company_config en backend:", err);
-    }
+  try {
+    await invoke('save_company_config', { config: configData });
+  } catch (err) {
+    console.warn("No se pudo invocar save_company_config en backend:", err);
   }
   // Mantener sincronizado localStorage para compatibilidad
-  localStorage.setItem('company_config', JSON.stringify(configData));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('company_config', JSON.stringify(configData));
+  }
 }
 
 /**
@@ -1031,16 +1019,16 @@ export async function saveCompanyConfig(configData) {
 export async function getCompanyLogo() {
   let logo = await getAjuste('company_logo', null);
   if (!logo) {
-    const localLogo = localStorage.getItem('company_logo');
+    const localLogo = typeof localStorage !== 'undefined' ? localStorage.getItem('company_logo') : null;
     if (localLogo) {
       logo = localLogo;
       await setAjuste('company_logo', logo);
-    } else if (window.__TAURI__ && window.__TAURI__.core) {
+    } else {
       try {
-        logo = await window.__TAURI__.core.invoke('get_company_logo');
+        logo = await invoke('get_company_logo');
         if (logo) await setAjuste('company_logo', logo);
       } catch (err) {
-        console.warn("Error al obtener logo desde Rust:", err);
+        console.warn("Error al obtener logo desde backend:", err);
       }
     }
   }
@@ -1052,7 +1040,9 @@ export async function getCompanyLogo() {
  */
 export async function saveCompanyLogo(logoDataUri) {
   await setAjuste('company_logo', logoDataUri);
-  localStorage.setItem('company_logo', logoDataUri);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('company_logo', logoDataUri);
+  }
 }
 
 /**
@@ -1061,14 +1051,30 @@ export async function saveCompanyLogo(logoDataUri) {
 export async function deleteCompanyLogo() {
   const db = await getDb();
   await db.execute("DELETE FROM ajustes WHERE clave = 'company_logo';");
-  localStorage.removeItem('company_logo');
-  if (window.__TAURI__ && window.__TAURI__.core) {
-    try {
-      await window.__TAURI__.core.invoke('delete_company_logo');
-    } catch (err) {
-      console.warn("Error al borrar logo en Rust:", err);
-    }
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('company_logo');
   }
+  try {
+    await invoke('delete_company_logo');
+  } catch (err) {
+    console.warn("Error al borrar logo en backend:", err);
+  }
+}
+
+/**
+ * Exporta una copia de seguridad de la base de datos cifrada.
+ * @returns {Promise<string>} Ruta del archivo de respaldo generado.
+ */
+export async function exportDbBackup() {
+  return await invoke('export_backup');
+}
+
+/**
+ * Importa y restaura una copia de seguridad en la base de datos cifrada.
+ * @returns {Promise<string>} Mensaje descriptivo o 'DEV_MODE'.
+ */
+export async function importDbBackup() {
+  return await invoke('import_backup');
 }
 
 /**

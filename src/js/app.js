@@ -11,6 +11,8 @@ import { initBackupView } from './views/backup.js';
 import { initWizard } from './views/wizard.js';
 import { initSettingsView, refreshCompanySettings } from './views/settings.js';
 import { initAgentsView, loadAgentsTable, ensureInitialAgentFlow } from './views/agents.js';
+import { showToast, showActionToast, showConfirm } from './ui.js';
+import { emitAppEvent, APP_EVENTS } from './events.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Inicializar sistema de temas (Claro / Oscuro)
@@ -190,7 +192,7 @@ function initNavigation() {
         await updateComercializadorasSelectors();
       } else if (item.btn === 'nav-history') {
         // Disparar evento para refrescar historial
-        window.dispatchEvent(new CustomEvent('comparison-saved'));
+        emitAppEvent(APP_EVENTS.COMPARISON_SAVED);
       } else if (item.btn === 'nav-renewals') {
         const renewalsModule = await import('./views/renewals.js');
         if (renewalsModule && renewalsModule.refreshRenewals) {
@@ -225,103 +227,6 @@ function initPrivateMode() {
     }
   });
 }
-
-// --- NOTIFICACIONES TOAST (Material 3) ---
-window.showToast = function(message, type = 'success') {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-
-  const toast = document.createElement('div');
-  toast.className = `m3-toast ${type}`;
-  toast.innerText = message;
-
-  container.appendChild(toast);
-
-  // Auto-eliminar después de 4 segundos
-  setTimeout(() => {
-    toast.classList.add('m3-toast-fadeout');
-    toast.addEventListener('animationend', () => {
-      toast.remove();
-    });
-  }, 4000);
-};
-
-window.showActionToast = function(message, actions = []) {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-
-  const toast = document.createElement('div');
-  toast.className = 'm3-toast action-toast';
-
-  const textSpan = document.createElement('span');
-  textSpan.className = 'toast-text';
-  textSpan.innerText = message;
-  toast.appendChild(textSpan);
-
-  const actionsDiv = document.createElement('div');
-  actionsDiv.className = 'toast-actions';
-
-  actions.forEach(action => {
-    const btn = document.createElement('button');
-    btn.className = action.class || '';
-    btn.innerText = action.text;
-    btn.addEventListener('click', () => {
-      if (action.callback) action.callback();
-      toast.classList.add('m3-toast-fadeout');
-      toast.addEventListener('animationend', () => {
-        toast.remove();
-      });
-    });
-    actionsDiv.appendChild(btn);
-  });
-
-  toast.appendChild(actionsDiv);
-  container.appendChild(toast);
-};
-
-
-/**
- * Muestra un diálogo de confirmación personalizado de Material Design 3.
- * @param {string} mensaje - Mensaje a mostrar.
- * @param {string} titulo - Título del diálogo.
- * @returns {Promise<boolean>} Devuelve una promesa que se resuelve a true si el usuario acepta, o false si cancela.
- */
-window.showConfirm = function(mensaje, titulo = "Confirmación") {
-  return new Promise((resolve) => {
-    const overlay = document.getElementById('dialog-confirm');
-    const titleEl = document.getElementById('dialog-confirm-title');
-    const msgEl = document.getElementById('dialog-confirm-message');
-    const btnCancel = document.getElementById('dialog-confirm-cancel');
-    const btnAccept = document.getElementById('dialog-confirm-accept');
-
-    if (!overlay || !titleEl || !msgEl || !btnCancel || !btnAccept) {
-      // Fallback a confirm nativo si por alguna razón no se encuentra el HTML
-      resolve(confirm(mensaje));
-      return;
-    }
-
-    titleEl.innerText = titulo;
-    msgEl.innerText = mensaje;
-
-    // Clonar botones para limpiar cualquier event listener previo
-    const cancelClone = btnCancel.cloneNode(true);
-    const acceptClone = btnAccept.cloneNode(true);
-    btnCancel.replaceWith(cancelClone);
-    btnAccept.replaceWith(acceptClone);
-
-    cancelClone.addEventListener('click', () => {
-      overlay.classList.remove('active');
-      resolve(false);
-    });
-
-    acceptClone.addEventListener('click', () => {
-      overlay.classList.remove('active');
-      resolve(true);
-    });
-
-    overlay.classList.add('active');
-  });
-};
 
 // --- MATERIAL 3 CUSTOM STYLED SELECT DROPDOWNS ---
 export function initCustomSelects() {
@@ -527,7 +432,7 @@ async function initStartupUpdateCheck() {
         const oneDayMs = 24 * 60 * 60 * 1000;
         const postponedTime = Date.now() + oneDayMs;
         localStorage.setItem('update_postponed_until', postponedTime.toString());
-        window.showToast("Actualización pospuesta durante 24 horas.", "info");
+        showToast("Actualización pospuesta durante 24 horas.", "info");
         overlay.classList.remove('active');
       });
 
@@ -539,7 +444,7 @@ async function initStartupUpdateCheck() {
 
         try {
           await update.downloadAndInstall();
-          window.showToast("Actualización instalada con éxito. Reiniciando...", "success");
+          showToast("Actualización instalada con éxito. Reiniciando...", "success");
           setTimeout(async () => {
             if (window.__TAURI__ && window.__TAURI__.core) {
               await window.__TAURI__.core.invoke('restart_app');
@@ -547,7 +452,7 @@ async function initStartupUpdateCheck() {
           }, 1500);
         } catch (err) {
           console.error(err);
-          window.showToast("Error al descargar e instalar la actualización.", "error");
+          showToast("Error al descargar e instalar la actualización.", "error");
           acceptClone.disabled = false;
           acceptClone.textContent = 'Reintentar';
           postponeClone.style.display = 'block';

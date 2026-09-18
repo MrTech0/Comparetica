@@ -1,5 +1,7 @@
 // src/js/csv_importer.js
 import { getClientesSchemaColumns, importClientesBatch } from './db.js';
+import { invoke, listen } from './ipc.js';
+import { showToast } from './ui.js';
 
 let parsedCsvData = { headers: [], rows: [] };
 let crmColumns = []; // [{ name, label, notnull, type }]
@@ -8,7 +10,7 @@ let columnMappings = {}; // { crmColumnName: csvHeaderIndex }
 let pendingConversionBuffer = null;
 let pendingFileName = "";
 
-export function initCsvImporter() {
+export async function initCsvImporter() {
   const fileInput = document.getElementById('csv-file-input');
   const dropzone = document.getElementById('csv-dropzone');
   const btnSelectFile = document.getElementById('btn-select-csv-file');
@@ -43,40 +45,38 @@ export function initCsvImporter() {
   });
 
   // Eventos nativos de drag & drop en Tauri 2 (escuchando eventos del sistema)
-  if (window.__TAURI__ && window.__TAURI__.event) {
-    try {
-      window.__TAURI__.event.listen('tauri://drag-enter', () => {
-        dropzone.classList.add('drag-over');
-      });
-      window.__TAURI__.event.listen('tauri://drag-over', () => {
-        dropzone.classList.add('drag-over');
-      });
-      window.__TAURI__.event.listen('tauri://drag-leave', () => {
-        dropzone.classList.remove('drag-over');
-      });
-      window.__TAURI__.event.listen('tauri://drag-drop', async (event) => {
-        dropzone.classList.remove('drag-over');
-        const step1 = document.getElementById('csv-step-1');
-        if (step1 && !step1.classList.contains('hidden')) {
-          const paths = event.payload?.paths || (Array.isArray(event.payload) ? event.payload : []);
-          if (paths.length > 0) {
-            await readAndProcessFilePath(paths[0]);
-          }
+  try {
+    await listen('tauri://drag-enter', () => {
+      dropzone.classList.add('drag-over');
+    });
+    await listen('tauri://drag-over', () => {
+      dropzone.classList.add('drag-over');
+    });
+    await listen('tauri://drag-leave', () => {
+      dropzone.classList.remove('drag-over');
+    });
+    await listen('tauri://drag-drop', async (event) => {
+      dropzone.classList.remove('drag-over');
+      const step1 = document.getElementById('csv-step-1');
+      if (step1 && !step1.classList.contains('hidden')) {
+        const paths = event.payload?.paths || (Array.isArray(event.payload) ? event.payload : []);
+        if (paths.length > 0) {
+          await readAndProcessFilePath(paths[0]);
         }
-      });
-      window.__TAURI__.event.listen('tauri://file-drop', async (event) => {
-        dropzone.classList.remove('drag-over');
-        const step1 = document.getElementById('csv-step-1');
-        if (step1 && !step1.classList.contains('hidden')) {
-          const paths = Array.isArray(event.payload) ? event.payload : (event.payload?.paths || []);
-          if (paths.length > 0) {
-            await readAndProcessFilePath(paths[0]);
-          }
+      }
+    });
+    await listen('tauri://file-drop', async (event) => {
+      dropzone.classList.remove('drag-over');
+      const step1 = document.getElementById('csv-step-1');
+      if (step1 && !step1.classList.contains('hidden')) {
+        const paths = Array.isArray(event.payload) ? event.payload : (event.payload?.paths || []);
+        if (paths.length > 0) {
+          await readAndProcessFilePath(paths[0]);
         }
-      });
-    } catch (e) {
-      console.warn("No se pudieron registrar eventos nativos de drag-drop:", e);
-    }
+      }
+    });
+  } catch (e) {
+    console.warn("No se pudieron registrar eventos nativos de drag-drop:", e);
   }
 
   if (btnSelectFile) {
@@ -137,11 +137,11 @@ function setupEncodingModals() {
         const decoder = new TextDecoder('windows-1252');
         const text = decoder.decode(pendingConversionBuffer);
         
-        window.showToast("✅ Conversión a UTF-8 completada con éxito. Puedes continuar con la importación.", "success");
+        showToast("✅ Conversión a UTF-8 completada con éxito. Puedes continuar con la importación.", "success");
         await processCsvContent(text, pendingFileName);
       } catch (err) {
         console.error("Error al convertir buffer a UTF-8:", err);
-        window.showToast("Error al realizar la conversión de codificación.", "error");
+        showToast("Error al realizar la conversión de codificación.", "error");
       } finally {
         pendingConversionBuffer = null;
         pendingFileName = "";
@@ -167,7 +167,7 @@ function resetImporter() {
 
 async function handleCsvFile(file) {
   if (!file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.txt')) {
-    window.showToast("Por favor, selecciona un archivo en formato CSV o TXT.", "error");
+    showToast("Por favor, selecciona un archivo en formato CSV o TXT.", "error");
     return;
   }
 
@@ -178,7 +178,7 @@ async function handleCsvFile(file) {
       await inspectAndProcessArrayBuffer(buffer, file.name);
     } catch (err) {
       console.error("Error al procesar el archivo CSV:", err);
-      window.showToast("Error al leer el archivo CSV.", "error");
+      showToast("Error al leer el archivo CSV.", "error");
     }
   };
 
@@ -187,24 +187,21 @@ async function handleCsvFile(file) {
 
 async function readAndProcessFilePath(filePath) {
   if (!filePath.toLowerCase().endsWith('.csv') && !filePath.toLowerCase().endsWith('.txt')) {
-    window.showToast("Por favor, selecciona un archivo en formato CSV o TXT.", "error");
+    showToast("Por favor, selecciona un archivo en formato CSV o TXT.", "error");
     return;
   }
 
   try {
     const fileName = filePath.split(/[/\\]/).pop() || "archivo.csv";
 
-    if (window.__TAURI__) {
-      const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
-      const text = await invoke('read_text_file', { path: filePath });
-      // Convert string to bytes for encoding inspection
-      const encoder = new TextEncoder();
-      const buffer = encoder.encode(text);
-      await inspectAndProcessArrayBuffer(buffer, fileName);
-    }
+    const text = await invoke('read_text_file', { path: filePath });
+    // Convert string to bytes for encoding inspection
+    const encoder = new TextEncoder();
+    const buffer = encoder.encode(text);
+    await inspectAndProcessArrayBuffer(buffer, fileName);
   } catch (err) {
     console.error("Error al procesar el archivo arrastrado:", err);
-    window.showToast("Error al leer el archivo arrastrado.", "error");
+    showToast("Error al leer el archivo arrastrado.", "error");
   }
 }
 
@@ -247,7 +244,7 @@ async function processCsvContent(text, fileName) {
   parsedCsvData = parseCSVText(text);
 
   if (!parsedCsvData.headers || parsedCsvData.headers.length === 0 || parsedCsvData.rows.length === 0) {
-    window.showToast("El archivo CSV está vacío o no tiene un formato válido.", "error");
+    showToast("El archivo CSV está vacío o no tiene un formato válido.", "error");
     return;
   }
 
@@ -490,7 +487,7 @@ async function executeImport() {
 
   if (missingRequired.length > 0) {
     const missingNames = missingRequired.map(c => c.label).join(', ');
-    window.showToast(`Debes asociar los campos obligatorios del CRM: ${missingNames}`, "error");
+    showToast(`Debes asociar los campos obligatorios del CRM: ${missingNames}`, "error");
     return;
   }
 
@@ -629,10 +626,10 @@ async function executeImport() {
       }
     }
 
-    window.showToast(`Importación completada: ${totalAdded.toLocaleString('es-ES')} creados, ${totalUpdated.toLocaleString('es-ES')} actualizados.`, "success");
+    showToast(`Importación completada: ${totalAdded.toLocaleString('es-ES')} creados, ${totalUpdated.toLocaleString('es-ES')} actualizados.`, "success");
   } catch (err) {
     console.error("Error durante la importación CSV:", err);
-    window.showToast(`Error durante la importación: ${err.message || err}`, "error");
+    showToast(`Error durante la importación: ${err.message || err}`, "error");
   } finally {
     if (btnProcess) {
       btnProcess.disabled = false;

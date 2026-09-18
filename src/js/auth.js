@@ -1,5 +1,7 @@
 // src/js/auth.js
 import { checkDbStatus, setupMasterPassword, loginDb, recoverDbAccess, changeMasterPassword } from './db.js';
+import { invoke } from './ipc.js';
+import { showToast } from './ui.js';
 
 let authOverlayEl = null;
 let authTitleEl = null;
@@ -176,14 +178,9 @@ function setupAuthEventListeners(onUnlockedCallback) {
 
   if (btnOnboardingRestoreBackup) {
     btnOnboardingRestoreBackup.addEventListener('click', async () => {
-      if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
-        showAlert("Las copias de seguridad solo se pueden restaurar en la app instalada (Tauri).");
-        return;
-      }
-
       try {
         btnOnboardingRestoreBackup.disabled = true;
-        const msg = await window.__TAURI__.core.invoke('import_backup');
+        const msg = await invoke('import_backup');
         localStorage.setItem('first_run_completed', 'true');
 
         if (msg === "DEV_MODE") {
@@ -400,10 +397,9 @@ async function generateRecoveryPdf(key) {
   doc.text("Fecha de generación: " + new Date().toLocaleString('es-ES'), 15, 110);
   doc.text("Comparetica - Sistema de Cifrado de Datos B2B", 15, 116);
 
-  if (window.__TAURI__) {
+  if (typeof window !== 'undefined' && window.__TAURI__) {
     const pdfDataUri = doc.output('datauristring');
     const base64Data = pdfDataUri.split(',')[1];
-    const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
 
     try {
       const savedPath = await invoke('save_pdf', {
