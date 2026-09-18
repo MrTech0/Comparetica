@@ -18,6 +18,8 @@
 - **Precios de la Energía Regulada (PVPC) en Tiempo Real**: Pantalla de inicio que consulta directamente a la API oficial de Red Eléctrica de España (REE) para mostrar el precio medio diario del PVPC, el precio del mercado pool diario (OMIE) y el desglose de precios regulados por horas en formato visual e interactivo.
 - **Gestión de Tarifas (CRUD)**: Panel interno para registrar, editar y dar de baja comercializadoras y tarifas de luz o gas.
 - **Modo Privado (Confidencialidad)**: Interruptor en la barra lateral que oculta visualmente (difumina) las comisiones del asesor de cara al cliente en todas las vistas de la aplicación durante presentaciones en vivo.
+- **Seguridad y Cifrado Local Zero-Plaintext**: Base de datos SQLite cifrada en reposo mediante ChaCha20-Poly1305 con derivación de clave por Argon2id (`vault.json`). Operaciones de descifrado y guardado 100% en memoria (`rusqlite::serialize`/`deserialize`) sin persistir ficheros de base de datos planos en disco. Persistencia atómica (`fs::rename` con sincronización física) para máxima tolerancia a fallos ante caídas o apagados inesperados.
+- **Gestión Integral de Cartera y Renovaciones**: Módulos completos para administración de clientes, agentes comerciales, panel de alertas de vencimiento de contratos y asistente guiado (*wizard*) para nuevos estudios.
 - **Reportes Ejecutivos en PDF**:
   - **Previsualización en Pantalla**: Permite ver el diseño del reporte en tiempo real en un visor integrado sin necesidad de guardarlo en disco.
   - **Exportación Local**: Generación nativa de un PDF estético y estructurado con el desglose de conceptos para entregar al cliente.
@@ -47,6 +49,19 @@ Para iniciar la aplicación de escritorio en modo de desarrollo local:
 pnpm tauri dev
 ```
 
+### Ejecutar Pruebas Automatizadas
+El proyecto incluye suites de pruebas unitarias y de integración tanto para el frontend como para el backend nativo:
+
+- **Pruebas de Frontend (JavaScript)**: Ejecutadas con el test runner nativo de Node.js, sin dependencias externas pesadas:
+  ```bash
+  pnpm test
+  # o directamente: node --test
+  ```
+- **Pruebas de Backend (Rust)**: Verifican la persistencia atómica, el ciclo de vida del almacén seguro (`vault`) y las operaciones criptográficas en memoria:
+  ```bash
+  cargo test --manifest-path src-tauri/Cargo.toml
+  ```
+
 ---
 
 ## 📦 Compilación y Distribución
@@ -70,13 +85,52 @@ pnpm tauri build
 
 ## 📂 Estructura del Código
 
-- `/src/index.html`: Estructura principal y plantillas de diálogos modales (Material Design 3).
-- `/src/js/app.js`: Inicializador del ciclo de vida, navegación y sistema de temas.
-- `/src/js/db.js`: Manejo de base de datos SQLite y consultas de almacenamiento local.
-- `/src/js/calculator.js`: Motor matemático de cálculo para facturas de luz y gas.
-- `/src/js/pdf.js`: Diseñador del reporte ejecutivo en PDF y previsualizador dinámico.
-- `/src/js/views/`: Controladores de vistas específicas (Inicio, Historial, Comparador, Tarifas, Backups).
-- `/src-tauri/`: Código nativo de integración con Windows escrito en Rust (comandos de backup, gestión de diálogos de guardado de PDF y eventos de cierre de aplicación).
+La aplicación sigue una arquitectura desacoplada, reactiva y modular, dividida entre el frontend en ES Modules (vanilla JavaScript con Material Design 3) y el backend nativo en Rust orquestado por Tauri:
+
+```
+├── src/                               # Frontend de la aplicación (Webview)
+│   ├── index.html                     # Contenedor principal, navegación y plantillas de modales M3
+│   ├── css/                           # Estilos globales y variables de diseño Material Design 3
+│   └── js/
+│       ├── app.js                     # Ciclo de vida, router SPA y listeners globales
+│       ├── ipc.js                     # Capa de abstracción centralizada para IPC con Tauri (v1 y v2)
+│       ├── events.js                  # Catálogo inmutable (APP_EVENTS) y bus de eventos desacoplado
+│       ├── ui.js                      # Sistema de notificaciones toast y diálogo modal interactivo
+│       ├── db.js                      # Capa de acceso a datos SQLite cifrados y tabla ajustes
+│       ├── auth.js                    # Autenticación, control de sesión maestra y agente activo
+│       ├── calculator.js              # Motor matemático de facturación (2.0TD, 3.0TD, gas, autoconsumo)
+│       ├── pdf.js                     # Generación nativa y previsualizador dinámico de reportes PDF
+│       ├── csv_importer.js            # Importación y normalización masiva de tarifas desde CSV
+│       ├── components/                # Componentes reutilizables de UI
+│       │   └── date_range_picker.js   # Selector de rangos de fechas interactivo
+│       └── views/                     # Controladores de vista modulares e independientes
+│           ├── home.js                # Precios PVPC y mercado mayorista (OMIE) en tiempo real
+│           ├── calculator_view.js     # Comparador dinámico de ofertas y estudios energéticos
+│           ├── wizard.js              # Asistente guiado paso a paso para nuevos estudios
+│           ├── history.js             # Historial, filtrado y gestión de comparativas guardadas
+│           ├── tariffs.js             # Catálogo y mantenimiento de comercializadoras y tarifas (CRUD)
+│           ├── clients.js             # Gestión de la cartera de clientes y contratos asociados
+│           ├── agents.js              # Gestión y asignación de agentes comerciales
+│           ├── renewals.js            # Panel de alertas y control de vencimientos de contratos
+│           ├── settings.js            # Configuración de empresa, logotipo y umbrales de alerta
+│           └── backup.js              # Gestión de copias de seguridad manuales y programadas
+│
+├── src-tauri/                         # Backend nativo en Rust (Tauri)
+│   ├── Cargo.toml                     # Dependencias nativas (rusqlite, chacha20poly1305, argon2, etc.)
+│   ├── tauri.conf.json                # Configuración de ventana, capacidades y CSP estricta
+│   └── src/
+│       ├── main.rs                    # Punto de entrada y runtime nativo de Tauri
+│       ├── lib.rs                     # Registro de comandos IPC, diálogos y eventos de la aplicación
+│       └── db.rs                      # Persistencia SQLite cifrada en memoria (serialize/deserialize),
+│                                      # escrituras atómicas (fs::rename), vault y copias de seguridad
+│
+├── test/                              # Suite de pruebas automatizadas (Node.js test runner)
+│   ├── calculator.test.js             # Verificación del motor de facturación (luz, gas, autoconsumo, bono)
+│   ├── ipc_and_ui.test.js             # Verificación de capa IPC, bus de eventos y notificaciones UI
+│   └── settings_dom.test.js           # Verificación de integridad del DOM y selectores personalizados
+│
+└── docs/                              # Especificaciones de diseño, arquitectura y planes de ejecución
+```
 
 ---
 
