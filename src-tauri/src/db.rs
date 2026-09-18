@@ -119,6 +119,11 @@ impl DbState {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn new_with_dir(app_data_dir: PathBuf) -> Self {
+        Self::new(app_data_dir)
+    }
+
     pub fn vault_path(&self) -> PathBuf {
         self.app_data_dir.join("vault.json")
     }
@@ -819,6 +824,18 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    struct Uuid;
+    impl Uuid {
+        fn new_v4() -> String {
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let rand_val: u64 = rand::random();
+            format!("{}-{}", nanos, rand_val)
+        }
+    }
+
     fn setup_test_dir(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -952,5 +969,61 @@ mod tests {
 
         drop(db_restart);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_atomic_persistence_and_empty_file_handling() {
+        let test_id = Uuid::new_v4().to_string();
+        let test_dir = std::env::temp_dir().join(format!("comparetica_test_atomic_{}", test_id));
+        let _ = fs::create_dir_all(&test_dir);
+
+        let mut state = DbState::new_with_dir(test_dir.clone());
+        let pwd = "Password123!";
+        let _rec = state.setup_master_password(pwd).unwrap();
+
+        // 1. Verificar que persist_db generó comparetica.db.enc y NO dejó .enc.tmp
+        let enc_file = test_dir.join("comparetica.db.enc");
+        let tmp_file = test_dir.join("comparetica.db.enc.tmp");
+
+        assert!(enc_file.exists(), "comparetica.db.enc debe existir tras setup");
+        assert!(!tmp_file.exists(), "comparetica.db.enc.tmp no debe quedar en disco tras persistir");
+        assert!(fs::metadata(&enc_file).unwrap().len() > 0, "El archivo cifrado no debe estar vacío");
+
+        // 2. Insertar registros y re-persistir asegurando atomicidad
+        state.execute("INSERT INTO comercializadoras (nombre) VALUES ('Test Atomic S.L.');", vec![]).unwrap();
+        assert!(!tmp_file.exists(), "El archivo temporal no debe existir tras execute");
+
+        // 3. Crear artificialmente un .enc.tmp huérfano y verificar que open_db lo limpia
+        fs::write(&tmp_file, b"stale tmp file").unwrap();
+        assert!(tmp_file.exists());
+
+        // Cargar vault y abrir db para probar limpieza de .tmp
+        let vault = state.load_vault().unwrap().unwrap();
+        let salt_p = general_purpose::STANDARD.decode(&vault.salt_password).unwrap();
+        let key_p = derive_key(pwd, &salt_p).unwrap();
+        let mdk_bytes = decrypt_aes_gcm(&key_p, &vault.encrypted_mdk_password).unwrap();
+        let mut mdk = [0u8; 32];
+        mdk.copy_from_slice(&mdk_bytes);
+
+        let mut fresh_state = DbState::new_with_dir(test_dir.clone());
+        fresh_state.open_db(mdk).unwrap();
+        assert!(!tmp_file.exists(), "open_db debe limpiar cualquier .enc.tmp huérfano existente");
+
+        // 4. Simular un archivo de 0 bytes en un directorio limpio y verificar rechazo explícito
+        let empty_test_dir = std::env::temp_dir().join(format!("comparetica_test_empty_{}", test_id));
+        let _ = fs::create_dir_all(&empty_test_dir);
+        let empty_enc = empty_test_dir.join("comparetica.db.enc");
+        fs::write(&empty_enc, b"").unwrap();
+
+        let mut empty_state = DbState::new_with_dir(empty_test_dir.clone());
+        let fake_mdk = [7u8; 32];
+        let open_res = empty_state.open_db(fake_mdk);
+
+        assert!(open_res.is_err(), "open_db debe fallar si el archivo cifrado tiene 0 bytes");
+        let err_msg = open_res.err().unwrap();
+        assert!(err_msg.contains("0 bytes"), "El mensaje de error debe indicar archivo vacío: {}", err_msg);
+
+        let _ = fs::remove_dir_all(test_dir);
+        let _ = fs::remove_dir_all(empty_test_dir);
     }
 }
