@@ -6,27 +6,14 @@ let dbInstance = null;
  * Comprueba el estado de inicialización y desbloqueo de la base de datos cifrada.
  */
 export async function checkDbStatus() {
-  if (!window.__TAURI__) {
-    return { is_initialized: true, is_unlocked: true, needs_migration: false };
-  }
   const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   return await invoke('db_check_status');
-}
-
-function generateMockRecoveryKey() {
-  const chars = '2345679ACDEFGHJKMNPQRSTVWXYZ';
-  let raw = '';
-  for (let i = 0; i < 16; i++) {
-    raw += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return `RC-${raw.substring(0, 4)}-${raw.substring(4, 8)}-${raw.substring(8, 12)}-${raw.substring(12, 16)}`;
 }
 
 /**
  * Configura por primera vez la Contraseña Maestra y devuelve la Clave de Recuperación.
  */
 export async function setupMasterPassword(password) {
-  if (!window.__TAURI__) return generateMockRecoveryKey();
   const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   return await invoke('db_setup_master_password', { password });
 }
@@ -35,7 +22,6 @@ export async function setupMasterPassword(password) {
  * Desbloquea la base de datos cifrada mediante la Contraseña Maestra.
  */
 export async function loginDb(password) {
-  if (!window.__TAURI__) return true;
   const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   return await invoke('db_login', { password });
 }
@@ -44,7 +30,6 @@ export async function loginDb(password) {
  * Recupera el acceso a la base de datos con la Clave de Recuperación y establece una nueva contraseña.
  */
 export async function recoverDbAccess(recoveryKey, newPassword) {
-  if (!window.__TAURI__) return true;
   const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   return await invoke('db_recover_access', { recoveryKey, newPassword });
 }
@@ -53,7 +38,6 @@ export async function recoverDbAccess(recoveryKey, newPassword) {
  * Cambia la contraseña maestra de la bóveda.
  */
 export async function changeMasterPassword(currentPassword, newPassword) {
-  if (!window.__TAURI__) return true;
   const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
   return await invoke('db_change_password', { currentPassword, newPassword });
 }
@@ -350,32 +334,19 @@ export async function addComparativa(clienteNombre, clienteCups, tipoEnergia, da
  */
 export async function getComparativas() {
   const db = await getDb();
-  if (window.__TAURI__ && window.__TAURI__.sql) {
-    return await db.select(`
-      SELECT c.*, 
-             tl.nombre as tarifa_luz_nombre, cl.nombre as comercializadora_luz_nombre,
-             tg.nombre as tarifa_gas_nombre, cg.nombre as comercializadora_gas_nombre,
-             cli.email as cliente_email
-      FROM comparativas c
-      LEFT JOIN tarifas_luz tl ON c.tarifa_luz_propuesta_id = tl.id
-      LEFT JOIN comercializadoras cl ON tl.comercializadora_id = cl.id
-      LEFT JOIN tarifas_gas tg ON c.tarifa_gas_propuesta_id = tg.id
-      LEFT JOIN comercializadoras cg ON tg.comercializadora_id = cg.id
-      LEFT JOIN clientes cli ON c.cliente_nombre = cli.nombre_empresa
-      ORDER BY c.fecha DESC;
-    `);
-  } else {
-    // Modo mock
-    const comps = await db.select("SELECT * FROM comparativas;");
-    const clients = await db.select("SELECT * FROM clientes;");
-    return comps.map(c => {
-      const client = clients.find(cli => cli.nombre_empresa === c.cliente_nombre);
-      return {
-        ...c,
-        cliente_email: client ? client.email : null
-      };
-    }).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-  }
+  return await db.select(`
+    SELECT c.*, 
+           tl.nombre as tarifa_luz_nombre, cl.nombre as comercializadora_luz_nombre,
+           tg.nombre as tarifa_gas_nombre, cg.nombre as comercializadora_gas_nombre,
+           cli.email as cliente_email
+    FROM comparativas c
+    LEFT JOIN tarifas_luz tl ON c.tarifa_luz_propuesta_id = tl.id
+    LEFT JOIN comercializadoras cl ON tl.comercializadora_id = cl.id
+    LEFT JOIN tarifas_gas tg ON c.tarifa_gas_propuesta_id = tg.id
+    LEFT JOIN comercializadoras cg ON tg.comercializadora_id = cg.id
+    LEFT JOIN clientes cli ON c.cliente_nombre = cli.nombre_empresa
+    ORDER BY c.fecha DESC;
+  `);
 }
 
 /**
@@ -393,30 +364,21 @@ export async function deleteComparativa(id) {
  */
 export async function clearAllTables() {
   const db = await getDb();
-  if (window.__TAURI__ && window.__TAURI__.sql) {
+  try {
+    await db.execute("DELETE FROM comparativas;");
+    await db.execute("DELETE FROM clientes;");
+    await db.execute("DELETE FROM tarifas_luz;");
+    await db.execute("DELETE FROM tarifas_gas;");
+    await db.execute("DELETE FROM comercializadoras;");
+    // Restablecer los contadores de incremento automático (AUTOINCREMENT) en SQLite
     try {
-      await db.execute("DELETE FROM comparativas;");
-      await db.execute("DELETE FROM clientes;");
-      await db.execute("DELETE FROM tarifas_luz;");
-      await db.execute("DELETE FROM tarifas_gas;");
-      await db.execute("DELETE FROM comercializadoras;");
-      // Restablecer los contadores de incremento automático (AUTOINCREMENT) en SQLite
-      try {
-        await db.execute("DELETE FROM sqlite_sequence;");
-      } catch (seqError) {
-        console.log("No se pudo limpiar sqlite_sequence, probablemente no existe aún:", seqError);
-      }
-    } catch (e) {
-      console.error("Error al vaciar tablas SQLite:", e);
-      throw e;
+      await db.execute("DELETE FROM sqlite_sequence;");
+    } catch (seqError) {
+      console.log("No se pudo limpiar sqlite_sequence, probablemente no existe aún:", seqError);
     }
-  } else {
-    // Modo mock
-    localStorage.removeItem('mock_comercializadoras');
-    localStorage.removeItem('mock_tarifas_luz');
-    localStorage.removeItem('mock_tarifas_gas');
-    localStorage.removeItem('mock_comparativas');
-    localStorage.removeItem('mock_clientes');
+  } catch (e) {
+    console.error("Error al vaciar tablas SQLite:", e);
+    throw e;
   }
 }
 
@@ -720,66 +682,33 @@ export async function checkAgenteSetupStatus() {
 
 export async function deleteCliente(id) {
   const db = await getDb();
-  if (window.__TAURI__ && window.__TAURI__.sql) {
-    // 1. Obtener el nombre del cliente
-    const clientRows = await db.select("SELECT nombre_empresa FROM clientes WHERE id = $1;", [id]);
-    if (clientRows.length === 0) {
-      throw new Error("Cliente no encontrado.");
-    }
-    const nombre = clientRows[0].nombre_empresa;
-
-    // 2. Comprobar si tiene comparativas aceptadas (menos de 6 años)
-    const comps = await db.select(`
-      SELECT COUNT(*) as count FROM comparativas 
-      WHERE cliente_nombre = $1 AND estado = 'Aceptada' 
-        AND fecha >= datetime('now', '-6 years');
-    `, [nombre]);
-    
-    const count = comps.length > 0 ? (comps[0].count || 0) : 0;
-    if (count > 0) {
-      throw new Error("OBLIGACION_LEGAL_RETENCION");
-    }
-
-    // 3. Eliminar comparativas pendientes o rechazadas asociadas
-    await db.execute(`
-      DELETE FROM comparativas 
-      WHERE cliente_nombre = $1 AND (estado != 'Aceptada' OR estado IS NULL);
-    `, [nombre]);
-
-    // 4. Eliminar el cliente
-    return await db.execute("DELETE FROM clientes WHERE id = $1;", [id]);
-  } else {
-    // Modo mock
-    const mockClients = await db.select("SELECT * FROM clientes;");
-    const client = mockClients.find(c => c.id === id);
-    if (!client) {
-      throw new Error("Cliente no encontrado.");
-    }
-    const nombre = client.nombre_empresa;
-
-    const mockComps = await db.select("SELECT * FROM comparativas;");
-    
-    // Comprobar si tiene comparativas aceptadas (menos de 6 años)
-    const legalAcceptedCutoff = Date.now() - (6 * 365 * 24 * 60 * 60 * 1000);
-    const hasAccepted = mockComps.some(c => 
-      c.cliente_nombre === nombre && 
-      c.estado === 'Aceptada' && 
-      new Date(c.fecha).getTime() >= legalAcceptedCutoff
-    );
-
-    if (hasAccepted) {
-      throw new Error("OBLIGACION_LEGAL_RETENCION");
-    }
-
-    // Limpiar comparativas asociadas pendientes o rechazadas en localStorage
-    const filteredComps = mockComps.filter(c => 
-      !(c.cliente_nombre === nombre && (c.estado !== 'Aceptada' || c.estado === null))
-    );
-    localStorage.setItem('mock_comparativas', JSON.stringify(filteredComps));
-
-    // Eliminar el cliente de localStorage usando db.execute de mock
-    return await db.execute("DELETE FROM clientes WHERE id = $1;", [id]);
+  // 1. Obtener el nombre del cliente
+  const clientRows = await db.select("SELECT nombre_empresa FROM clientes WHERE id = $1;", [id]);
+  if (clientRows.length === 0) {
+    throw new Error("Cliente no encontrado.");
   }
+  const nombre = clientRows[0].nombre_empresa;
+
+  // 2. Comprobar si tiene comparativas aceptadas (menos de 6 años)
+  const comps = await db.select(`
+    SELECT COUNT(*) as count FROM comparativas 
+    WHERE cliente_nombre = $1 AND estado = 'Aceptada' 
+      AND fecha >= datetime('now', '-6 years');
+  `, [nombre]);
+  
+  const count = comps.length > 0 ? (comps[0].count || 0) : 0;
+  if (count > 0) {
+    throw new Error("OBLIGACION_LEGAL_RETENCION");
+  }
+
+  // 3. Eliminar comparativas pendientes o rechazadas asociadas
+  await db.execute(`
+    DELETE FROM comparativas 
+    WHERE cliente_nombre = $1 AND (estado != 'Aceptada' OR estado IS NULL);
+  `, [nombre]);
+
+  // 4. Eliminar el cliente
+  return await db.execute("DELETE FROM clientes WHERE id = $1;", [id]);
 }
 
 /**
@@ -819,15 +748,10 @@ export async function updateComparativaContrato(id, estadoContrato, motivoRechaz
  */
 export async function getPuntosSuministroByCliente(clienteId) {
   const db = await getDb();
-  if (window.__TAURI__ && window.__TAURI__.sql) {
-    return await db.select(
-      "SELECT * FROM puntos_suministro WHERE cliente_id = $1 ORDER BY id ASC;",
-      [clienteId]
-    );
-  } else {
-    const mockPuntos = JSON.parse(localStorage.getItem('mock_puntos_suministro') || '[]');
-    return mockPuntos.filter(p => p.cliente_id === clienteId);
-  }
+  return await db.select(
+    "SELECT * FROM puntos_suministro WHERE cliente_id = $1 ORDER BY id ASC;",
+    [clienteId]
+  );
 }
 
 /**
@@ -836,11 +760,7 @@ export async function getPuntosSuministroByCliente(clienteId) {
  */
 export async function getPuntosSuministroAll() {
   const db = await getDb();
-  if (window.__TAURI__ && window.__TAURI__.sql) {
-    return await db.select("SELECT ps.*, c.nombre_empresa as cliente_nombre FROM puntos_suministro ps JOIN clientes c ON ps.cliente_id = c.id ORDER BY ps.id ASC;");
-  } else {
-    return JSON.parse(localStorage.getItem('mock_puntos_suministro') || '[]');
-  }
+  return await db.select("SELECT ps.*, c.nombre_empresa as cliente_nombre FROM puntos_suministro ps JOIN clientes c ON ps.cliente_id = c.id ORDER BY ps.id ASC;");
 }
 
 /**
@@ -850,37 +770,18 @@ export async function getPuntosSuministroAll() {
  */
 export async function syncPuntosSuministroCliente(clienteId, puntosArray) {
   const db = await getDb();
-  if (window.__TAURI__ && window.__TAURI__.sql) {
-    // 1. Eliminar puntos actuales del cliente
-    await db.execute("DELETE FROM puntos_suministro WHERE cliente_id = $1;", [clienteId]);
+  // 1. Eliminar puntos actuales del cliente
+  await db.execute("DELETE FROM puntos_suministro WHERE cliente_id = $1;", [clienteId]);
 
-    // 2. Insertar los puntos actualizados
-    for (const p of puntosArray) {
-      if (p.cups && p.cups.trim() !== '') {
-        await db.execute(
-          `INSERT INTO puntos_suministro (cliente_id, cups, direccion_alias, tipo_energia, notas)
-           VALUES ($1, $2, $3, $4, $5);`,
-          [clienteId, p.cups.trim().toUpperCase(), p.direccionAlias || 'Principal', p.tipoEnergia || 'LUZ', p.notas || '']
-        );
-      }
+  // 2. Insertar los puntos actualizados
+  for (const p of puntosArray) {
+    if (p.cups && p.cups.trim() !== '') {
+      await db.execute(
+        `INSERT INTO puntos_suministro (cliente_id, cups, direccion_alias, tipo_energia, notas)
+         VALUES ($1, $2, $3, $4, $5);`,
+        [clienteId, p.cups.trim().toUpperCase(), p.direccionAlias || 'Principal', p.tipoEnergia || 'LUZ', p.notas || '']
+      );
     }
-  } else {
-    let mockPuntos = JSON.parse(localStorage.getItem('mock_puntos_suministro') || '[]');
-    mockPuntos = mockPuntos.filter(p => p.cliente_id !== clienteId);
-    
-    puntosArray.forEach((p, idx) => {
-      if (p.cups && p.cups.trim() !== '') {
-        mockPuntos.push({
-          id: Date.now() + idx,
-          cliente_id: clienteId,
-          cups: p.cups.trim().toUpperCase(),
-          direccion_alias: p.direccionAlias || 'Principal',
-          tipo_energia: p.tipoEnergia || 'LUZ',
-          notas: p.notas || ''
-        });
-      }
-    });
-    localStorage.setItem('mock_puntos_suministro', JSON.stringify(mockPuntos));
   }
 }
 
@@ -905,67 +806,31 @@ export async function updateComparativaCobro(id, estadoCobro, fechaCobro = null)
  */
 export async function purgeOldData(days) {
   const db = await getDb();
-  if (window.__TAURI__ && window.__TAURI__.sql) {
-    try {
-      // 1. Eliminar comparativas pendientes o rechazadas antiguas (más de 365 días)
-      await db.execute(`
-        DELETE FROM comparativas 
-        WHERE (estado = 'Pendiente de aceptación' OR estado = 'Rechazada' OR estado IS NULL) 
-          AND fecha < datetime('now', '-365 days');
-      `);
-      
-      // 2. Eliminar comparativas aceptadas antiguas (más de 6 años)
-      await db.execute(`
-        DELETE FROM comparativas 
-        WHERE estado = 'Aceptada' 
-          AND fecha < datetime('now', '-6 years');
-      `);
-      
-      // 3. Eliminar clientes antiguos (más de 365 días) que no posean ninguna comparativa en el sistema
-      await db.execute(`
-        DELETE FROM clientes 
-        WHERE creado_en < datetime('now', '-365 days') 
-          AND nombre_empresa NOT IN (SELECT DISTINCT cliente_nombre FROM comparativas);
-      `);
-      
-      console.log("Purga automática de datos completada (plazos legales fijos aplicados).");
-    } catch (e) {
-      console.error("Error al ejecutar purga automática SQLite:", e);
-    }
-  } else {
-    // Purga en modo mock
-    try {
-      const retentionCutoff = Date.now() - (365 * 24 * 60 * 60 * 1000); // 365 días
-      const legalAcceptedCutoff = Date.now() - (6 * 365 * 24 * 60 * 60 * 1000); // 6 años
-      
-      const mockComps = JSON.parse(localStorage.getItem('mock_comparativas') || '[]');
-      
-      // Filtrar comparativas por su estado y antigüedad correspondiente
-      const filteredComps = mockComps.filter(c => {
-        const estado = c.estado || 'Pendiente de aceptación';
-        const dateMs = new Date(c.fecha).getTime();
-        if (estado === 'Aceptada') {
-          return dateMs >= legalAcceptedCutoff;
-        } else {
-          return dateMs >= retentionCutoff;
-        }
-      });
-      localStorage.setItem('mock_comparativas', JSON.stringify(filteredComps));
-
-      const mockClients = JSON.parse(localStorage.getItem('mock_clientes') || '[]');
-      const filteredClients = mockClients.filter(c => {
-        const isOld = new Date(c.creado_en).getTime() < retentionCutoff;
-        if (isOld) {
-          const hasComps = filteredComps.some(comp => comp.cliente_nombre === c.nombre_empresa);
-          return hasComps;
-        }
-        return true;
-      });
-      localStorage.setItem('mock_clientes', JSON.stringify(filteredClients));
-      console.log("Purga automática en modo mock completada (plazos legales fijos aplicados).");
-    } catch (e) {
-      console.error("Error al ejecutar purga automática en mock:", e);
-    }
+  try {
+    // 1. Eliminar comparativas pendientes o rechazadas antiguas (más de 365 días)
+    await db.execute(`
+      DELETE FROM comparativas 
+      WHERE (estado = 'Pendiente de aceptación' OR estado = 'Rechazada' OR estado IS NULL) 
+        AND fecha < datetime('now', '-365 days');
+    `);
+    
+    // 2. Eliminar comparativas aceptadas antiguas (más de 6 años)
+    await db.execute(`
+      DELETE FROM comparativas 
+      WHERE estado = 'Aceptada' 
+        AND fecha < datetime('now', '-6 years');
+    `);
+    
+    // 3. Eliminar clientes antiguos (más de 365 días) que no posean ninguna comparativa en el sistema
+    await db.execute(`
+      DELETE FROM clientes 
+      WHERE creado_en < datetime('now', '-365 days') 
+        AND nombre_empresa NOT IN (SELECT DISTINCT cliente_nombre FROM comparativas);
+    `);
+    
+    console.log("Purga automática de datos completada (plazos legales fijos aplicados).");
+  } catch (e) {
+    console.error("Error al ejecutar purga automática SQLite:", e);
   }
 }
 
@@ -975,16 +840,12 @@ export async function purgeOldData(days) {
  */
 export async function getSqliteVersion() {
   const db = await getDb();
-  if (window.__TAURI__ && window.__TAURI__.sql) {
-    try {
-      const res = await db.select("SELECT sqlite_version() as version;");
-      return res[0].version;
-    } catch (err) {
-      console.error(err);
-      return "Desconocida";
-    }
-  } else {
-    return "3.45.0 (Simulado)";
+  try {
+    const res = await db.select("SELECT sqlite_version() as version;");
+    return res[0].version;
+  } catch (err) {
+    console.error(err);
+    return "Desconocida";
   }
 }
 
@@ -1062,92 +923,9 @@ export async function importClientesBatch(rows, updateExisting = false) {
     }
   }
 
-  if (window.__TAURI__) {
-    const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
-    const [added, updated, skipped] = await invoke('db_import_clientes_batch', { rows, updateExisting });
-    return { added, updated, skipped, errors: [] };
-  }
-
-  // Fallback Mock DB (desarrollo sin Tauri)
-  let added = 0;
-  let updated = 0;
-  let skipped = 0;
-  const errors = [];
-
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const { nombre_empresa, cif, ...otherFields } = row;
-
-    if (!nombre_empresa || !cif) {
-      skipped++;
-      errors.push(`Fila ${i + 1}: Faltan campos obligatorios (Nombre o CIF).`);
-      continue;
-    }
-
-    try {
-      if (window.__TAURI__) {
-        const existing = await db.select("SELECT id FROM clientes WHERE cif = ?;", [cif.trim()]);
-        if (existing.length > 0) {
-          if (updateExisting) {
-            const fieldsToUpdate = [];
-            const params = [];
-            fieldsToUpdate.push("nombre_empresa = ?");
-            params.push(nombre_empresa.trim());
-
-            for (const [key, val] of Object.entries(otherFields)) {
-              if (val !== undefined && val !== null && val !== '') {
-                fieldsToUpdate.push(`${key} = ?`);
-                params.push(typeof val === 'string' ? val.trim() : val);
-              }
-            }
-            params.push(existing[0].id);
-
-            const query = `UPDATE clientes SET ${fieldsToUpdate.join(', ')} WHERE id = ?;`;
-            await db.execute(query, params);
-            updated++;
-          } else {
-            skipped++;
-          }
-        } else {
-          const keys = ['nombre_empresa', 'cif'];
-          const values = [nombre_empresa.trim(), cif.trim()];
-          const placeholders = ['?', '?'];
-
-          for (const [key, val] of Object.entries(otherFields)) {
-            if (val !== undefined && val !== null && val !== '') {
-              keys.push(key);
-              values.push(typeof val === 'string' ? val.trim() : val);
-              placeholders.push('?');
-            }
-          }
-
-          const query = `INSERT INTO clientes (${keys.join(', ')}) VALUES (${placeholders.join(', ')});`;
-          await db.execute(query, values);
-          added++;
-        }
-      } else {
-        const mockClients = JSON.parse(localStorage.getItem('mock_clientes') || '[]');
-        const existingIndex = mockClients.findIndex(c => c.cif === cif.trim());
-        if (existingIndex !== -1) {
-          if (updateExisting) {
-            mockClients[existingIndex] = { ...mockClients[existingIndex], nombre_empresa: nombre_empresa.trim(), ...otherFields };
-            updated++;
-          } else {
-            skipped++;
-          }
-        } else {
-          mockClients.push({ id: mockClients.length + 1, nombre_empresa: nombre_empresa.trim(), cif: cif.trim(), ...otherFields, creado_en: new Date().toISOString() });
-          added++;
-        }
-        localStorage.setItem('mock_clientes', JSON.stringify(mockClients));
-      }
-    } catch (err) {
-      skipped++;
-      errors.push(`Fila ${i + 1} (${cif}): ${err.message || err}`);
-    }
-  }
-
-  return { added, updated, skipped, errors };
+  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
+  const [added, updated, skipped] = await invoke('db_import_clientes_batch', { rows, updateExisting });
+  return { added, updated, skipped, errors: [] };
 }
 
 /**
@@ -1158,21 +936,152 @@ export async function importClientesBatch(rows, updateExisting = false) {
 export async function importRenovacionesBatch(rows) {
   if (!rows || rows.length === 0) return 0;
 
-  if (window.__TAURI__) {
-    const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
-    return await invoke('db_import_renovaciones_batch', { rows });
-  }
+  const invoke = window.__TAURI__.core ? window.__TAURI__.core.invoke : (window.__TAURI__.invoke || window.__TAURI__.core?.invoke);
+  return await invoke('db_import_renovaciones_batch', { rows });
+}
 
-  let count = 0;
-  if (!mockStorage.renovaciones) mockStorage.renovaciones = [];
+// --- Ajustes Generales y Configuración de Empresa ---
 
-  for (const r of rows) {
-    mockStorage.renovaciones.push({
-      id: mockStorage.renovaciones.length + 1,
-      ...r,
-      creado_en: new Date().toISOString()
-    });
-    count++;
+/**
+ * Obtiene un valor de la tabla ajustes en SQLite cifrada.
+ * @param {string} clave 
+ * @param {any} defaultValue 
+ * @returns {Promise<any>}
+ */
+export async function getAjuste(clave, defaultValue = null) {
+  const db = await getDb();
+  const rows = await db.select("SELECT valor FROM ajustes WHERE clave = $1 LIMIT 1;", [clave]);
+  if (rows && rows.length > 0) {
+    try {
+      return JSON.parse(rows[0].valor);
+    } catch {
+      return rows[0].valor;
+    }
   }
-  return count;
+  return defaultValue;
+}
+
+/**
+ * Guarda o actualiza un valor en la tabla ajustes en SQLite cifrada.
+ * @param {string} clave 
+ * @param {any} valor 
+ * @returns {Promise<void>}
+ */
+export async function setAjuste(clave, valor) {
+  const db = await getDb();
+  const serialized = typeof valor === 'string' ? valor : JSON.stringify(valor);
+  await db.execute(`
+    INSERT INTO ajustes (clave, valor, actualizado_en)
+    VALUES ($1, $2, CURRENT_TIMESTAMP)
+    ON CONFLICT(clave) DO UPDATE SET
+      valor = excluded.valor,
+      actualizado_en = CURRENT_TIMESTAMP;
+  `, [clave, serialized]);
+}
+
+/**
+ * Obtiene la configuración de empresa (con migración transparente desde localStorage o Rust si aún no está en SQLite).
+ */
+export async function getCompanyConfig() {
+  let config = await getAjuste('company_config', null);
+  if (!config) {
+    // Intentar migrar desde localStorage si existe
+    const localStr = localStorage.getItem('company_config');
+    if (localStr) {
+      try {
+        config = JSON.parse(localStr);
+        await setAjuste('company_config', config);
+      } catch (e) {
+        console.error("Error al migrar company_config desde localStorage:", e);
+      }
+    }
+  }
+  return config || {};
+}
+
+/**
+ * Guarda la configuración de empresa en SQLite cifrada y sincroniza con Rust.
+ */
+export async function saveCompanyConfig(configData) {
+  await setAjuste('company_config', configData);
+  if (window.__TAURI__ && window.__TAURI__.core) {
+    try {
+      await window.__TAURI__.core.invoke('save_company_config', { config: configData });
+    } catch (err) {
+      console.warn("No se pudo invocar save_company_config en backend:", err);
+    }
+  }
+  // Mantener sincronizado localStorage para compatibilidad
+  localStorage.setItem('company_config', JSON.stringify(configData));
+}
+
+/**
+ * Obtiene el logotipo de empresa (Data URI).
+ */
+export async function getCompanyLogo() {
+  let logo = await getAjuste('company_logo', null);
+  if (!logo) {
+    const localLogo = localStorage.getItem('company_logo');
+    if (localLogo) {
+      logo = localLogo;
+      await setAjuste('company_logo', logo);
+    } else if (window.__TAURI__ && window.__TAURI__.core) {
+      try {
+        logo = await window.__TAURI__.core.invoke('get_company_logo');
+        if (logo) await setAjuste('company_logo', logo);
+      } catch (err) {
+        console.warn("Error al obtener logo desde Rust:", err);
+      }
+    }
+  }
+  return logo || null;
+}
+
+/**
+ * Guarda el logotipo de empresa en SQLite cifrada.
+ */
+export async function saveCompanyLogo(logoDataUri) {
+  await setAjuste('company_logo', logoDataUri);
+  localStorage.setItem('company_logo', logoDataUri);
+}
+
+/**
+ * Elimina el logotipo de empresa.
+ */
+export async function deleteCompanyLogo() {
+  const db = await getDb();
+  await db.execute("DELETE FROM ajustes WHERE clave = 'company_logo';");
+  localStorage.removeItem('company_logo');
+  if (window.__TAURI__ && window.__TAURI__.core) {
+    try {
+      await window.__TAURI__.core.invoke('delete_company_logo');
+    } catch (err) {
+      console.warn("Error al borrar logo en Rust:", err);
+    }
+  }
+}
+
+/**
+ * Obtiene los umbrales de alerta de renovaciones.
+ */
+export async function getRenewalThresholds() {
+  let thresholds = await getAjuste('renewal_thresholds', null);
+  if (!thresholds) {
+    const crit = parseInt(localStorage.getItem('renewal_critical_days') || '30', 10);
+    const warn = parseInt(localStorage.getItem('renewal_warning_days') || '60', 10);
+    const rad = parseInt(localStorage.getItem('renewal_radar_days') || '90', 10);
+    thresholds = { critical: crit, warning: warn, radar: rad };
+    await setAjuste('renewal_thresholds', thresholds);
+  }
+  return thresholds;
+}
+
+/**
+ * Guarda los umbrales de alerta de renovaciones en SQLite.
+ */
+export async function saveRenewalThresholds(thresholds) {
+  await setAjuste('renewal_thresholds', thresholds);
+  localStorage.setItem('renewal_critical_days', thresholds.critical.toString());
+  localStorage.setItem('renewal_warning_days', thresholds.warning.toString());
+  localStorage.setItem('renewal_radar_days', thresholds.radar.toString());
 }
