@@ -1,10 +1,20 @@
 /* src/js/views/renewals.js */
-import { getDb, getClientes, getClientesForSelect, searchClientes, getComercializadoras, getTarifasLuz, getTarifasGas } from '../db.js';
+import {
+  getDb,
+  getClientes,
+  getClientesForSelect,
+  searchClientes,
+  getComercializadoras,
+  getTarifasLuz,
+  getTarifasGas,
+  getRenewalThresholds
+} from '../db.js';
 
 let currentViewMode = 'list'; // 'list' | 'calendar'
 let currentCalendarDate = new Date();
 let renewalsData = [];
 let clientsMap = {};
+let currentThresholds = { critical: 30, warning: 60, radar: 90 };
 
 let currentRenewalPage = 1;
 const RENEWALS_PER_PAGE = 25;
@@ -16,19 +26,15 @@ export async function initRenewalsView() {
     setupRenewalEventListeners();
     isListenersInitialized = true;
   }
-  await refreshRenewals();
+  await loadRenewals();
 }
 
-export function getRenewalThresholds() {
-  const crit = parseInt(localStorage.getItem('renewal_critical_days') || '30', 10);
-  const warn = parseInt(localStorage.getItem('renewal_warning_days') || '60', 10);
-  const rad = parseInt(localStorage.getItem('renewal_radar_days') || '90', 10);
-  return { critical: crit, warning: warn, radar: rad };
-}
-
-export async function refreshRenewals() {
+export async function loadRenewals() {
   try {
     const db = await getDb();
+    const thresholds = await getRenewalThresholds();
+    currentThresholds = thresholds;
+
     const clients = await getClientes();
     clientsMap = {};
     if (Array.isArray(clients)) {
@@ -48,12 +54,12 @@ export async function refreshRenewals() {
       renewalsData = [];
     }
 
-    updateRenewalsBadge();
-    updateKpis();
+    updateRenewalsBadge(thresholds);
+    updateKpis(thresholds);
     if (currentViewMode === 'list') {
-      renderRenewalsTable();
+      renderRenewalsTable(thresholds);
     } else {
-      renderRenewalsCalendar();
+      renderRenewalsCalendar(thresholds);
     }
   } catch (err) {
     console.error("Error al cargar renovaciones:", err);
@@ -61,11 +67,13 @@ export async function refreshRenewals() {
   }
 }
 
-export function updateRenewalsBadge() {
+export const refreshRenewals = loadRenewals;
+export { getRenewalThresholds };
+
+export function updateRenewalsBadge(thresholds = currentThresholds) {
   const badgeEl = document.getElementById('renewals-badge');
   if (!badgeEl) return;
 
-  const thresholds = getRenewalThresholds();
   const now = new Date();
   let criticalCount = 0;
 
@@ -86,8 +94,7 @@ export function updateRenewalsBadge() {
   }
 }
 
-function updateKpis() {
-  const thresholds = getRenewalThresholds();
+function updateKpis(thresholds = currentThresholds) {
   const now = new Date();
 
   let total = renewalsData.length;
@@ -156,7 +163,7 @@ function updateRenewalsPaginationUI(totalCount, totalPages, startIdx, endIdx) {
   }
 }
 
-function renderRenewalsTable() {
+function renderRenewalsTable(thresholds = currentThresholds) {
   const tbody = document.getElementById('renewals-tbody');
   if (!tbody) return;
   tbody.innerHTML = '';
@@ -164,7 +171,6 @@ function renderRenewalsTable() {
   const searchVal = (document.getElementById('search-renewals-input')?.value || '').toLowerCase().trim();
   const statusFilter = document.getElementById('filter-renewals-status')?.value || 'ALL';
 
-  const thresholds = getRenewalThresholds();
   const now = new Date();
 
   const filtered = renewalsData.filter(ren => {
@@ -277,7 +283,7 @@ function renderRenewalsTable() {
   });
 }
 
-function renderRenewalsCalendar() {
+function renderRenewalsCalendar(thresholds = currentThresholds) {
   const grid = document.getElementById('renewals-calendar-grid');
   const titleEl = document.getElementById('calendar-month-year-title');
   if (!grid || !titleEl) return;
@@ -313,7 +319,6 @@ function renderRenewalsCalendar() {
     grid.appendChild(cell);
   }
 
-  const thresholds = getRenewalThresholds();
   const today = new Date();
 
   // Current month days
@@ -348,9 +353,13 @@ function renderRenewalsCalendar() {
         else if (diffDays <= thresholds.radar) hasRadar = true;
       });
 
-      if (hasCritical) badgeClass = 'critical';
-      else if (hasWarning) badgeClass = 'warning';
-      else if (hasRadar) badgeClass = 'radar';
+      if (hasCritical) {
+        badgeClass = 'critical';
+      } else if (hasWarning) {
+        badgeClass = 'warning';
+      } else if (hasRadar) {
+        badgeClass = 'radar';
+      }
 
       const labelText = dayEvents.length === 1 ? '1 renovación' : `${dayEvents.length} renovaciones`;
       countHtml = `<div class="calendar-count-badge ${badgeClass}" title="${dayEvents.length} vencimientos el ${day}/${month + 1}/${year}">
@@ -359,7 +368,7 @@ function renderRenewalsCalendar() {
 
       // Click listener on cell to open modal listing clients
       cell.addEventListener('click', () => {
-        openCalendarDayModal(cellDateStr, day, monthNames[month], year, dayEvents);
+        openCalendarDayModal(cellDateStr, day, monthNames[month], year, dayEvents, thresholds);
       });
     }
 
@@ -381,7 +390,7 @@ function renderRenewalsCalendar() {
   }
 }
 
-function openCalendarDayModal(dateStr, day, monthName, year, dayEvents) {
+function openCalendarDayModal(dateStr, day, monthName, year, dayEvents, thresholds = currentThresholds) {
   const dialog = document.getElementById('dialog-calendar-day-renewals');
   const titleEl = document.getElementById('dialog-calendar-day-title');
   const subtitleEl = document.getElementById('dialog-calendar-day-subtitle');
@@ -398,7 +407,6 @@ function openCalendarDayModal(dateStr, day, monthName, year, dayEvents) {
 
   tbody.innerHTML = '';
 
-  const thresholds = getRenewalThresholds();
   const now = new Date();
 
   dayEvents.forEach(ren => {
@@ -980,7 +988,8 @@ async function saveManualRenewal() {
     const notas = document.getElementById('manual-ren-notes').value.trim();
 
     // Obtener parámetros globales de días de aviso desde Configuración -> Parámetros
-    const warningDays = parseInt(localStorage.getItem('renewal_warning_days') || '60', 10);
+    const thresholds = await getRenewalThresholds();
+    const warningDays = thresholds.warning;
 
     let fecha_aviso_personalizada = null;
     if (fecha_vencimiento) {

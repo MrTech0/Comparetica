@@ -1,4 +1,5 @@
 /* src/js/pdf.js */
+import { getCompanyConfig, getCompanyLogo } from './db.js';
 
 /**
  * Solicita una contraseña para proteger el PDF exportado mediante un diálogo modal.
@@ -82,21 +83,11 @@ export async function generatePDFReport(data, previewMode = false, returnBase64 
   let config = {};
   let logoDataUri = null;
 
-  if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-    try {
-      config = await window.__TAURI__.core.invoke('get_company_config');
-      logoDataUri = await window.__TAURI__.core.invoke('get_company_logo');
-    } catch (e) {
-      console.error("Error al obtener la configuración de la consultora:", e);
-    }
-  } else {
-    // Modo mock
-    try {
-      config = JSON.parse(localStorage.getItem('company_config') || '{}');
-      logoDataUri = localStorage.getItem('company_logo');
-    } catch (e) {
-      console.error(e);
-    }
+  try {
+    config = await getCompanyConfig();
+    logoDataUri = await getCompanyLogo();
+  } catch (e) {
+    console.error("Error al obtener la configuración de la consultora:", e);
   }
 
   const options = {

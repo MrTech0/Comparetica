@@ -1,17 +1,28 @@
 /* src/js/views/settings.js */
 
-import { clearAllTables, getSqliteVersion, changeMasterPassword } from '../db.js';
+import {
+  clearAllTables,
+  getSqliteVersion,
+  changeMasterPassword,
+  getCompanyConfig,
+  saveCompanyConfig,
+  getCompanyLogo,
+  saveCompanyLogo,
+  deleteCompanyLogo,
+  getRenewalThresholds,
+  saveRenewalThresholds
+} from '../db.js';
 import { initCsvImporter } from '../csv_importer.js';
 
-export function initSettingsView() {
+export async function initSettingsView() {
   setupTabs();
   setupAppearance();
-  setupCompanySettings();
+  await setupCompanySettings();
   initCsvImporter();
   setupSecuritySettings();
   setupCleanup();
   setupUpdates();
-  setupRenewalParamsSettings();
+  await setupRenewalParamsSettings();
 }
 
 // --- Pestañas de Configuración ---
@@ -52,8 +63,8 @@ function setupTabs() {
       panel.style.display = 'block';
 
       // Recargar datos si corresponde
-      if (item.btn === 'tab-btn-settings-company') {
-        await loadCurrentCompanyData();
+      if (item.btn === 'tab-btn-settings-company' || item.btn === 'tab-btn-settings-params') {
+        await loadSettings();
       } else if (item.btn === 'tab-btn-settings-about') {
         await loadAboutInfo();
       }
@@ -382,27 +393,28 @@ async function setupCompanySettings() {
       submitBtn.innerText = "Guardando...";
 
       // 1. Guardar Configuración de Texto
-      if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-        await window.__TAURI__.core.invoke('save_company_config', { config: configData });
-      } else {
-        localStorage.setItem('company_config', JSON.stringify(configData));
-      }
+      await saveCompanyConfig(configData);
 
       // 2. Guardar Logotipo si se ha seleccionado uno nuevo
       if (logoInput && logoInput.files && logoInput.files[0]) {
         const file = logoInput.files[0];
         const extension = file.name.split('.').pop().toLowerCase();
         const base64Data = await fileToBase64(file);
+        const dataUri = `data:image/${extension === 'svg' ? 'svg+xml' : extension};base64,${base64Data}`;
+
+        await saveCompanyLogo(dataUri);
 
         if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-          await window.__TAURI__.core.invoke('save_company_logo', { base64Data, extension });
-        } else {
-          localStorage.setItem('company_logo', `data:image/${extension === 'svg' ? 'svg+xml' : extension};base64,${base64Data}`);
+          try {
+            await window.__TAURI__.core.invoke('save_company_logo', { base64Data, extension });
+          } catch (errLogo) {
+            console.warn("No se pudo invocar save_company_logo en backend:", errLogo);
+          }
         }
       }
 
       window.showToast("Configuración de la consultora guardada correctamente.", "success");
-      await loadCurrentCompanyData(); // Refrescar vista previa
+      await loadSettings(); // Refrescar vista previa
 
     } catch (error) {
       console.error("Error al guardar la configuración de la consultora:", error);
@@ -424,15 +436,11 @@ async function setupCompanySettings() {
       }
 
       try {
-        if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-          await window.__TAURI__.core.invoke('delete_company_logo');
-        } else {
-          localStorage.removeItem('company_logo');
-        }
+        await deleteCompanyLogo();
         
         logoInput.value = ''; // Limpiar input file
         window.showToast("Logotipo eliminado con éxito. Ahora se usará el icono por defecto.", "success");
-        await loadCurrentCompanyData(); // Refrescar vista previa
+        await loadSettings(); // Refrescar vista previa
       } catch (error) {
         console.error("Error al eliminar el logotipo:", error);
         window.showToast("Error al eliminar el logotipo personalizado.", "error");
@@ -443,32 +451,36 @@ async function setupCompanySettings() {
 
 // Exportar función para refrescar la configuración al navegar
 export async function refreshCompanySettings() {
-  await loadCurrentCompanyData();
+  await loadSettings();
 }
 
-// Helper para cargar y pintar datos actuales en los inputs
-async function loadCurrentCompanyData() {
+/**
+ * Carga la configuración de empresa, logotipo y umbrales de renovación desde SQLite cifrada.
+ */
+export async function loadSettings() {
   let config = {};
   let logoDataUri = null;
-  const logoPreview = document.getElementById('settings-company-logo-preview');
+  let thresholds = { critical: 30, warning: 60, radar: 90 };
 
-  if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-    try {
-      config = await window.__TAURI__.core.invoke('get_company_config');
-      logoDataUri = await window.__TAURI__.core.invoke('get_company_logo');
-    } catch (e) {
-      console.error(e);
-    }
-  } else {
-    try {
-      config = JSON.parse(localStorage.getItem('company_config') || '{}');
-      logoDataUri = localStorage.getItem('company_logo');
-    } catch (e) {
-      console.error(e);
-    }
+  try {
+    config = await getCompanyConfig();
+  } catch (e) {
+    console.error("Error al cargar company_config:", e);
   }
 
-  // Llenar inputs
+  try {
+    logoDataUri = await getCompanyLogo();
+  } catch (e) {
+    console.error("Error al cargar company_logo:", e);
+  }
+
+  try {
+    thresholds = await getRenewalThresholds();
+  } catch (e) {
+    console.error("Error al cargar renewal_thresholds:", e);
+  }
+
+  // Llenar inputs de empresa
   const nameInput = document.getElementById('settings-company-name');
   const streetInput = document.getElementById('settings-company-street');
   const numberInput = document.getElementById('settings-company-number');
@@ -489,7 +501,8 @@ async function loadCurrentCompanyData() {
   if (emailInput) emailInput.value = config.consultora_email || '';
   if (phoneInput) phoneInput.value = config.consultora_telefono || '';
 
-  // Pintar preview
+  // Pintar preview de logo
+  const logoPreview = document.getElementById('settings-company-logo-preview');
   if (logoPreview) {
     if (logoDataUri) {
       logoPreview.innerHTML = `<img src="${logoDataUri}" style="width: 100%; height: 100%; object-fit: contain;" />`;
@@ -497,6 +510,22 @@ async function loadCurrentCompanyData() {
       logoPreview.innerHTML = `<span class="text-muted" style="font-size: 9px; text-align: center; padding: 4px;">Bombilla (Defecto)</span>`;
     }
   }
+
+  // Llenar inputs de umbrales de renovaciones
+  const critInput = document.getElementById('settings-renewal-critical-days');
+  const warnInput = document.getElementById('settings-renewal-warning-days');
+  const radInput = document.getElementById('settings-renewal-radar-days');
+
+  if (critInput) critInput.value = thresholds.critical;
+  if (warnInput) warnInput.value = thresholds.warning;
+  if (radInput) radInput.value = thresholds.radar;
+
+  return { config, logo: logoDataUri, thresholds };
+}
+
+// Helper para compatibilidad interna
+async function loadCurrentCompanyData() {
+  await loadSettings();
 }
 
 // Convertir archivo a base64
@@ -696,15 +725,20 @@ async function loadAboutInfo() {
   }
 }
 
-function setupRenewalParamsSettings() {
+async function setupRenewalParamsSettings() {
   const critInput = document.getElementById('settings-renewal-critical-days');
   const warnInput = document.getElementById('settings-renewal-warning-days');
   const radInput = document.getElementById('settings-renewal-radar-days');
   const btnSave = document.getElementById('btn-save-renewal-params');
 
-  if (critInput) critInput.value = localStorage.getItem('renewal_critical_days') || '30';
-  if (warnInput) warnInput.value = localStorage.getItem('renewal_warning_days') || '60';
-  if (radInput) radInput.value = localStorage.getItem('renewal_radar_days') || '90';
+  try {
+    const thresholds = await getRenewalThresholds();
+    if (critInput) critInput.value = thresholds.critical;
+    if (warnInput) warnInput.value = thresholds.warning;
+    if (radInput) radInput.value = thresholds.radar;
+  } catch (e) {
+    console.error("Error al cargar umbrales de renovación:", e);
+  }
 
   if (btnSave) {
     btnSave.addEventListener('click', async () => {
@@ -712,9 +746,7 @@ function setupRenewalParamsSettings() {
       const warnVal = parseInt(warnInput?.value || '60', 10);
       const radVal = parseInt(radInput?.value || '90', 10);
 
-      localStorage.setItem('renewal_critical_days', critVal.toString());
-      localStorage.setItem('renewal_warning_days', warnVal.toString());
-      localStorage.setItem('renewal_radar_days', radVal.toString());
+      await saveRenewalThresholds({ critical: critVal, warning: warnVal, radar: radVal });
 
       window.showToast("Parámetros y umbrales de renovación guardados con éxito.", "success");
 

@@ -1,5 +1,6 @@
 /* src/js/views/wizard.js */
 import { loadBackupConfig } from './backup.js';
+import { saveCompanyConfig, saveCompanyLogo } from '../db.js';
 
 export async function initWizard() {
   const wizardOverlay = document.getElementById('dialog-welcome-wizard');
@@ -147,18 +148,15 @@ export async function initWizard() {
         }
 
         // 1. Guardar Configuración de Texto
-        if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-          await window.__TAURI__.core.invoke('save_company_config', { config: configData });
+        await saveCompanyConfig(configData);
 
+        if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
           // Configurar directorio de copias de seguridad (renombrando existente si corresponde)
           const parentArg = customSelectedParent ? customSelectedParent : null;
           await window.__TAURI__.core.invoke('setup_backup_directory', { parentPath: parentArg });
 
           // Refrescar inmediatamente la vista de backup
           await loadBackupConfig();
-        } else {
-          // Modo mock
-          localStorage.setItem('company_config', JSON.stringify(configData));
         }
 
         // 2. Guardar Logotipo si se ha subido
@@ -167,11 +165,16 @@ export async function initWizard() {
           const extension = file.name.split('.').pop().toLowerCase();
           
           const base64Data = await fileToBase64(file);
+          const logoDataUri = `data:image/${extension === 'svg' ? 'svg+xml' : extension};base64,${base64Data}`;
+
+          await saveCompanyLogo(logoDataUri);
 
           if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-            await window.__TAURI__.core.invoke('save_company_logo', { base64Data, extension });
-          } else {
-            localStorage.setItem('company_logo', `data:image/${extension === 'svg' ? 'svg+xml' : extension};base64,${base64Data}`);
+            try {
+              await window.__TAURI__.core.invoke('save_company_logo', { base64Data, extension });
+            } catch (errLogo) {
+              console.warn("No se pudo guardar logotipo en backend:", errLogo);
+            }
           }
         }
 
