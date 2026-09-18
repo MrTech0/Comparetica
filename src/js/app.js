@@ -326,19 +326,6 @@ window.showConfirm = function(mensaje, titulo = "Confirmación") {
 // --- MATERIAL 3 CUSTOM STYLED SELECT DROPDOWNS ---
 export function initCustomSelects() {
   window.initCustomSelects = initCustomSelects;
-  const originalValueProp = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
-  if (originalValueProp && !HTMLSelectElement.prototype._customValueHooked) {
-    Object.defineProperty(HTMLSelectElement.prototype, 'value', {
-      get: function() {
-        return originalValueProp.get.call(this);
-      },
-      set: function(val) {
-        originalValueProp.set.call(this, val);
-        this.dispatchEvent(new CustomEvent('custom-value-set'));
-      }
-    });
-    HTMLSelectElement.prototype._customValueHooked = true;
-  }
 
   const nativeSelects = document.querySelectorAll('select.m3-select');
   nativeSelects.forEach(select => {
@@ -406,6 +393,20 @@ export function initCustomSelects() {
 
     populateOptions();
 
+    const protoDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+    if (protoDescriptor) {
+      Object.defineProperty(select, 'value', {
+        get() {
+          return protoDescriptor.get.call(this);
+        },
+        set(val) {
+          protoDescriptor.set.call(this, val);
+          populateOptions();
+        },
+        configurable: true
+      });
+    }
+
     select.parentNode.insertBefore(wrapper, select.nextSibling);
 
     trigger.addEventListener('click', (e) => {
@@ -414,10 +415,6 @@ export function initCustomSelects() {
         if (cs !== wrapper) cs.classList.remove('open');
       });
       wrapper.classList.toggle('open');
-    });
-
-    select.addEventListener('custom-value-set', () => {
-      populateOptions();
     });
 
     select.addEventListener('change', () => {
