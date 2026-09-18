@@ -994,6 +994,16 @@ export async function getCompanyConfig() {
       } catch (e) {
         console.error("Error al migrar company_config desde localStorage:", e);
       }
+    } else if (window.__TAURI__ && window.__TAURI__.core) {
+      try {
+        const rustConfig = await window.__TAURI__.core.invoke('get_company_config');
+        if (rustConfig && Object.keys(rustConfig).length > 0) {
+          config = rustConfig;
+          await setAjuste('company_config', config);
+        }
+      } catch (err) {
+        console.warn("Error al obtener company_config desde Rust:", err);
+      }
     }
   }
   return config || {};
@@ -1079,9 +1089,9 @@ export async function getRenewalThresholds() {
 /**
  * Guarda los umbrales de alerta de renovaciones en SQLite.
  */
-export async function saveRenewalThresholds(thresholds) {
+export async function saveRenewalThresholds(thresholds = {}) {
   await setAjuste('renewal_thresholds', thresholds);
-  localStorage.setItem('renewal_critical_days', thresholds.critical.toString());
-  localStorage.setItem('renewal_warning_days', thresholds.warning.toString());
-  localStorage.setItem('renewal_radar_days', thresholds.radar.toString());
+  localStorage.setItem('renewal_critical_days', String(thresholds.critical ?? 30));
+  localStorage.setItem('renewal_warning_days', String(thresholds.warning ?? 60));
+  localStorage.setItem('renewal_radar_days', String(thresholds.radar ?? 90));
 }
