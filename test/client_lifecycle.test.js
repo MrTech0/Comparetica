@@ -9,6 +9,7 @@ import {
   searchClientes,
   getClientes
 } from '../src/js/db.js';
+import { generateLopdCertificatePdf } from '../src/js/pdf.js';
 
 describe('Ciclo de Vida de Clientes y Bloqueo LOPD (src/js/db.js)', () => {
   const originalWindow = globalThis.window;
@@ -314,4 +315,68 @@ describe('Ciclo de Vida de Clientes y Bloqueo LOPD (src/js/db.js)', () => {
       assert.strictEqual(searchList[0].nombre_empresa, 'Empresa Activa');
     });
   });
+
+  describe('Certificado Oficial LOPD (src/js/pdf.js)', () => {
+    test('generateLopdCertificatePdf genera el documento en memoria e invoca save_pdf', async () => {
+      let savedFilename = null;
+      let savedBase64 = null;
+
+      // Mock jsPDF
+      const mockDoc = {
+        setFont: () => {},
+        setFontSize: () => {},
+        setTextColor: () => {},
+        setFillColor: () => {},
+        setDrawColor: () => {},
+        setLineWidth: () => {},
+        rect: () => {},
+        roundedRect: () => {},
+        line: () => {},
+        text: () => {},
+        splitTextToSize: (txt) => [txt],
+        addImage: () => {},
+        output: () => 'data:application/pdf;base64,JVBERi0xLjQK...',
+        save: (fn) => { savedFilename = fn; }
+      };
+
+      globalThis.window = {
+        ...(globalThis.window || {}),
+        __TAURI__: {
+          core: {
+            invoke: async (cmd, args) => {
+              if (cmd === 'save_pdf') {
+                savedFilename = args.filename;
+                savedBase64 = args.base64Data;
+                return '/fake/path/' + args.filename;
+              }
+              return null;
+            }
+          }
+        },
+        jspdf: {
+          jsPDF: function() { return mockDoc; }
+        }
+      };
+
+      const cliente = {
+        id: 99,
+        nombre_empresa: 'Cliente Bloqueado S.L.',
+        cif: 'B99887766',
+        bloqueado_en: '2026-09-20T00:00:00Z',
+        bloqueado_hasta: '2032-09-20'
+      };
+
+      const companyConfig = {
+        name: 'Asesoría Energética Test',
+        cif: 'B12345678',
+        email: 'info@test.es',
+        phone: '900000000'
+      };
+
+      const path = await generateLopdCertificatePdf(cliente, companyConfig);
+      assert.ok(path.includes('certificado_bloqueo_lopd_cliente_bloqueado_s_l__b99887766.pdf'));
+      assert.strictEqual(savedBase64, 'JVBERi0xLjQK...');
+    });
+  });
 });
+

@@ -650,3 +650,254 @@ function getDefaultLogoAsPng() {
   return canvas.toDataURL('image/png');
 }
 
+/**
+ * Genera y descarga el Certificado Oficial de Bloqueo LOPD conforme al Art. 32 LOPDGDD y Art. 17.3 RGPD.
+ * Se genera exclusivamente bajo demanda y se guarda mediante save_pdf nativo cifrado.
+ * @param {Object} cliente - Objeto cliente con id, nombre_empresa, cif, bloqueado_en, bloqueado_hasta.
+ * @param {Object} [companyConfig] - Configuración opcional de la consultora emisora.
+ */
+export async function generateLopdCertificatePdf(cliente, companyConfig = null) {
+  if (!cliente) {
+    showToast("Error: No se ha especificado ningún cliente para generar el certificado.", "error");
+    return;
+  }
+
+  const jsPDFClass = (typeof window !== 'undefined' && ((window.jspdf && window.jspdf.jsPDF) || window.jsPDF)) || null;
+  if (!jsPDFClass) {
+    showToast("Error: No se ha cargado la librería jsPDF. No se puede generar el certificado.", "error");
+    return;
+  }
+
+  let config = companyConfig;
+  let logoDataUri = null;
+  if (!config) {
+    try {
+      config = await getCompanyConfig();
+    } catch (e) {
+      config = {};
+    }
+  }
+  try {
+    logoDataUri = await getCompanyLogo();
+  } catch (e) {}
+
+  const doc = new jsPDFClass({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  doc.setFont('helvetica');
+
+  // Colores institucionales
+  const primaryColor = [10, 62, 130];
+  const secondaryColor = [70, 80, 95];
+  const cardBgColor = [246, 248, 252];
+  const cardBorderColor = [205, 215, 228];
+
+  // Franja decorativa superior
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.rect(0, 0, 210, 10, 'F');
+
+  // Cabecera con logo y datos de la consultora emisora
+  let startHeaderY = 16;
+  if (typeof document !== 'undefined') {
+    try {
+      const logoPng = await loadAndConvertLogo(logoDataUri);
+      if (logoPng) {
+        doc.addImage(logoPng, 'PNG', 20, startHeaderY, 24, 20);
+      }
+    } catch (eLogo) {
+      console.warn("No se pudo cargar el logo:", eLogo);
+    }
+  }
+
+  const consultantName = (config && config.name) ? config.name : 'Comparetica Asesoría Energética';
+  const consultantCif = (config && config.cif) ? `NIF/CIF: ${config.cif}` : '';
+  const consultantEmail = (config && config.email) ? `Email: ${config.email}` : '';
+  const consultantPhone = (config && config.phone) ? `Tel: ${config.phone}` : '';
+  const consultantAddress = (config && config.address) ? config.address : '';
+
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text(consultantName, 50, startHeaderY + 5);
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 110, 120);
+  const infoLine1 = [consultantCif, consultantPhone, consultantEmail].filter(Boolean).join('  |  ');
+  if (infoLine1) doc.text(infoLine1, 50, startHeaderY + 11);
+  if (consultantAddress) doc.text(consultantAddress, 50, startHeaderY + 16);
+
+  // Línea divisoria cabecera
+  doc.setDrawColor(220, 225, 235);
+  doc.setLineWidth(0.5);
+  doc.line(20, startHeaderY + 23, 190, startHeaderY + 23);
+
+  // Título oficial
+  const titleY = startHeaderY + 33;
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("CERTIFICADO OFICIAL DE BLOQUEO DE DATOS", 105, titleY, { align: 'center' });
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.text("Garantía de Supresión Comercial y Conservación Restringida", 105, titleY + 5.5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text("(Art. 32 Ley Orgánica 3/2018 - LOPDGDD y Art. 17.3 Reglamento General (UE) 2016/679 - RGPD)", 105, titleY + 10, { align: 'center' });
+
+  // Recuadro de datos del cliente afectado
+  const cardY = titleY + 14;
+  const cardH = 34;
+  doc.setFillColor(cardBgColor[0], cardBgColor[1], cardBgColor[2]);
+  doc.setDrawColor(cardBorderColor[0], cardBorderColor[1], cardBorderColor[2]);
+  doc.roundedRect(20, cardY, 170, cardH, 2.5, 2.5, 'FD');
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("DATOS DEL TITULAR / INTERESADO:", 25, cardY + 7);
+
+  doc.setFontSize(8.5);
+  doc.setTextColor(30, 30, 30);
+  doc.setFont('helvetica', 'bold');
+  doc.text("Razón Social / Nombre:", 25, cardY + 14);
+  doc.setFont('helvetica', 'normal');
+  doc.text(String(cliente.nombre_empresa || '-'), 68, cardY + 14);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text("NIF / CIF:", 25, cardY + 20);
+  doc.setFont('helvetica', 'normal');
+  doc.text(String(cliente.cif || '-'), 68, cardY + 20);
+
+  // Formato fechas
+  const formatFecha = (f) => {
+    if (!f) return '-';
+    const d = new Date(f);
+    if (isNaN(d.getTime())) return String(f);
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  };
+
+  const fechaBloqueoStr = formatFecha(cliente.bloqueado_en || new Date());
+  let fechaHasta = cliente.bloqueado_hasta;
+  if (!fechaHasta && cliente.bloqueado_en) {
+    const d = new Date(cliente.bloqueado_en);
+    d.setFullYear(d.getFullYear() + 6);
+    fechaHasta = d.toISOString().split('T')[0];
+  }
+  const fechaHastaStr = formatFecha(fechaHasta || new Date(Date.now() + 6 * 365.25 * 24 * 3600 * 1000));
+
+  doc.setFont('helvetica', 'bold');
+  doc.text("Fecha de Bloqueo Efectivo:", 25, cardY + 26);
+  doc.setFont('helvetica', 'normal');
+  doc.text(fechaBloqueoStr, 68, cardY + 26);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text("Vencimiento Retención Legal:", 115, cardY + 26);
+  doc.setFont('helvetica', 'normal');
+  doc.text(fechaHastaStr, 163, cardY + 26);
+
+  // Declaración formal / Certificación jurídica
+  let textY = cardY + cardH + 8;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(35, 40, 45);
+
+  const introText = `${consultantName}, en calidad de Responsable del Tratamiento de los datos, mediante la emisión del presente documento oficial, CERTIFICA formalmente:`;
+  const splitIntro = doc.splitTextToSize(introText, 170);
+  doc.text(splitIntro, 20, textY);
+  textY += (splitIntro.length * 4.5) + 3;
+
+  const points = [
+    {
+      num: "PRIMERO.- CESE Y BLOQUEO EFECTIVO.",
+      body: `Con motivo del cese de la colaboración mercantil con la entidad y en fecha ${fechaBloqueoStr}, se ha aplicado la medida de BLOQUEO TÉCNICO de todos los datos identificativos y contractuales correspondientes al interesado en todos los registros activos del sistema informático.`
+    },
+    {
+      num: "SEGUNDO.- EXCLUSIÓN COMERCIAL ABSOLUTA.",
+      body: "En cumplimiento estricto del Artículo 32 de la Ley Orgánica 3/2018 (LOPDGDD), el bloqueo impide el tratamiento de los datos para fines operativos, comerciales, publicitarios o de elaboración de ofertas/comparativas tarifarias, asegurando que ningún usuario del sistema puede acceder a ellos para finalidades distintas de la mera custodia jurídica."
+    },
+    {
+      num: "TERCERO.- CONSERVACIÓN POR OBLIGACIÓN LEGAL MERCANTIL Y TRIBUTARIA.",
+      body: `De conformidad con el Artículo 17.3 apartados (b) y (e) del RGPD y el Artículo 30 del Código de Comercio, los datos derivados de relaciones contractuales perfeccionadas quedan legalmente retenidos durante el plazo preceptivo de prescripción de responsabilidades (6 años), hasta el ${fechaHastaStr}.`
+    },
+    {
+      num: "CUARTO.- DISPONIBILIDAD EXCLUSIVA ANTE AUTORIDADES Y SUPRESIÓN POSTERIOR.",
+      body: "Durante el período de bloqueo indicado, los datos permanecerán únicamente a disposición de Jueces y Tribunales, el Ministerio Fiscal o las Administraciones Públicas competentes (incluida la Agencia Española de Protección de Datos - AEPD). Una vez transcurrido íntegramente el período de retención legal, se ejecutará la destrucción y supresión irreversible definitiva de dichos registros."
+    }
+  ];
+
+  points.forEach(p => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.2);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text(p.num, 20, textY);
+    textY += 4;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(45, 50, 55);
+    const splitBody = doc.splitTextToSize(p.body, 170);
+    doc.text(splitBody, 20, textY);
+    textY += (splitBody.length * 3.8) + 3.5;
+  });
+
+  // Bloque de Firma y Validez
+  textY = Math.max(textY + 2, 236);
+
+  const todayStr = formatFecha(new Date());
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(60, 65, 70);
+  doc.text(`Expedido y certificado a fecha: ${todayStr}`, 20, textY);
+
+  textY += 7;
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text(`Por ${consultantName}:`, 20, textY);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(110, 115, 125);
+  doc.text("Firma y sello del Responsable del Tratamiento", 20, textY + 5);
+
+  doc.setDrawColor(180, 190, 205);
+  doc.setLineWidth(0.4);
+  doc.line(20, textY + 24, 85, textY + 24);
+
+  doc.setFontSize(7);
+  doc.setTextColor(120, 125, 135);
+  doc.text("Firma fehaciente / Sello de conformidad LOPDGDD", 20, textY + 28);
+
+  // Pie de página con franja
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.rect(0, 292, 210, 5, 'F');
+
+  // Guardar archivo mediante diálogo nativo o descarga
+  const safeClient = (cliente.nombre_empresa || 'cliente').toLowerCase().replace(/[^a-z0-9]/g, '_');
+  const safeCif = (cliente.cif || 'nif').toLowerCase().replace(/[^a-z0-9]/g, '_');
+  const filename = `certificado_bloqueo_lopd_${safeClient}_${safeCif}.pdf`;
+
+  if (typeof window !== 'undefined' && window.__TAURI__) {
+    const pdfBase64 = doc.output('datauristring').split(',')[1];
+    try {
+      const path = await invoke('save_pdf', { filename, base64Data: pdfBase64 });
+      showToast("Certificado LOPD descargado con éxito.", "success");
+      return path;
+    } catch (err) {
+      if (err !== "Cancelado por el usuario") {
+        showToast("Error al guardar el Certificado LOPD: " + err, "error");
+      }
+      return null;
+    }
+  } else {
+    doc.save(filename);
+    showToast("Certificado LOPD descargado.", "success");
+    return true;
+  }
+}
+
