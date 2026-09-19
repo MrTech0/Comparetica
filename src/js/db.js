@@ -378,8 +378,16 @@ export async function clearAllTables() {
  * Obtiene la lista completa de clientes ordenados alfabéticamente por nombre de empresa/particular.
  * @returns {Promise<Array<Object>>} Lista de clientes.
  */
-export async function getClientes() {
+/**
+ * Obtiene la lista completa de clientes.
+ * @param {Object} [options]
+ * @param {boolean} [options.soloActivos=false] Si es true, retorna solo clientes activos.
+ * @returns {Promise<Array<Object>>} Lista de clientes.
+ */
+export async function getClientes(options = {}) {
   const db = await getDb();
+  const { soloActivos = false } = options;
+  const whereSql = soloActivos ? "WHERE (c.estado = 'activo' OR c.estado IS NULL)" : "";
   try {
     const clients = await db.select(`
       SELECT c.*, 
@@ -388,6 +396,7 @@ export async function getClientes() {
                WHERE comp.cliente_nombre = c.nombre_empresa AND comp.estado = 'Aceptada'
              ) AS tiene_aceptada
       FROM clientes c
+      ${whereSql}
       ORDER BY c.nombre_empresa ASC;
     `);
     return Array.isArray(clients) ? clients : [];
@@ -402,9 +411,11 @@ export async function getClientes() {
  * @param {number} page Número de página (1-based).
  * @param {number} pageSize Tamaño de página (por defecto 25).
  * @param {string} search Término opcional de búsqueda (nombre, CIF o CUPS).
+ * @param {number|null} agentId Filtro por agente.
+ * @param {string|null} statusFilter Filtro por estado ('activo', 'inactivo', 'bloqueado', o null para todos).
  * @returns {Promise<{clients: Array<Object>, totalCount: number, page: number, pageSize: number, totalPages: number}>}
  */
-export async function getClientesPaginated(page = 1, pageSize = 25, search = '', agentId = null) {
+export async function getClientesPaginated(page = 1, pageSize = 25, search = '', agentId = null, statusFilter = null) {
   const db = await getDb();
   const validPage = Math.max(1, parseInt(page, 10) || 1);
   const validPageSize = Math.max(1, parseInt(pageSize, 10) || 25);
@@ -424,6 +435,15 @@ export async function getClientesPaginated(page = 1, pageSize = 25, search = '',
     if (agentId !== null && agentId !== '' && !isNaN(parseInt(agentId, 10))) {
       whereClauses.push(`c.agente_id = ?`);
       params.push(parseInt(agentId, 10));
+    }
+
+    if (statusFilter && ['activo', 'inactivo', 'bloqueado'].includes(statusFilter)) {
+      if (statusFilter === 'activo') {
+        whereClauses.push(`(c.estado = 'activo' OR c.estado IS NULL)`);
+      } else {
+        whereClauses.push(`c.estado = ?`);
+        params.push(statusFilter);
+      }
     }
 
     const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -476,13 +496,16 @@ export async function getClientesPaginated(page = 1, pageSize = 25, search = '',
 /**
  * Obtiene los primeros N clientes para selectores desplegables sin sobrecargar la memoria del DOM.
  * @param {number} limit Número máximo de clientes a recuperar.
+ * @param {boolean} [soloActivos=true] Si es true, solo retorna clientes con estado 'activo'.
  */
-export async function getClientesForSelect(limit = 100) {
+export async function getClientesForSelect(limit = 100, soloActivos = true) {
   const db = await getDb();
   try {
+    const whereSql = soloActivos ? "WHERE (estado = 'activo' OR estado IS NULL)" : "";
     const clients = await db.select(`
-      SELECT id, nombre_empresa, cif, cups
+      SELECT id, nombre_empresa, cif, cups, estado
       FROM clientes
+      ${whereSql}
       ORDER BY nombre_empresa ASC
       LIMIT ?;
     `, [limit]);
@@ -497,18 +520,21 @@ export async function getClientesForSelect(limit = 100) {
  * Busca clientes por nombre, CIF o CUPS con un límite estricto para evitar bloqueos del DOM.
  * @param {string} term Término de búsqueda.
  * @param {number} limit Límite máximo de resultados.
+ * @param {boolean} [soloActivos=true] Si es true, solo retorna clientes con estado 'activo'.
  */
-export async function searchClientes(term, limit = 50) {
+export async function searchClientes(term, limit = 50, soloActivos = true) {
   const db = await getDb();
   if (!term || term.trim().length === 0) {
-    return await getClientesForSelect(limit);
+    return await getClientesForSelect(limit, soloActivos);
   }
   try {
     const pattern = `%${term.trim()}%`;
+    const statusClause = soloActivos ? "AND (estado = 'activo' OR estado IS NULL)" : "";
     const clients = await db.select(`
-      SELECT id, nombre_empresa, cif, cups
+      SELECT id, nombre_empresa, cif, cups, estado
       FROM clientes
-      WHERE nombre_empresa LIKE ? OR cif LIKE ? OR cups LIKE ?
+      WHERE (nombre_empresa LIKE ? OR cif LIKE ? OR cups LIKE ?)
+      ${statusClause}
       ORDER BY nombre_empresa ASC
       LIMIT ?;
     `, [pattern, pattern, pattern, limit]);
@@ -516,6 +542,140 @@ export async function searchClientes(term, limit = 50) {
   } catch (err) {
     console.error("Error al buscar clientes:", err);
     return [];
+  }
+}
+
+/**
+ * Actualiza el estado de un cliente (activo, inactivo, bloqueado) y gestiona las fechas LOPD.
+ * @param {number} id - ID del cliente.
+ * @param {'activo'|'inactivo'|'bloqueado'} nuevoEstado - Nuevo estado.
+ * @param {Object} [opts]
+ * @param {string} [opts.bloqueado_en] - Timestamp de bloqueo ISO.
+ * @param {string} [opts.bloqueado_hasta] - Fecha fin de retención YYYY-MM-DD.
+ */
+export async function updateClienteEstado(id, nuevoEstado, { bloqueado_en = null, bloqueado_hasta = null } = {}) {
+  const validEstados = ['activo', 'inactivo', 'bloqueado'];
+  if (!validEstados.includes(nuevoEstado)) {
+    throw new Error(`Estado inválido: ${nuevoEstado}. Debe ser uno de: ${validEstados.join(', ')}`);
+  }
+
+  const db = await getDb();
+  if (nuevoEstado === 'bloqueado') {
+    const bEn = bloqueado_en || new Date().toISOString();
+    let bHasta = bloqueado_hasta;
+    if (!bHasta) {
+      const d = new Date(bEn);
+      d.setFullYear(d.getFullYear() + 6);
+      bHasta = d.toISOString().split('T')[0];
+    }
+    return await db.execute(
+      "UPDATE clientes SET estado = ?, bloqueado_en = ?, bloqueado_hasta = ? WHERE id = ?;",
+      [nuevoEstado, bEn, bHasta, id]
+    );
+  } else {
+    return await db.execute(
+      "UPDATE clientes SET estado = ?, bloqueado_en = NULL, bloqueado_hasta = NULL WHERE id = ?;",
+      [nuevoEstado, id]
+    );
+  }
+}
+
+/**
+ * Evalúa y sincroniza automáticamente clientes de estado 'activo' a 'inactivo'
+ * según vencimiento de contratos y período de cortesía para nuevos clientes.
+ * @returns {Promise<{transitionedCount: number}>}
+ */
+export async function syncClientesEstadoAutomatico() {
+  const db = await getDb();
+  try {
+    const { mesesNuevo, diasVencimiento } = await getClientInactivityParams();
+
+    const activeClients = await db.select(`
+      SELECT c.id, c.nombre_empresa, c.creado_en, c.estado,
+             EXISTS (
+               SELECT 1 FROM comparativas comp 
+               WHERE comp.cliente_nombre = c.nombre_empresa AND comp.estado = 'Aceptada'
+             ) AS tiene_aceptada
+      FROM clientes c
+      WHERE c.estado = 'activo' OR c.estado IS NULL;
+    `);
+
+    if (!Array.isArray(activeClients) || activeClients.length === 0) {
+      return { transitionedCount: 0 };
+    }
+
+    const now = new Date();
+    let transitionedCount = 0;
+
+    for (const client of activeClients) {
+      // Blindaje legal: clientes bloqueados nunca se alteran
+      if (client.estado === 'bloqueado') continue;
+
+      const renewals = await db.select(
+        "SELECT id, fecha_vencimiento, estado_renovacion FROM renovaciones WHERE cliente_id = ? ORDER BY fecha_vencimiento DESC;",
+        [client.id]
+      );
+
+      let shouldBeInactive = false;
+
+      if (Array.isArray(renewals) && renewals.length > 0) {
+        // Al menos un contrato vigente o dentro del margen
+        const hasAnyActiveContract = renewals.some(r => {
+          if (!r.fecha_vencimiento) return false;
+          const vtoDate = new Date(r.fecha_vencimiento);
+          const diffDays = Math.floor((now - vtoDate) / (1000 * 60 * 60 * 24));
+          return diffDays <= diasVencimiento;
+        });
+
+        if (!hasAnyActiveContract) {
+          const recentComps = await db.select(`
+            SELECT COUNT(*) as count FROM comparativas 
+            WHERE cliente_nombre = ? AND fecha >= datetime('now', '-${diasVencimiento} days');
+          `, [client.nombre_empresa]);
+          const recentCount = (recentComps && (recentComps[0]?.count || recentComps[0]?.['COUNT(*)'])) || 0;
+          if (recentCount === 0) {
+            shouldBeInactive = true;
+          }
+        }
+      } else {
+        // Sin renovaciones registradas
+        if (client.tiene_aceptada) {
+          const lastAccepted = await db.select(`
+            SELECT MAX(fecha) as ultima_fecha FROM comparativas 
+            WHERE cliente_nombre = ? AND estado = 'Aceptada';
+          `, [client.nombre_empresa]);
+          const lastDateStr = lastAccepted && lastAccepted[0]?.ultima_fecha;
+          if (lastDateStr) {
+            const lastDate = new Date(lastDateStr);
+            const maxDays = 365 + diasVencimiento;
+            const diffDays = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24));
+            if (diffDays > maxDays) {
+              shouldBeInactive = true;
+            }
+          }
+        } else {
+          // Cliente potencial sin contratos
+          if (client.creado_en) {
+            const created = new Date(client.creado_en);
+            const diffDays = Math.floor((now - created) / (1000 * 60 * 60 * 24));
+            const maxCourtesyDays = mesesNuevo * 30;
+            if (diffDays > maxCourtesyDays) {
+              shouldBeInactive = true;
+            }
+          }
+        }
+      }
+
+      if (shouldBeInactive) {
+        await db.execute("UPDATE clientes SET estado = 'inactivo' WHERE id = ?;", [client.id]);
+        transitionedCount++;
+      }
+    }
+
+    return { transitionedCount };
+  } catch (err) {
+    console.error("Error en syncClientesEstadoAutomatico:", err);
+    return { transitionedCount: 0, error: err.message };
   }
 }
 
@@ -1101,3 +1261,36 @@ export async function saveRenewalThresholds(thresholds = {}) {
   localStorage.setItem('renewal_warning_days', String(thresholds.warning ?? 60));
   localStorage.setItem('renewal_radar_days', String(thresholds.radar ?? 90));
 }
+
+/**
+ * Obtiene los parámetros de inactividad de clientes (meses de cortesía y margen de vencimiento).
+ * @returns {Promise<{mesesNuevo: number, diasVencimiento: number}>}
+ */
+export async function getClientInactivityParams() {
+  const params = await getAjuste('client_inactivity_params', null);
+  if (params && typeof params.mesesNuevo === 'number' && typeof params.diasVencimiento === 'number') {
+    return params;
+  }
+  const defaultParams = {
+    mesesNuevo: 3,
+    diasVencimiento: 30
+  };
+  await setAjuste('client_inactivity_params', defaultParams);
+  return defaultParams;
+}
+
+/**
+ * Guarda los parámetros de inactividad de clientes en SQLite.
+ * @param {Object} params
+ * @param {number} params.mesesNuevo
+ * @param {number} params.diasVencimiento
+ * @returns {Promise<{mesesNuevo: number, diasVencimiento: number}>}
+ */
+export async function saveClientInactivityParams(params = {}) {
+  const mesesNuevo = Math.max(1, parseInt(params.mesesNuevo, 10) || 3);
+  const diasVencimiento = Math.max(1, parseInt(params.diasVencimiento, 10) || 30);
+  const cleanParams = { mesesNuevo, diasVencimiento };
+  await setAjuste('client_inactivity_params', cleanParams);
+  return cleanParams;
+}
+
