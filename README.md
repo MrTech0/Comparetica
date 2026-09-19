@@ -4,6 +4,10 @@
 
 # Comparetica
 
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3"></a>
+</p>
+
 > [!NOTE]
 > **Estado del proyecto**: Este proyecto se encuentra en **pleno desarrollo** y es una **versión beta**. Algunas características y funcionalidades podrían cambiar o refinarse en futuras actualizaciones.
 
@@ -141,4 +145,12 @@ Esta aplicación es una herramienta de simulación y estimación de ofertas ener
 1. **Sin Garantías**: El software se proporciona "tal cual" (*as is*), sin garantías de ningún tipo, explícitas o implícitas, sobre la precisión, exhaustividad, vigencia o ausencia de errores en las fórmulas de cálculo o tarifas cargadas.
 2. **Exención de Responsabilidad**: En ningún caso el autor del software (MrTech0) será responsable por reclamaciones, pérdidas de datos, perjuicios comerciales, pérdidas de clientes o cualquier otro daño directo, indirecto o accidental derivado del uso o de la imposibilidad de uso de esta herramienta.
 3. **Responsabilidad del Usuario**: Es responsabilidad exclusiva del usuario (consultor o asesor) verificar la validez, vigencia y exactitud de todas las tarifas y términos de facturación directamente con las comercializadoras antes de formalizar cualquier contrato o emitir ofertas comerciales definitivas a clientes externos.
+ 
+---
+
+## 📄 Licencia
+
+Este proyecto se distribuye bajo la licencia **GNU Affero General Public License v3.0** ([AGPL-3.0-or-later](LICENSE)).
+
+Eres libre de usar, estudiar, modificar y compartir este software. De acuerdo con los términos de la licencia AGPLv3, cualquier modificación o trabajo derivado que se distribuya o se ponga a disposición de usuarios a través de una red o servicio debe publicarse bajo esta misma licencia y con su código fuente completo accesible a la comunidad. Para más detalles, consulta el archivo [LICENSE](LICENSE).
 
