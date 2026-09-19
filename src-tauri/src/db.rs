@@ -463,11 +463,14 @@ impl DbState {
                 cups TEXT,
                 email TEXT,
                 agente_id INTEGER REFERENCES agentes(id),
+                estado TEXT NOT NULL DEFAULT 'activo',
+                bloqueado_en TIMESTAMP,
+                bloqueado_hasta DATE,
                 creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         ", []).map_err(|e| e.to_string())?;
 
-        // Migración defensiva: asegurar que la columna agente_id existe en bases de datos existentes
+        // Migración defensiva: asegurar que las columnas nuevas existan en bases de datos existentes
         let client_cols: Vec<String> = {
             let mut stmt = conn.prepare("PRAGMA table_info(clientes);").map_err(|e| e.to_string())?;
             let rows = stmt.query_map([], |row| row.get::<_, String>(1)).map_err(|e| e.to_string())?;
@@ -475,6 +478,15 @@ impl DbState {
         };
         if !client_cols.contains(&"agente_id".to_string()) {
             conn.execute("ALTER TABLE clientes ADD COLUMN agente_id INTEGER REFERENCES agentes(id);", []).map_err(|e| e.to_string())?;
+        }
+        if !client_cols.contains(&"estado".to_string()) {
+            conn.execute("ALTER TABLE clientes ADD COLUMN estado TEXT NOT NULL DEFAULT 'activo';", []).map_err(|e| e.to_string())?;
+        }
+        if !client_cols.contains(&"bloqueado_en".to_string()) {
+            conn.execute("ALTER TABLE clientes ADD COLUMN bloqueado_en TIMESTAMP;", []).map_err(|e| e.to_string())?;
+        }
+        if !client_cols.contains(&"bloqueado_hasta".to_string()) {
+            conn.execute("ALTER TABLE clientes ADD COLUMN bloqueado_hasta DATE;", []).map_err(|e| e.to_string())?;
         }
 
         conn.execute("
@@ -1149,6 +1161,46 @@ mod tests {
         let reopened_rows = reopened_state.select("SELECT nombre FROM legacy_clientes;", vec![]).unwrap();
         assert_eq!(reopened_rows.len(), 1);
         assert_eq!(reopened_rows[0].get("nombre").unwrap().as_str(), Some("Cliente Migrado SL"));
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_cliente_estado_columns_and_migration() {
+        let test_id = Uuid::new_v4().to_string();
+        let test_dir = std::env::temp_dir().join(format!("comparetica_test_estado_{}", test_id));
+        let _ = fs::create_dir_all(&test_dir);
+
+        let mut state = DbState::new_with_dir(test_dir.clone());
+        let pwd = "Password123!";
+        let _ = state.setup_master_password(pwd).unwrap();
+
+        // 1. Insertar cliente sin especificar estado (debe ser 'activo' por defecto)
+        let insert_res = state.execute(
+            "INSERT INTO clientes (nombre_empresa, cif, email) VALUES ('Cliente Activo SL', 'B11111111', 'test@activo.com');",
+            vec![]
+        );
+        assert!(insert_res.is_ok(), "Debe insertar cliente correctamente");
+
+        let rows = state.select("SELECT id, estado, bloqueado_en, bloqueado_hasta FROM clientes WHERE cif = 'B11111111';", vec![]).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].get("estado").unwrap().as_str(), Some("activo"));
+        assert!(rows[0].get("bloqueado_en").unwrap().is_null());
+        assert!(rows[0].get("bloqueado_hasta").unwrap().is_null());
+
+        // 2. Actualizar a estado 'bloqueado' con fechas LOPD
+        let client_id = rows[0].get("id").unwrap().as_i64().unwrap();
+        let update_res = state.execute(
+            "UPDATE clientes SET estado = 'bloqueado', bloqueado_en = '2026-09-20T00:00:00Z', bloqueado_hasta = '2032-09-20' WHERE id = ?;",
+            vec![serde_json::Value::from(client_id)]
+        );
+        assert!(update_res.is_ok(), "Debe actualizar estado y fechas LOPD");
+
+        let updated_rows = state.select("SELECT estado, bloqueado_en, bloqueado_hasta FROM clientes WHERE id = ?;", vec![serde_json::Value::from(client_id)]).unwrap();
+        assert_eq!(updated_rows.len(), 1);
+        assert_eq!(updated_rows[0].get("estado").unwrap().as_str(), Some("bloqueado"));
+        assert_eq!(updated_rows[0].get("bloqueado_en").unwrap().as_str(), Some("2026-09-20T00:00:00Z"));
+        assert_eq!(updated_rows[0].get("bloqueado_hasta").unwrap().as_str(), Some("2032-09-20"));
 
         let _ = fs::remove_dir_all(test_dir);
     }
