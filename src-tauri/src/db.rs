@@ -86,7 +86,7 @@ fn derive_key(secret: &str, salt: &[u8]) -> Result<[u8; 32], String> {
     Ok(key)
 }
 
-fn encrypt_aes_gcm(key: &[u8; 32], plaintext: &[u8]) -> Result<String, String> {
+fn encrypt_bytes(key: &[u8; 32], plaintext: &[u8]) -> Result<Vec<u8>, String> {
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
     let mut nonce_bytes = [0u8; 12];
     thread_rng().fill_bytes(&mut nonce_bytes);
@@ -96,11 +96,10 @@ fn encrypt_aes_gcm(key: &[u8; 32], plaintext: &[u8]) -> Result<String, String> {
     let mut combined = Vec::with_capacity(12 + ciphertext.len());
     combined.extend_from_slice(&nonce_bytes);
     combined.extend_from_slice(&ciphertext);
-    Ok(general_purpose::STANDARD.encode(combined))
+    Ok(combined)
 }
 
-fn decrypt_aes_gcm(key: &[u8; 32], encoded: &str) -> Result<Vec<u8>, String> {
-    let combined = general_purpose::STANDARD.decode(encoded).map_err(|e| e.to_string())?;
+fn decrypt_bytes(key: &[u8; 32], combined: &[u8]) -> Result<Vec<u8>, String> {
     if combined.len() < 12 {
         return Err("Datos cifrados inválidos".to_string());
     }
@@ -108,6 +107,35 @@ fn decrypt_aes_gcm(key: &[u8; 32], encoded: &str) -> Result<Vec<u8>, String> {
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
     let nonce = Nonce::from_slice(nonce_bytes);
     cipher.decrypt(nonce, ciphertext).map_err(|_| "Contraseña o clave incorrecta".to_string())
+}
+
+fn encrypt_aes_gcm(key: &[u8; 32], plaintext: &[u8]) -> Result<String, String> {
+    let combined = encrypt_bytes(key, plaintext)?;
+    Ok(general_purpose::STANDARD.encode(combined))
+}
+
+fn decrypt_aes_gcm(key: &[u8; 32], encoded: &str) -> Result<Vec<u8>, String> {
+    let combined = general_purpose::STANDARD.decode(encoded).map_err(|e| e.to_string())?;
+    decrypt_bytes(key, &combined)
+}
+
+fn deserialize_into_conn(conn: &mut Connection, bytes: &[u8]) -> Result<(), String> {
+    let sz = bytes.len();
+    let ptr = unsafe { rusqlite::ffi::sqlite3_malloc64(sz as u64) as *mut u8 };
+    if ptr.is_null() && sz > 0 {
+        return Err("Error de memoria al deserializar SQLite".to_string());
+    }
+    if !ptr.is_null() {
+        unsafe {
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, sz);
+        }
+    }
+    let non_null = std::ptr::NonNull::new(ptr)
+        .ok_or_else(|| "Puntero nulo al deserializar SQLite".to_string())?;
+    let owned_data = unsafe { rusqlite::serialize::OwnedData::from_raw_nonnull(non_null, sz) };
+
+    conn.deserialize(rusqlite::DatabaseName::Main, owned_data, false)
+        .map_err(|e| format!("Error al deserializar base de datos en memoria: {}", e))
 }
 
 impl DbState {
@@ -185,30 +213,13 @@ impl DbState {
             }
 
             let enc_bytes = fs::read(&enc_path).map_err(|e| e.to_string())?;
-            let db_bytes = decrypt_aes_gcm(&mdk, &general_purpose::STANDARD.encode(enc_bytes))?;
+            let db_bytes = decrypt_bytes(&mdk, &enc_bytes)?;
 
             if db_bytes.is_empty() {
                 return Err("El contenido descifrado de la base de datos está vacío.".to_string());
             }
             
-            let owned_data = {
-                let sz = db_bytes.len();
-                let ptr = unsafe { rusqlite::ffi::sqlite3_malloc64(sz as u64) as *mut u8 };
-                if ptr.is_null() && sz > 0 {
-                    return Err("Error de memoria al deserializar SQLite".to_string());
-                }
-                if !ptr.is_null() {
-                    unsafe {
-                        std::ptr::copy_nonoverlapping(db_bytes.as_ptr(), ptr, sz);
-                    }
-                }
-                let non_null = std::ptr::NonNull::new(ptr)
-                    .ok_or_else(|| "Puntero nulo al deserializar SQLite".to_string())?;
-                unsafe { rusqlite::serialize::OwnedData::from_raw_nonnull(non_null, sz) }
-            };
-
-            conn.deserialize(rusqlite::DatabaseName::Main, owned_data, false)
-                .map_err(|e| format!("Error al deserializar base de datos en memoria: {}", e))?;
+            deserialize_into_conn(&mut conn, &db_bytes)?;
         } else if legacy_path.exists() {
             // Migrar base de datos legacy en texto plano
             let disk_conn = Connection::open(&legacy_path).map_err(|e| e.to_string())?;
@@ -241,8 +252,7 @@ impl DbState {
         let db_bytes = conn.serialize(rusqlite::DatabaseName::Main)
             .map_err(|e| format!("Error al serializar base de datos desde memoria: {}", e))?;
 
-        let enc_str = encrypt_aes_gcm(mdk, &db_bytes)?;
-        let enc_bytes = general_purpose::STANDARD.decode(enc_str).map_err(|e| e.to_string())?;
+        let enc_bytes = encrypt_bytes(mdk, &db_bytes)?;
         
         let final_path = self.enc_db_path();
         let tmp_path = final_path.with_extension("enc.tmp");
@@ -267,17 +277,15 @@ impl DbState {
         let is_initialized = self.load_vault()?.map(|v| v.is_initialized).unwrap_or(false);
 
         if self.conn.is_some() && self.mdk.is_some() {
-            // Caso 1: Bóveda desbloqueada -> Importar en memoria, cifrar a comparetica.db.enc y borrar temporal inmediatamente
-            let temp_legacy = self.app_data_dir.join("temp_legacy_import.db");
-            fs::write(&temp_legacy, bytes).map_err(|e| e.to_string())?;
+            // Caso 1: Bóveda desbloqueada -> Importar 100% en memoria, cifrar a comparetica.db.enc sin tocar disco
+            let mut temp_mem_conn = Connection::open_in_memory().map_err(|e| e.to_string())?;
+            deserialize_into_conn(&mut temp_mem_conn, bytes)?;
 
-            let disk_conn = Connection::open(&temp_legacy).map_err(|e| e.to_string())?;
             if let Some(ref mut in_mem_conn) = self.conn {
-                let backup = rusqlite::backup::Backup::new(&disk_conn, in_mem_conn).map_err(|e| e.to_string())?;
+                let backup = rusqlite::backup::Backup::new(&temp_mem_conn, in_mem_conn).map_err(|e| e.to_string())?;
                 backup.run_to_completion(5, std::time::Duration::from_millis(10), None).map_err(|e| e.to_string())?;
             }
-            drop(disk_conn);
-            let _ = fs::remove_file(&temp_legacy);
+            drop(temp_mem_conn);
 
             self.init_schema()?;
             self.persist_db()?;
@@ -1072,6 +1080,75 @@ mod tests {
         let recovered_rows = restarted_state.select("SELECT valor FROM ajustes WHERE clave = 'company_config';", vec![]).unwrap();
         assert_eq!(recovered_rows.len(), 1);
         assert_eq!(recovered_rows[0].get("valor").unwrap().as_str(), Some("{\"nombre\":\"Test S.L.\"}"));
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_direct_bytes_encryption_and_in_memory_legacy_import() {
+        // 1. Verificar primitivas de cifrado/descifrado directo en bytes
+        let mut test_key = [0u8; 32];
+        thread_rng().fill_bytes(&mut test_key);
+        let sample_payload = b"Prueba de cifrado directo en bytes sin Base64";
+
+        let encrypted_bytes = encrypt_bytes(&test_key, sample_payload).expect("encrypt_bytes debe tener éxito");
+        // Debe tener 12 bytes de nonce + ciphertext (payload + 16 bytes de tag Poly1305/GCM)
+        assert_eq!(encrypted_bytes.len(), 12 + sample_payload.len() + 16);
+
+        let decrypted_bytes = decrypt_bytes(&test_key, &encrypted_bytes).expect("decrypt_bytes debe tener éxito");
+        assert_eq!(decrypted_bytes, sample_payload);
+
+        // Corrupción de datos debe provocar fallo en decrypt_bytes
+        let mut corrupted_bytes = encrypted_bytes.clone();
+        corrupted_bytes[15] ^= 0xFF;
+        assert!(decrypt_bytes(&test_key, &corrupted_bytes).is_err(), "Datos alterados deben fallar el descifrado");
+
+        // 2. Verificar importación de SQLite legacy 100% en memoria
+        let test_id = Uuid::new_v4().to_string();
+        let test_dir = std::env::temp_dir().join(format!("comparetica_test_legacy_import_{}", test_id));
+        let _ = fs::create_dir_all(&test_dir);
+
+        let mut state = DbState::new_with_dir(test_dir.clone());
+        let pwd = "MasterPassword2026!";
+        let _ = state.setup_master_password(pwd).unwrap();
+
+        // Crear una base de datos SQLite legacy en memoria y serializarla a bytes
+        let legacy_conn = Connection::open_in_memory().unwrap();
+        legacy_conn.execute("CREATE TABLE legacy_clientes (id INTEGER PRIMARY KEY, nombre TEXT);", []).unwrap();
+        legacy_conn.execute("INSERT INTO legacy_clientes (nombre) VALUES ('Cliente Migrado SL');", []).unwrap();
+        let legacy_bytes = legacy_conn.serialize(rusqlite::DatabaseName::Main).unwrap().to_vec();
+        drop(legacy_conn);
+
+        // Importar usando el método optimizado en memoria
+        let import_res = state.import_legacy_sqlite(&legacy_bytes);
+        assert!(import_res.is_ok(), "import_legacy_sqlite debe importar con éxito");
+
+        // Verificar que NUNCA se creó temp_legacy_import.db en disco
+        let temp_legacy_file = test_dir.join("temp_legacy_import.db");
+        assert!(!temp_legacy_file.exists(), "temp_legacy_import.db no debe existir en disco");
+
+        // Verificar que los datos legacy están disponibles en la conexión activa
+        let rows = state.select("SELECT nombre FROM legacy_clientes;", vec![]).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].get("nombre").unwrap().as_str(), Some("Cliente Migrado SL"));
+
+        // 3. Verificar persistencia cifrada directa tras importación
+        let vault = state.load_vault().unwrap().unwrap();
+        let salt_p = general_purpose::STANDARD.decode(&vault.salt_password).unwrap();
+        let key_p = derive_key(pwd, &salt_p).unwrap();
+        let mdk_bytes = decrypt_aes_gcm(&key_p, &vault.encrypted_mdk_password).unwrap();
+        let mut mdk = [0u8; 32];
+        mdk.copy_from_slice(&mdk_bytes);
+
+        drop(state);
+
+        // Reabrir estado con open_db (usando decrypt_bytes directo)
+        let mut reopened_state = DbState::new_with_dir(test_dir.clone());
+        reopened_state.open_db(mdk).unwrap();
+
+        let reopened_rows = reopened_state.select("SELECT nombre FROM legacy_clientes;", vec![]).unwrap();
+        assert_eq!(reopened_rows.len(), 1);
+        assert_eq!(reopened_rows[0].get("nombre").unwrap().as_str(), Some("Cliente Migrado SL"));
 
         let _ = fs::remove_dir_all(test_dir);
     }
