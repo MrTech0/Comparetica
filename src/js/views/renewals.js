@@ -47,6 +47,7 @@ export async function loadRenewals() {
         SELECT r.*, c.nombre_empresa as cliente_nombre, c.cif as cliente_cif
         FROM renovaciones r
         JOIN clientes c ON r.cliente_id = c.id
+        WHERE (c.estado = 'activo' OR c.estado IS NULL)
         ORDER BY r.fecha_vencimiento ASC;
       `);
       renewalsData = Array.isArray(res) ? res : [];
@@ -644,7 +645,7 @@ export async function openNewRenewalDialogFromHistory(comp) {
 
   // 3. Buscar ID de cliente por nombre o NIF
   try {
-    const clients = await getClientes();
+    const clients = await getClientes({ soloActivos: true });
     const matchedClient = Array.isArray(clients) ? clients.find(c => (c.nombre_empresa || '').trim().toLowerCase() === (comp.cliente_nombre || '').trim().toLowerCase()) : null;
 
     const searchInput = document.getElementById('manual-ren-client-search');

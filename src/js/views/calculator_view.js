@@ -81,7 +81,7 @@ export function initCalculatorView() {
 
       try {
         const [allClients, allPuntos] = await Promise.all([
-          getClientes(),
+          getClientes({ soloActivos: true }),
           getPuntosSuministroAll().catch(() => [])
         ]);
 
@@ -341,16 +341,26 @@ function setupCalcFormSubmit() {
     const clientNameInput = document.getElementById('calc-client-name');
     const clientName = clientNameInput ? clientNameInput.value.trim() : "";
     
-    // Verificar si el cliente existe en base de datos
+    // Verificar si el cliente existe en base de datos y su estado
     const clients = await getClientes();
-    const clientExists = clients.some(c => c.nombre_empresa.toLowerCase() === clientName.toLowerCase());
+    const matchedClient = clients.find(c => c.nombre_empresa.toLowerCase() === clientName.toLowerCase());
 
-    if (!clientExists) {
+    if (!matchedClient) {
       const choice = await showNoClientAlert();
       if (choice === 'redirect') {
         const navClients = document.getElementById('nav-clients');
         if (navClients) navClients.click();
       }
+      return;
+    }
+
+    if (matchedClient.estado === 'bloqueado') {
+      showToast("El cliente seleccionado se encuentra bloqueado conforme a la LOPD/RGPD y no puede recibir ofertas ni comparativas.", "error");
+      return;
+    }
+
+    if (matchedClient.estado === 'inactivo') {
+      showToast("El cliente seleccionado está inactivo. Debe reactivarlo en la sección de Clientes antes de generar una nueva comparativa.", "warning");
       return;
     }
 
