@@ -10,7 +10,9 @@ import {
   saveCompanyLogo,
   deleteCompanyLogo,
   getRenewalThresholds,
-  saveRenewalThresholds
+  saveRenewalThresholds,
+  getClientInactivityParams,
+  saveClientInactivityParams
 } from '../db.js';
 import { initCsvImporter } from '../csv_importer.js';
 import { invoke } from '../ipc.js';
@@ -25,6 +27,7 @@ export async function initSettingsView() {
   setupCleanup();
   setupUpdates();
   await setupRenewalParamsSettings();
+  await setupClientInactivitySettings();
 }
 
 // --- Pestañas de Configuración ---
@@ -758,6 +761,44 @@ async function setupRenewalParamsSettings() {
       const { refreshRenewals } = await import('./renewals.js');
       await refreshRenewals();
     });
+  }
+}
+
+async function setupClientInactivitySettings() {
+  const newMonthsInput = document.getElementById('settings-client-inactive-new-months');
+  const expiryDaysInput = document.getElementById('settings-client-inactive-expiry-days');
+  const btnSave = document.getElementById('btn-save-client-inactivity-params');
+
+  try {
+    const params = await getClientInactivityParams();
+    if (newMonthsInput) newMonthsInput.value = params.cliente_inactivo_meses_nuevo;
+    if (expiryDaysInput) expiryDaysInput.value = params.cliente_inactivo_dias_vencimiento;
+  } catch (e) {
+    console.error("Error al cargar parámetros de inactividad de clientes:", e);
+  }
+
+  if (btnSave && !btnSave.dataset.listenerAdded) {
+    btnSave.addEventListener('click', async () => {
+      const mesesNuevo = parseInt(newMonthsInput?.value || '3', 10);
+      const diasVencimiento = parseInt(expiryDaysInput?.value || '30', 10);
+
+      if (isNaN(mesesNuevo) || mesesNuevo < 1) {
+        showToast("Error: El plazo de meses para clientes nuevos debe ser mayor o igual a 1.", "error");
+        return;
+      }
+      if (isNaN(diasVencimiento) || diasVencimiento < 1) {
+        showToast("Error: El margen de días tras vencimiento debe ser mayor o igual a 1.", "error");
+        return;
+      }
+
+      await saveClientInactivityParams({
+        cliente_inactivo_meses_nuevo: mesesNuevo,
+        cliente_inactivo_dias_vencimiento: diasVencimiento
+      });
+
+      showToast("Parámetros de inactividad de clientes guardados con éxito.", "success");
+    });
+    btnSave.dataset.listenerAdded = 'true';
   }
 }
 

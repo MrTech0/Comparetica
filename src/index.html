@@ -1559,6 +1559,41 @@
               </div>
 
               <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Automatización del Ciclo de Vida e Inactividad de Clientes</h3>
+                <p class="text-muted" style="margin-bottom: 20px; font-size: 13px; line-height: 1.5;">
+                  Configura los plazos para que la aplicación detecte automáticamente el cese de colaboración de tus clientes y los transicione a estado <strong>Inactivo</strong>. Los clientes inactivos quedan excluidos del comparador y del radar de renovaciones.
+                </p>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                  <div class="m3-field" style="margin-bottom: 0;">
+                    <label class="m3-label" for="settings-client-inactive-new-months">Plazo para clientes nuevos sin actividad *</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <input type="number" id="settings-client-inactive-new-months" class="m3-input" min="1" max="24" value="3" style="width: 110px;" />
+                      <span class="text-muted" style="font-size: 13px;">meses</span>
+                    </div>
+                    <small class="text-muted" style="display: block; font-size: 11.5px; margin-top: 6px; line-height: 1.4;">
+                      Si se da de alta a un cliente nuevo potencial y transcurre este plazo sin contratos ni comparativas, pasará automáticamente a Inactivo.
+                    </small>
+                  </div>
+
+                  <div class="m3-field" style="margin-bottom: 0;">
+                    <label class="m3-label" for="settings-client-inactive-expiry-days">Margen tras vencimiento de contratos *</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <input type="number" id="settings-client-inactive-expiry-days" class="m3-input" min="1" max="180" value="30" style="width: 110px;" />
+                      <span class="text-muted" style="font-size: 13px;">días</span>
+                    </div>
+                    <small class="text-muted" style="display: block; font-size: 11.5px; margin-top: 6px; line-height: 1.4;">
+                      Para clientes con suministros (CUPS): si todos sus contratos vencen y transcurren estos días de gracia sin renovación, pasará automáticamente a Inactivo.
+                    </small>
+                  </div>
+                </div>
+
+                <button type="button" id="btn-save-client-inactivity-params" class="m3-btn">
+                  <span>Guardar Parámetros de Inactividad</span>
+                </button>
+              </div>
+
+              <div class="m3-card margin-top-md">
                 <h3 style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-outline); margin-bottom: 12px;">Retención legal de los datos</h3>
                 <p class="text-muted" style="margin-bottom: 16px; font-size: 13px; line-height: 1.6;">
                   De acuerdo con el Reglamento General de Protección de Datos (RGPD), la LOPDGDD y el Código de Comercio de España, la aplicación aplica plazos automáticos y fijos de retención de la información para garantizar el cumplimiento normativo. Los datos de comparativas e historial se depuran conforme a las siguientes reglas:
