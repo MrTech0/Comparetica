@@ -1,5 +1,6 @@
 /* src/js/pdf.js */
 import { getCompanyConfig, getCompanyLogo } from './db.js';
+import { formatPriceDecimals } from './calculator.js';
 import { invoke } from './ipc.js';
 import { showToast } from './ui.js';
 
@@ -448,20 +449,26 @@ export async function generatePDFReport(data, previewMode = false, returnBase64 
   doc.setTextColor(30, 30, 30);
   if (data.energyType === 'LUZ') {
     if (is30TD) {
-      const potStr = `Potencia (€/kW/día): P1: ${(data.tariffDetails.potencia_p1 / 365).toFixed(7)} | P2: ${(data.tariffDetails.potencia_p2 / 365).toFixed(7)} | P3: ${(data.tariffDetails.potencia_p3 / 365).toFixed(7)} | P4: ${(data.tariffDetails.potencia_p4 / 365).toFixed(7)} | P5: ${(data.tariffDetails.potencia_p5 / 365).toFixed(7)} | P6: ${(data.tariffDetails.potencia_p6 / 365).toFixed(7)}`;
-      let eneStr = `Energía (€/kWh):     P1: ${data.tariffDetails.energia_p1.toFixed(7)} | P2: ${data.tariffDetails.energia_p2.toFixed(7)} | P3: ${data.tariffDetails.energia_p3.toFixed(7)} | P4: ${data.tariffDetails.energia_p4.toFixed(7)} | P5: ${data.tariffDetails.energia_p5.toFixed(7)} | P6: ${data.tariffDetails.energia_p6.toFixed(7)}`;
+      const potStr1 = `Potencia P1-P3 (€/kW/día): P1: ${formatPriceDecimals(data.tariffDetails.potencia_p1 / 365)} | P2: ${formatPriceDecimals(data.tariffDetails.potencia_p2 / 365)} | P3: ${formatPriceDecimals((data.tariffDetails.potencia_p3 || 0) / 365)}`;
+      const potStr2 = `Potencia P4-P6 (€/kW/día): P4: ${formatPriceDecimals((data.tariffDetails.potencia_p4 || 0) / 365)} | P5: ${formatPriceDecimals((data.tariffDetails.potencia_p5 || 0) / 365)} | P6: ${formatPriceDecimals((data.tariffDetails.potencia_p6 || 0) / 365)}`;
+      const eneStr1 = `Energía P1-P3 (€/kWh):     P1: ${formatPriceDecimals(data.tariffDetails.energia_p1)} | P2: ${formatPriceDecimals(data.tariffDetails.energia_p2)} | P3: ${formatPriceDecimals(data.tariffDetails.energia_p3)}`;
+      let eneStr2 = `Energía P4-P6 (€/kWh):     P4: ${formatPriceDecimals(data.tariffDetails.energia_p4 || 0)} | P5: ${formatPriceDecimals(data.tariffDetails.energia_p5 || 0)} | P6: ${formatPriceDecimals(data.tariffDetails.energia_p6 || 0)}`;
       if (data.tariffDetails.excedente !== undefined && data.tariffDetails.excedente > 0) {
-        eneStr += ` | Excedente: ${data.tariffDetails.excedente.toFixed(7)}`;
+        eneStr2 += ` | Excedente: ${formatPriceDecimals(data.tariffDetails.excedente)}`;
       }
       currentY += 5;
-      doc.text(potStr, 15, currentY);
+      doc.text(potStr1, 15, currentY);
       currentY += 4.5;
-      doc.text(eneStr, 15, currentY);
+      doc.text(potStr2, 15, currentY);
+      currentY += 4.5;
+      doc.text(eneStr1, 15, currentY);
+      currentY += 4.5;
+      doc.text(eneStr2, 15, currentY);
     } else {
-      const potStr = `Potencia (€/kW/día): P1: ${(data.tariffDetails.potencia_p1 / 365).toFixed(7)} | P2: ${(data.tariffDetails.potencia_p2 / 365).toFixed(7)}`;
-      let eneStr = `Energía (€/kWh):     P1: ${data.tariffDetails.energia_p1.toFixed(7)} | P2: ${data.tariffDetails.energia_p2.toFixed(7)} | P3: ${data.tariffDetails.energia_p3.toFixed(7)}`;
+      const potStr = `Potencia (€/kW/día): P1: ${formatPriceDecimals(data.tariffDetails.potencia_p1 / 365)} | P2: ${formatPriceDecimals(data.tariffDetails.potencia_p2 / 365)}`;
+      let eneStr = `Energía (€/kWh):     P1: ${formatPriceDecimals(data.tariffDetails.energia_p1)} | P2: ${formatPriceDecimals(data.tariffDetails.energia_p2)} | P3: ${formatPriceDecimals(data.tariffDetails.energia_p3)}`;
       if (data.tariffDetails.excedente !== undefined && data.tariffDetails.excedente > 0) {
-        eneStr += ` | Excedente: ${data.tariffDetails.excedente.toFixed(7)}`;
+        eneStr += ` | Excedente: ${formatPriceDecimals(data.tariffDetails.excedente)}`;
       }
       currentY += 5;
       doc.text(potStr, 15, currentY);
@@ -470,7 +477,7 @@ export async function generatePDFReport(data, previewMode = false, returnBase64 
     }
   } else {
     const gasType = data.tariffDetails.tipo_tarifa || 'RL.1';
-    const gasStr = `Peaje: ${gasType} | Término Fijo: ${data.tariffDetails.termino_fijo.toFixed(7)} €/mes | Término Variable: ${data.tariffDetails.termino_variable.toFixed(7)} €/kWh`;
+    const gasStr = `Peaje: ${gasType} | Término Fijo: ${formatPriceDecimals(data.tariffDetails.termino_fijo)} €/mes | Término Variable: ${formatPriceDecimals(data.tariffDetails.termino_variable)} €/kWh`;
     currentY += 5;
     doc.text(gasStr, 15, currentY);
   }

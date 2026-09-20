@@ -317,6 +317,7 @@ export function initCustomSelects() {
 
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (select.disabled) return;
       document.querySelectorAll('.m3-custom-select').forEach(cs => {
         if (cs !== wrapper) cs.classList.remove('open');
       });

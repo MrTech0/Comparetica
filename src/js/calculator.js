@@ -3,6 +3,33 @@
 const BONO_SOCIAL_DAILY_RATE = 0.038455; // Cargo regulado diario aproximado en España (€/día)
 
 /**
+ * Formatea un precio numérico mostrando hasta un máximo de decimales (por defecto 10),
+ * omitiendo ceros redundantes a la derecha pero manteniendo un mínimo de 2 decimales para legibilidad monetaria.
+ *
+ * Sigue buenas prácticas de programación defensiva:
+ * - Acepta cadenas numéricas con coma (formato español) o punto.
+ * - Maneja de forma segura valores nulos, no finitos (Infinity) o sub-precisión bajo cero (-0).
+ * - Garantiza un suelo de 2 decimales para presentación de divisas/precios.
+ *
+ * @param {number|string} val - Valor numérico o cadena a formatear.
+ * @param {number} [maxDecimals=10] - Cantidad máxima de decimales a preservar (mínimo 2).
+ * @returns {string} Cadena formateada.
+ */
+export function formatPriceDecimals(val, maxDecimals = 10) {
+  if (val === null || val === undefined) return '0.00';
+  const normalized = typeof val === 'string' ? val.trim().replace(',', '.') : val;
+  const num = Number(normalized);
+  if (!Number.isFinite(num)) return '0.00';
+
+  const safeMax = Number.isFinite(maxDecimals) ? maxDecimals : 10;
+  const effectiveMax = Math.max(2, Math.min(20, Math.floor(safeMax)));
+  const fixed = num.toFixed(effectiveMax);
+  const trimmed = fixed.replace(/(\.\d*?[1-9])0+$/, '$1').replace(/\.0+$/, '.00');
+  const result = /\.\d$/.test(trimmed) ? trimmed + '0' : trimmed;
+  return result === '-0.00' ? '0.00' : result;
+}
+
+/**
  * Calcula el coste detallado de una factura de Luz (Tarifa 2.0TD).
  * @param {Object} input - Datos introducidos en el formulario.
  * @param {number} input.dias - Días del periodo de facturación.

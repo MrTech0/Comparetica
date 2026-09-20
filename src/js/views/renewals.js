@@ -10,6 +10,7 @@ import {
   getRenewalThresholds
 } from '../db.js';
 import { showToast, showConfirm } from '../ui.js';
+import { normalizeCups, isValidSpanishCups } from '../utils/validators.js';
 
 let currentViewMode = 'list'; // 'list' | 'calendar'
 let currentCalendarDate = new Date();
@@ -651,15 +652,19 @@ export async function openNewRenewalDialogFromHistory(comp) {
     const searchInput = document.getElementById('manual-ren-client-search');
     const idInput = document.getElementById('manual-ren-client-id');
     const cupsInput = document.getElementById('manual-ren-cups');
-    const energySelect = document.getElementById('manual-ren-energy');
-    const retailerInput = document.getElementById('manual-ren-retailer');
-    const tariffInput = document.getElementById('manual-ren-tariff');
+    const energySelect = document.getElementById('manual-ren-tipo') || document.getElementById('manual-ren-energy');
+    const retailerInput = document.getElementById('manual-ren-comercializadora') || document.getElementById('manual-ren-retailer');
+    const tariffInput = document.getElementById('manual-ren-tarifa') || document.getElementById('manual-ren-tariff');
     const durationInput = document.getElementById('manual-ren-duration');
 
     if (matchedClient && idInput) idInput.value = matchedClient.id;
     if (searchInput) searchInput.value = comp.cliente_nombre || '';
-    if (cupsInput) cupsInput.value = comp.cliente_cups || '';
-    if (energySelect) energySelect.value = comp.tipo_energia || 'Luz';
+    if (cupsInput) cupsInput.value = normalizeCups(comp.cliente_cups || '');
+    if (energySelect) {
+      const compEnergy = (comp.tipo_energia || '').toUpperCase();
+      energySelect.value = compEnergy.includes('GAS') ? 'Gas' : 'Luz';
+      energySelect.dispatchEvent(new Event('change'));
+    }
 
     const retailerName = comp.comercializadora_luz_nombre || comp.comercializadora_gas_nombre || '';
     const tariffName = comp.tarifa_luz_nombre || comp.tarifa_gas_nombre || '';
@@ -784,13 +789,32 @@ export async function openManualAddModal() {
               item.onmouseenter = () => { item.style.backgroundColor = 'var(--color-surface-variant)'; };
               item.onmouseleave = () => { item.style.backgroundColor = 'transparent'; };
 
-              item.onclick = () => {
+              item.onclick = async () => {
                 searchInput.value = c.nombre_empresa;
                 idInput.value = c.id.toString();
 
                 const cupsInput = document.getElementById('manual-ren-cups');
+                const tipoSelect = document.getElementById('manual-ren-tipo');
+
                 if (cupsInput && c.cups) {
-                  cupsInput.value = c.cups;
+                  cupsInput.value = normalizeCups(c.cups);
+                }
+
+                try {
+                  const { getPuntosSuministroByCliente } = await import('../db.js');
+                  const puntos = await getPuntosSuministroByCliente(c.id);
+                  if (Array.isArray(puntos) && puntos.length > 0) {
+                    const primerPunto = puntos[0];
+                    if (cupsInput && primerPunto.cups) {
+                      cupsInput.value = normalizeCups(primerPunto.cups);
+                    }
+                    if (tipoSelect && primerPunto.tipo_energia) {
+                      tipoSelect.value = primerPunto.tipo_energia.toUpperCase() === 'GAS' ? 'Gas' : 'Luz';
+                      tipoSelect.dispatchEvent(new Event('change'));
+                    }
+                  }
+                } catch (errPuntos) {
+                  console.warn("No se pudieron cargar los puntos de suministro del cliente:", errPuntos);
                 }
 
                 suggestionsBox.style.display = 'none';
@@ -974,7 +998,13 @@ async function saveManualRenewal() {
 
     const cliente_id = parseInt(clientIdVal, 10);
     const tipo_energia = document.getElementById('manual-ren-tipo').value;
-    const cups = document.getElementById('manual-ren-cups').value.trim();
+    const cupsRaw = document.getElementById('manual-ren-cups')?.value || '';
+    const cups = normalizeCups(cupsRaw);
+
+    if (cups && !isValidSpanishCups(cups)) {
+      showToast("El CUPS introducido no tiene un formato oficial español válido (debe comenzar por ES y tener 20 o 22 caracteres).", "error");
+      return;
+    }
     const comercializadora_actual = document.getElementById('manual-ren-comercializadora').value.trim();
     const tarifa_actual = document.getElementById('manual-ren-tarifa').value.trim();
     const fecha_firma = document.getElementById('manual-ren-date-start').value;

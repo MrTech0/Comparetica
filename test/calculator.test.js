@@ -1,6 +1,6 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateLightBill, calculateLightBill30TD, calculateGasBill } from '../src/js/calculator.js';
+import { calculateLightBill, calculateLightBill30TD, calculateGasBill, formatPriceDecimals } from '../src/js/calculator.js';
 
 describe('Motor Matemático: Facturación Eléctrica 2.0TD', () => {
   const defaultTariff20TD = {
@@ -246,5 +246,116 @@ describe('Motor Matemático: Robustez y Casos Límite', () => {
 
     // Proyección anual de 1 kW debe ser exactamente 36.50 €
     assert.strictEqual(res10d.annual.potenciaTotal.toFixed(2), '36.50');
+  });
+});
+
+describe('Motor Matemático: Precisión Extendida (Hasta 10 Decimales)', () => {
+  test('formatPriceDecimals formatea con fidelidad hasta 10 decimales sin ceros redundantes', () => {
+    assert.strictEqual(formatPriceDecimals(0.12345678), '0.12345678');
+    assert.strictEqual(formatPriceDecimals('0.1234567891'), '0.1234567891');
+    assert.strictEqual(formatPriceDecimals(0.0000000001), '0.0000000001');
+    assert.strictEqual(formatPriceDecimals(0.18), '0.18');
+    assert.strictEqual(formatPriceDecimals(0.1), '0.10');
+    assert.strictEqual(formatPriceDecimals(5), '5.00');
+    assert.strictEqual(formatPriceDecimals(0), '0.00');
+    assert.strictEqual(formatPriceDecimals(null), '0.00');
+  });
+
+  test('formatPriceDecimals maneja robustamente casos límite y defensivos', () => {
+    // Soporte para coma decimal (locale español)
+    assert.strictEqual(formatPriceDecimals('0,07808221'), '0.07808221');
+    assert.strictEqual(formatPriceDecimals('  0,1234567890  '), '0.123456789');
+
+    // Valores no finitos y nulos
+    assert.strictEqual(formatPriceDecimals(Infinity), '0.00');
+    assert.strictEqual(formatPriceDecimals(-Infinity), '0.00');
+    assert.strictEqual(formatPriceDecimals(NaN), '0.00');
+    assert.strictEqual(formatPriceDecimals(undefined), '0.00');
+    assert.strictEqual(formatPriceDecimals(''), '0.00');
+    assert.strictEqual(formatPriceDecimals('abc'), '0.00');
+
+    // Cero negativo y sub-precisión bajo cero
+    assert.strictEqual(formatPriceDecimals(-0), '0.00');
+    assert.strictEqual(formatPriceDecimals(-0.00000000001), '0.00');
+    assert.strictEqual(formatPriceDecimals(-5.25), '-5.25');
+
+    // maxDecimals personalizado respetando suelo mínimo de 2 decimales
+    assert.strictEqual(formatPriceDecimals(0.123456, 4), '0.1235');
+    assert.strictEqual(formatPriceDecimals(0.123456, 1), '0.12');
+    assert.strictEqual(formatPriceDecimals(0.12345678912, NaN), '0.1234567891');
+    assert.strictEqual(formatPriceDecimals(0.12345678912, null), '0.1234567891');
+  });
+
+  test('Cálculo de luz 2.0TD con precios de potencia y energía de 8 y 10 decimales', () => {
+    const input = {
+      dias: 30,
+      p1Pot: 4.6, p2Pot: 4.6,
+      p1Cons: 1000, p2Cons: 500, p3Cons: 200,
+      alquiler: 0.81, impuestoElectrico: 5.11269632, iva: 21,
+      excedenteCons: 0, bonoSocialPct: 0
+    };
+    const precisionTariff = {
+      potencia_p1: 30.5012345678, // 10 decimales
+      potencia_p2: 12.2098765432, // 10 decimales
+      energia_p1: 0.12345678,     // 8 decimales
+      energia_p2: 0.0987654321,   // 10 decimales
+      energia_p3: 0.0543210987    // 10 decimales
+    };
+
+    const res = calculateLightBill(input, precisionTariff);
+    assert.ok(!Number.isNaN(res.period.total));
+    assert.ok(res.period.total > 0);
+
+    // Potencia P1 = 4.6 * 30.5012345678 * (30 / 365) = 11.5319736...
+    assert.strictEqual(res.period.potenciaP1.toFixed(5), '11.53197');
+    // Coste E1 = 1000 * 0.12345678 = 123.45678
+    assert.strictEqual(res.period.energiaP1.toFixed(5), '123.45678');
+    // Coste E2 = 500 * 0.0987654321 = 49.38271605
+    assert.strictEqual(res.period.energiaP2.toFixed(6), '49.382716');
+  });
+
+  test('Cálculo de luz 3.0TD con 6 periodos y precios de hasta 10 decimales', () => {
+    const input30 = {
+      dias: 30,
+      p1Pot: 15, p2Pot: 15, p3Pot: 20, p4Pot: 20, p5Pot: 25, p6Pot: 25,
+      p1Cons: 500, p2Cons: 400, p3Cons: 300, p4Cons: 200, p5Cons: 100, p6Cons: 50,
+      alquiler: 2.50, impuestoElectrico: 5.11269632, iva: 21,
+      bonoSocialFinanciacion: 0.038455,
+      excedenteCons: 0, otherConcepts: 10.50, reactivePenalties: 5.25
+    };
+    const precisionTariff30 = {
+      tipo_tarifa: '3.0TD',
+      potencia_p1: 28.1234567891, potencia_p2: 24.1234567891,
+      potencia_p3: 18.1234567891, potencia_p4: 15.1234567891,
+      potencia_p5: 12.1234567891, potencia_p6: 9.1234567891,
+      energia_p1: 0.1987654321, energia_p2: 0.1687654321,
+      energia_p3: 0.1387654321, energia_p4: 0.1087654321,
+      energia_p5: 0.0887654321, energia_p6: 0.0687654321
+    };
+
+    const res30 = calculateLightBill(input30, precisionTariff30);
+    assert.ok(!Number.isNaN(res30.period.total));
+    assert.ok(res30.period.total > 0);
+    assert.strictEqual(res30.period.otherConcepts, 10.50);
+    assert.strictEqual(res30.period.reactivePenalties, 5.25);
+    // Coste E1 = 500 * 0.1987654321 = 99.38271605
+    assert.strictEqual(res30.period.energiaP1.toFixed(5), '99.38272');
+  });
+
+  test('Cálculo de gas con término variable de 8 y 10 decimales', () => {
+    const input = {
+      dias: 60, consumo: 1500, alquiler: 1.50,
+      impuestoHidrocarburos: 0.00234, iva: 21
+    };
+    const precisionGasTariff = {
+      termino_fijo: 5.1234567891,    // 10 decimales
+      termino_variable: 0.06123456   // 8 decimales
+    };
+
+    const res = calculateGasBill(input, precisionGasTariff);
+    assert.ok(!Number.isNaN(res.period.total));
+    assert.ok(res.period.total > 0);
+    // Variable = 1500 * 0.06123456 = 91.85184 €
+    assert.strictEqual(res.period.variable.toFixed(5), '91.85184');
   });
 });

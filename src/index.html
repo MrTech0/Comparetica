@@ -477,191 +477,204 @@
                     <div id="clients-autocomplete-list" class="m3-autocomplete-list"></div>
                   </div>
                   <div class="m3-field">
-                    <label class="m3-label" for="calc-client-cups">CUPS (Opcional)</label>
-                    <input type="text" id="calc-client-cups" class="m3-input" placeholder="Ej. ES0021..." />
+                    <label class="m3-label" for="calc-client-cups">CUPS *</label>
+                    <input type="text" id="calc-client-cups" class="m3-input" placeholder="Ej. ES0021..." style="text-transform: uppercase;" maxlength="22" required />
                   </div>
                   <div class="m3-field">
                     <label class="m3-label" for="calc-energy-type">Tipo de Suministro *</label>
                     <select id="calc-energy-type" class="m3-input m3-select" required>
                       <option value="LUZ">Luz</option>
                       <option value="GAS">Gas</option>
-                      <option value="DUAL">Dual (Luz + Gas)</option>
                     </select>
                   </div>
                 </div>
 
                 <!-- Bloque de Luz -->
                 <div id="calc-light-block" class="margin-top-md">
-                  <h3 class="text-muted" style="font-size: 14px; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 6px; margin-bottom: 12px;">Detalle Factura Luz</h3>
+                  <h3 class="text-muted" style="font-size: 14px; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 6px; margin-bottom: 16px;">Detalle Factura Luz</h3>
                   
-                  <div class="m3-field-row" style="margin-bottom: 16px;">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-tariff-type">Tipo de Tarifa Luz *</label>
-                      <select id="calc-light-tariff-type" class="m3-input m3-select" required>
-                        <option value="2.0TD">Tarifa 2.0TD (&le; 15 kW)</option>
-                        <option value="3.0TD">Tarifa 3.0TD (&gt; 15 kW)</option>
-                      </select>
+                  <!-- 1. Datos Generales y Periodo -->
+                  <div class="m3-subcard">
+                    <div class="m3-subcard-header">
+                      <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+                      Periodo y Modalidad de Tarifa
+                    </div>
+                    <div class="m3-field-row">
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-light-tariff-type">Tipo de Tarifa Luz *</label>
+                        <select id="calc-light-tariff-type" class="m3-input m3-select" required>
+                          <option value="2.0TD">Tarifa 2.0TD (&le; 15 kW)</option>
+                          <option value="3.0TD">Tarifa 3.0TD (&gt; 15 kW)</option>
+                        </select>
+                      </div>
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-light-days">Días de Periodo (días) *</label>
+                        <input type="number" id="calc-light-days" class="m3-input" value="30" min="1" required />
+                      </div>
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-light-meter">Alquiler Contador (&euro;/periodo)</label>
+                        <input type="number" id="calc-light-meter" class="m3-input" value="0.81" step="0.01" min="0" />
+                      </div>
                     </div>
                   </div>
 
-                  <div class="m3-field-row">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-days">Días de Periodo (días) *</label>
-                      <input type="number" id="calc-light-days" class="m3-input" value="30" min="1" required />
+                  <!-- 2. Término de Potencia -->
+                  <div class="m3-subcard">
+                    <div class="m3-subcard-header">
+                      <svg viewBox="0 0 24 24"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z"/></svg>
+                      Término de Potencia
                     </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-tax">Impuesto Eléctrico (%) *</label>
-                      <input type="number" id="calc-light-tax" class="m3-input" value="5.11269632" step="0.00000001" min="0" required />
+                    
+                    <!-- Potencias Contratadas (kW) -->
+                    <div style="margin-bottom: 14px;">
+                      <span class="m3-subcard-subtitle">Potencias Contratadas (kW)</span>
+                      <div class="m3-field-row">
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p1-pot">Potencia P1 (kW) *</label>
+                          <input type="number" id="calc-light-p1-pot" class="m3-input" placeholder="Ej. 4.6" step="0.01" min="0" required />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p2-pot">Potencia P2 (kW) *</label>
+                          <input type="number" id="calc-light-p2-pot" class="m3-input" placeholder="Ej. 4.6" step="0.01" min="0" required />
+                        </div>
+                      </div>
+                      <!-- Filas P3-P6 3.0TD -->
+                      <div id="calc-light-30td-pot-row" class="m3-field-row" style="display: none; margin-top: 12px;">
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p3-pot">Potencia P3 (kW) *</label>
+                          <input type="number" id="calc-light-p3-pot" class="m3-input" placeholder="Ej. 17.5" step="0.01" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p4-pot">Potencia P4 (kW) *</label>
+                          <input type="number" id="calc-light-p4-pot" class="m3-input" placeholder="Ej. 17.5" step="0.01" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p5-pot">Potencia P5 (kW) *</label>
+                          <input type="number" id="calc-light-p5-pot" class="m3-input" placeholder="Ej. 17.5" step="0.01" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p6-pot">Potencia P6 (kW) *</label>
+                          <input type="number" id="calc-light-p6-pot" class="m3-input" placeholder="Ej. 17.5" step="0.01" min="0" />
+                        </div>
+                      </div>
                     </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-vat">IVA / IGIC *</label>
-                      <select id="calc-light-vat" class="m3-input m3-select" required>
-                        <option value="21">IVA 21%</option>
-                        <option value="10">IVA 10% (Reducido)</option>
-                        <option value="5">IVA 5%</option>
-                        <option value="7">IGIC Canario 7%</option>
-                      </select>
+
+                    <!-- Precios Actuales Potencia (€/kW/día) -->
+                    <div class="m3-subcard-divider">
+                      <span class="m3-subcard-subtitle">Precios Actuales de Potencia del Cliente (&euro;/kW/d&iacute;a)</span>
+                      <div class="m3-field-row">
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p1-pot-price">Precio Pot. P1 (&euro;/kW/d&iacute;a)</label>
+                          <input type="number" id="calc-light-p1-pot-price" class="m3-input" placeholder="Ej. 0.0780822" step="0.0000000001" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p2-pot-price">Precio Pot. P2 (&euro;/kW/d&iacute;a)</label>
+                          <input type="number" id="calc-light-p2-pot-price" class="m3-input" placeholder="Ej. 0.0331507" step="0.0000000001" min="0" />
+                        </div>
+                      </div>
+                      <!-- Precios P3-P6 3.0TD -->
+                      <div id="calc-light-30td-pot-price-row" class="m3-field-row" style="display: none; margin-top: 12px;">
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p3-pot-price">Precio Pot. P3 (&euro;/kW/d&iacute;a)</label>
+                          <input type="number" id="calc-light-p3-pot-price" class="m3-input" placeholder="Ej. 0.0287671" step="0.0000000001" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p4-pot-price">Precio Pot. P4 (&euro;/kW/d&iacute;a)</label>
+                          <input type="number" id="calc-light-p4-pot-price" class="m3-input" placeholder="Ej. 0.0287671" step="0.0000000001" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p5-pot-price">Precio Pot. P5 (&euro;/kW/d&iacute;a)</label>
+                          <input type="number" id="calc-light-p5-pot-price" class="m3-input" placeholder="Ej. 0.0287671" step="0.0000000001" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p6-pot-price">Precio Pot. P6 (&euro;/kW/d&iacute;a)</label>
+                          <input type="number" id="calc-light-p6-pot-price" class="m3-input" placeholder="Ej. 0.0232877" step="0.0000000001" min="0" />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div class="m3-field-row">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p1-pot">Potencia P1 (kW) *</label>
-                      <input type="number" id="calc-light-p1-pot" class="m3-input" placeholder="Ej. 4.6" step="0.01" min="0" required />
+                  <!-- 3. Término de Energía (Consumo) -->
+                  <div class="m3-subcard">
+                    <div class="m3-subcard-header">
+                      <svg viewBox="0 0 24 24"><path d="M12 3C7.03 3 3 7.03 3 12c0 3.31 1.8 6.21 4.5 7.76V21c0 .55.45 1 1 1h7c.55 0 1-.45 1-1v-1.24c2.7-1.55 4.5-4.45 4.5-7.76 0-4.97-4.03-9-9-9zm-1 16h2v1h-2v-1zm1-14c3.31 0 6 2.69 6 6 0 2.22-1.21 4.15-3 5.19V17h-6v-2.81c-1.79-1.04-3-2.97-3-5.19 0-3.31 2.69-6 6-6z"/></svg>
+                      Término de Energía (Consumo)
                     </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p2-pot">Potencia P2 (kW) *</label>
-                      <input type="number" id="calc-light-p2-pot" class="m3-input" placeholder="Ej. 4.6" step="0.01" min="0" required />
+
+                    <!-- Consumos Facturados (kWh) -->
+                    <div style="margin-bottom: 14px;">
+                      <span class="m3-subcard-subtitle">Consumo Facturado en el Periodo (kWh)</span>
+                      <div class="m3-field-row">
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p1-cons">Consumo P1 (kWh) *</label>
+                          <input type="number" id="calc-light-p1-cons" class="m3-input" placeholder="Ej. 120" min="0" required />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p2-cons">Consumo P2 (kWh) *</label>
+                          <input type="number" id="calc-light-p2-cons" class="m3-input" placeholder="Ej. 100" min="0" required />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p3-cons">Consumo P3 (kWh) *</label>
+                          <input type="number" id="calc-light-p3-cons" class="m3-input" placeholder="Ej. 180" min="0" required />
+                        </div>
+                      </div>
+                      <!-- Consumos P4-P6 3.0TD -->
+                      <div id="calc-light-30td-cons-row" class="m3-field-row" style="display: none; margin-top: 12px;">
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p4-cons">Consumo P4 (kWh) *</label>
+                          <input type="number" id="calc-light-p4-cons" class="m3-input" placeholder="Ej. 150" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p5-cons">Consumo P5 (kWh) *</label>
+                          <input type="number" id="calc-light-p5-cons" class="m3-input" placeholder="Ej. 130" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p6-cons">Consumo P6 (kWh) *</label>
+                          <input type="number" id="calc-light-p6-cons" class="m3-input" placeholder="Ej. 200" min="0" />
+                        </div>
+                      </div>
                     </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-meter">Alquiler Contador (&euro;/periodo)</label>
-                      <input type="number" id="calc-light-meter" class="m3-input" value="0.81" step="0.01" min="0" />
+
+                    <!-- Precios Actuales Energía (€/kWh) -->
+                    <div class="m3-subcard-divider">
+                      <span class="m3-subcard-subtitle">Precios Actuales de Energía del Cliente (&euro;/kWh)</span>
+                      <div class="m3-field-row">
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p1-ene-price">Precio Energ. P1 (&euro;/kWh)</label>
+                          <input type="number" id="calc-light-p1-ene-price" class="m3-input" placeholder="Ej. 0.1800000" step="0.0000000001" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p2-ene-price">Precio Energ. P2 (&euro;/kWh)</label>
+                          <input type="number" id="calc-light-p2-ene-price" class="m3-input" placeholder="Ej. 0.1400000" step="0.0000000001" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p3-ene-price">Precio Energ. P3 (&euro;/kWh)</label>
+                          <input type="number" id="calc-light-p3-ene-price" class="m3-input" placeholder="Ej. 0.0900000" step="0.0000000001" min="0" />
+                        </div>
+                      </div>
+                      <!-- Precios P4-P6 3.0TD -->
+                      <div id="calc-light-30td-ene-price-row" class="m3-field-row" style="display: none; margin-top: 12px;">
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p4-ene-price">Precio Energ. P4 (&euro;/kWh)</label>
+                          <input type="number" id="calc-light-p4-ene-price" class="m3-input" placeholder="Ej. 0.0800000" step="0.0000000001" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p5-ene-price">Precio Energ. P5 (&euro;/kWh)</label>
+                          <input type="number" id="calc-light-p5-ene-price" class="m3-input" placeholder="Ej. 0.0800000" step="0.0000000001" min="0" />
+                        </div>
+                        <div class="m3-field">
+                          <label class="m3-label" for="calc-light-p6-ene-price">Precio Energ. P6 (&euro;/kWh)</label>
+                          <input type="number" id="calc-light-p6-ene-price" class="m3-input" placeholder="Ej. 0.0700000" step="0.0000000001" min="0" />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <!-- Campos de Potencia extra 3.0TD (P3-P6) -->
-                  <div id="calc-light-30td-pot-row" class="m3-field-row" style="display: none;">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p3-pot">Potencia P3 (kW) *</label>
-                      <input type="number" id="calc-light-p3-pot" class="m3-input" placeholder="Ej. 17.5" step="0.01" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p4-pot">Potencia P4 (kW) *</label>
-                      <input type="number" id="calc-light-p4-pot" class="m3-input" placeholder="Ej. 17.5" step="0.01" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p5-pot">Potencia P5 (kW) *</label>
-                      <input type="number" id="calc-light-p5-pot" class="m3-input" placeholder="Ej. 17.5" step="0.01" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p6-pot">Potencia P6 (kW) *</label>
-                      <input type="number" id="calc-light-p6-pot" class="m3-input" placeholder="Ej. 17.5" step="0.01" min="0" />
-                    </div>
-                  </div>
-
-                  <div class="m3-field-row">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p1-cons">Consumo P1 (kWh) *</label>
-                      <input type="number" id="calc-light-p1-cons" class="m3-input" placeholder="Ej. 120" min="0" required />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p2-cons">Consumo P2 (kWh) *</label>
-                      <input type="number" id="calc-light-p2-cons" class="m3-input" placeholder="Ej. 100" min="0" required />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p3-cons">Consumo P3 (kWh) *</label>
-                      <input type="number" id="calc-light-p3-cons" class="m3-input" placeholder="Ej. 180" min="0" required />
-                    </div>
-                  </div>
-
-                  <!-- Campos de Consumo extra 3.0TD (P4-P6) -->
-                  <div id="calc-light-30td-cons-row" class="m3-field-row" style="display: none;">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p4-cons">Consumo P4 (kWh) *</label>
-                      <input type="number" id="calc-light-p4-cons" class="m3-input" placeholder="Ej. 150" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p5-cons">Consumo P5 (kWh) *</label>
-                      <input type="number" id="calc-light-p5-cons" class="m3-input" placeholder="Ej. 130" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p6-cons">Consumo P6 (kWh) *</label>
-                      <input type="number" id="calc-light-p6-cons" class="m3-input" placeholder="Ej. 200" min="0" />
-                    </div>
-                  </div>
-
-                  <div class="m3-field-row">
-                    <!-- Precios actuales pagados por el cliente (para calcular ahorro real) -->
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p1-pot-price">Precio Pot. P1 Actual (&euro;/kW/d&iacute;a)</label>
-                      <input type="number" id="calc-light-p1-pot-price" class="m3-input" placeholder="Ej. 0.0780822" step="0.0000001" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p2-pot-price">Precio Pot. P2 Actual (&euro;/kW/d&iacute;a)</label>
-                      <input type="number" id="calc-light-p2-pot-price" class="m3-input" placeholder="Ej. 0.0331507" step="0.0000001" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p1-ene-price">Precio Energ. P1 Actual (&euro;/kWh)</label>
-                      <input type="number" id="calc-light-p1-ene-price" class="m3-input" placeholder="Ej. 0.1800000" step="0.0000001" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p2-ene-price">Precio Energ. P2 Actual (&euro;/kWh)</label>
-                      <input type="number" id="calc-light-p2-ene-price" class="m3-input" placeholder="Ej. 0.1400000" step="0.0000001" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p3-ene-price">Precio Energ. P3 Actual (&euro;/kWh)</label>
-                      <input type="number" id="calc-light-p3-ene-price" class="m3-input" placeholder="Ej. 0.0900000" step="0.0000001" min="0" />
-                    </div>
-                  </div>
-
-                  <!-- Campos de Precios de Potencia extra 3.0TD Actuales (P3-P6) -->
-                  <div id="calc-light-30td-pot-price-row" class="m3-field-row" style="display: none;">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p3-pot-price">Precio Pot. P3 Actual (&euro;/kW/d&iacute;a)</label>
-                      <input type="number" id="calc-light-p3-pot-price" class="m3-input" placeholder="Ej. 0.0287671" step="0.0000001" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p4-pot-price">Precio Pot. P4 Actual (&euro;/kW/d&iacute;a)</label>
-                      <input type="number" id="calc-light-p4-pot-price" class="m3-input" placeholder="Ej. 0.0287671" step="0.0000001" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p5-pot-price">Precio Pot. P5 Actual (&euro;/kW/d&iacute;a)</label>
-                      <input type="number" id="calc-light-p5-pot-price" class="m3-input" placeholder="Ej. 0.0287671" step="0.0000001" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p6-pot-price">Precio Pot. P6 Actual (&euro;/kW/d&iacute;a)</label>
-                      <input type="number" id="calc-light-p6-pot-price" class="m3-input" placeholder="Ej. 0.0232877" step="0.0000001" min="0" />
-                    </div>
-                  </div>
-
-                  <!-- Campos de Precios de Energía extra 3.0TD Actuales (P4-P6) -->
-                  <div id="calc-light-30td-ene-price-row" class="m3-field-row" style="display: none;">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p4-ene-price">Precio Energ. P4 Actual (&euro;/kWh)</label>
-                      <input type="number" id="calc-light-p4-ene-price" class="m3-input" placeholder="Ej. 0.0800000" step="0.0000001" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p5-ene-price">Precio Energ. P5 Actual (&euro;/kWh)</label>
-                      <input type="number" id="calc-light-p5-ene-price" class="m3-input" placeholder="Ej. 0.0800000" step="0.0000001" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-p6-ene-price">Precio Energ. P6 Actual (&euro;/kWh)</label>
-                      <input type="number" id="calc-light-p6-ene-price" class="m3-input" placeholder="Ej. 0.0700000" step="0.0000001" min="0" />
-                    </div>
-                  </div>
-
-                  <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px;">
-                    <div class="m3-field" style="width: 280px;">
-                      <label class="m3-label" for="calc-light-bono-social-financiacion">Tasa Bono Social (€/día) *</label>
-                      <input type="number" id="calc-light-bono-social-financiacion" class="m3-input" placeholder="Ej. 0.038455" min="0" step="0.000001" required />
-                    </div>
-                  </div>
-
-                  <!-- Autoconsumo / Excedentes -->
-                  <div style="margin-top: 16px; padding: 12px; border: 1px dashed var(--color-outline-variant); border-radius: var(--radius-md); background-color: var(--color-surface-container-low);">
-                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; margin-bottom: 8px; color: var(--color-on-surface);">
+                  <!-- 4. Autoconsumo / Excedentes -->
+                  <div class="m3-subcard-dashed">
+                    <label for="calc-light-has-excedente" style="display: flex; align-items: center; gap: 8px; font-weight: 500; margin-bottom: 0; color: var(--color-on-surface); cursor: pointer;">
                       <input type="checkbox" id="calc-light-has-excedente" style="width: 18px; height: 18px; cursor: pointer;" />
-                      Tiene Autoconsumo (Compensación de Excedentes)
+                      <span>Tiene Autoconsumo (Compensación de Excedentes)</span>
                     </label>
                     <div id="calc-light-excedente-group" class="m3-field-row" style="display: none; margin-top: 12px;">
                       <div class="m3-field">
@@ -670,90 +683,146 @@
                       </div>
                       <div class="m3-field">
                         <label class="m3-label" for="calc-light-excedente-price">Precio Excedente Actual (&euro;/kWh) *</label>
-                        <input type="number" id="calc-light-excedente-price" class="m3-input" placeholder="Ej. 0.0800000" step="0.0000001" min="0" />
+                        <input type="number" id="calc-light-excedente-price" class="m3-input" placeholder="Ej. 0.0800000" step="0.0000000001" min="0" />
                       </div>
                     </div>
                   </div>
-                  
-                  <!-- Conceptos Opcionales Luz -->
-                  <div class="m3-field-row" style="margin-top: 12px; border-top: 1px dashed var(--color-outline-variant); padding-top: 12px;">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-other-concepts">Mantenimientos / Otros conceptos (&euro;/periodo)</label>
-                      <input type="number" id="calc-light-other-concepts" class="m3-input" placeholder="Ej. 5.95 (opcional)" min="0" step="0.01" />
+
+                  <!-- 5. Impuestos y Tasas Reguladas -->
+                  <div class="m3-subcard">
+                    <div class="m3-subcard-header">
+                      <svg viewBox="0 0 24 24"><path d="M19 14V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zm-9-1c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm13-6v11c0 1.1-.9 2-2 2H4v-2h17V7h2z"/></svg>
+                      Impuestos y Cargos Regulados
                     </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-light-reactive-penalties">Recargo Reactiva / Penalizaciones (&euro;/periodo)</label>
-                      <input type="number" id="calc-light-reactive-penalties" class="m3-input" placeholder="Ej. 12.45 (opcional)" min="0" step="0.01" />
+                    <div class="m3-field-row">
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-light-tax">Impuesto Eléctrico (%) *</label>
+                        <input type="number" id="calc-light-tax" class="m3-input" value="5.11269632" step="0.0000000001" min="0" required />
+                      </div>
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-light-bono-social-financiacion">Tasa Bono Social (€/día) *</label>
+                        <input type="number" id="calc-light-bono-social-financiacion" class="m3-input" placeholder="Ej. 0.038455" min="0" step="0.0000000001" required />
+                      </div>
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-light-vat">IVA / IGIC *</label>
+                        <select id="calc-light-vat" class="m3-input m3-select" required>
+                          <option value="21">IVA 21%</option>
+                          <option value="10">IVA 10% (Reducido)</option>
+                          <option value="5">IVA 5%</option>
+                          <option value="7">IGIC Canario 7%</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 6. Conceptos Opcionales Luz -->
+                  <div class="m3-subcard">
+                    <div class="m3-subcard-header m3-subcard-header-muted">
+                      <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                      Otros Conceptos y Penalizaciones (Opcional)
+                    </div>
+                    <div class="m3-field-row">
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-light-other-concepts">Mantenimientos / Otros conceptos (&euro;/periodo)</label>
+                        <input type="number" id="calc-light-other-concepts" class="m3-input" placeholder="Ej. 5.95 (opcional)" min="0" step="0.01" />
+                      </div>
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-light-reactive-penalties">Recargo Reactiva / Penalizaciones (&euro;/periodo)</label>
+                        <input type="number" id="calc-light-reactive-penalties" class="m3-input" placeholder="Ej. 12.45 (opcional)" min="0" step="0.01" />
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 <!-- Bloque de Gas -->
                 <div id="calc-gas-block" class="margin-top-md" style="display:none;">
-                  <h3 class="text-muted" style="font-size: 14px; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 6px; margin-bottom: 12px;">Detalle Factura Gas</h3>
+                  <h3 class="text-muted" style="font-size: 14px; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 6px; margin-bottom: 16px;">Detalle Factura Gas</h3>
                   
-                  <div class="m3-field-row" style="margin-bottom: 16px;">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-gas-tariff-type">Tipo de Tarifa Gas *</label>
-                      <select id="calc-gas-tariff-type" class="m3-input m3-select" required>
-                        <option value="RL.1">Tarifa RL.1 (≤ 5.000 kWh/año)</option>
-                        <option value="RL.2">Tarifa RL.2 (5.001 - 15.000 kWh/año)</option>
-                        <option value="RL.3">Tarifa RL.3 (15.001 - 50.000 kWh/año)</option>
-                        <option value="RL.4">Tarifa RL.4 (50.001 - 300.000 kWh/año)</option>
-                        <option value="RL.5">Tarifa RL.5 (300.001 - 1.500.000 kWh/año)</option>
-                        <option value="RL.6">Tarifa RL.6 (1.500.001 - 5.000.000 kWh/año)</option>
-                      </select>
+                  <!-- 1. Periodo y Modalidad Gas -->
+                  <div class="m3-subcard">
+                    <div class="m3-subcard-header">
+                      <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+                      Periodo y Modalidad de Tarifa Gas
                     </div>
-                  </div>
-                  
-                  <div class="m3-field-row">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-gas-days">Días de Periodo (días) *</label>
-                      <input type="number" id="calc-gas-days" class="m3-input" value="30" min="1" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-gas-tax">Imp. Hidrocarburos (€/kWh) *</label>
-                      <input type="number" id="calc-gas-tax" class="m3-input" value="0.00234" step="0.00001" min="0" />
-                    </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-gas-vat">IVA / IGIC *</label>
-                      <select id="calc-gas-vat" class="m3-input m3-select">
-                        <option value="21">IVA 21%</option>
-                        <option value="10">IVA 10% (Reducido)</option>
-                        <option value="5">IVA 5%</option>
-                        <option value="7">IGIC Canario 7%</option>
-                      </select>
+                    <div class="m3-field-row">
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-gas-tariff-type">Tipo de Tarifa Gas *</label>
+                        <select id="calc-gas-tariff-type" class="m3-input m3-select" required>
+                          <option value="RL.1">Tarifa RL.1 (≤ 5.000 kWh/año)</option>
+                          <option value="RL.2">Tarifa RL.2 (5.001 - 15.000 kWh/año)</option>
+                          <option value="RL.3">Tarifa RL.3 (15.001 - 50.000 kWh/año)</option>
+                          <option value="RL.4">Tarifa RL.4 (50.001 - 300.000 kWh/año)</option>
+                          <option value="RL.5">Tarifa RL.5 (300.001 - 1.500.000 kWh/año)</option>
+                          <option value="RL.6">Tarifa RL.6 (1.500.001 - 5.000.000 kWh/año)</option>
+                        </select>
+                      </div>
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-gas-days">Días de Periodo (días) *</label>
+                        <input type="number" id="calc-gas-days" class="m3-input" value="30" min="1" />
+                      </div>
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-gas-meter">Alquiler Contador (€/periodo)</label>
+                        <input type="number" id="calc-gas-meter" class="m3-input" value="0.69" step="0.01" min="0" />
+                      </div>
                     </div>
                   </div>
 
-                  <div class="m3-field-row">
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-gas-consumption">Consumo en el Periodo (kWh) *</label>
-                      <input type="number" id="calc-gas-consumption" class="m3-input" placeholder="Ej. 350" min="0" />
+                  <!-- 2. Consumo y Precios Actuales Gas -->
+                  <div class="m3-subcard">
+                    <div class="m3-subcard-header">
+                      <svg viewBox="0 0 24 24"><path d="M12 2c-3.87 0-7 3.13-7 7 0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                      Consumo y Precios Actuales Gas
                     </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-gas-meter">Alquiler Contador (€/periodo)</label>
-                      <input type="number" id="calc-gas-meter" class="m3-input" value="0.69" step="0.01" min="0" />
+                    <div class="m3-field-row">
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-gas-consumption">Consumo en el Periodo (kWh) *</label>
+                        <input type="number" id="calc-gas-consumption" class="m3-input" placeholder="Ej. 350" min="0" />
+                      </div>
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-gas-fixed-price">Término Fijo Actual (€/mes)</label>
+                        <input type="number" id="calc-gas-fixed-price" class="m3-input" placeholder="Ej. 5.5000000" step="0.0000000001" min="0" />
+                      </div>
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-gas-var-price">Término Variable Actual (€/kWh)</label>
+                        <input type="number" id="calc-gas-var-price" class="m3-input" placeholder="Ej. 0.0800000" step="0.0000000001" min="0" />
+                      </div>
                     </div>
                   </div>
 
-                  <div class="m3-field-row">
-                    <!-- Precios actuales gas del cliente -->
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-gas-fixed-price">Término Fijo Actual (€/mes)</label>
-                      <input type="number" id="calc-gas-fixed-price" class="m3-input" placeholder="Ej. 5.5000000" step="0.0000001" min="0" />
+                  <!-- 3. Impuestos Gas -->
+                  <div class="m3-subcard">
+                    <div class="m3-subcard-header">
+                      <svg viewBox="0 0 24 24"><path d="M19 14V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zm-9-1c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm13-6v11c0 1.1-.9 2-2 2H4v-2h17V7h2z"/></svg>
+                      Impuestos de Gas
                     </div>
-                    <div class="m3-field">
-                      <label class="m3-label" for="calc-gas-var-price">Término Variable Actual (€/kWh)</label>
-                      <input type="number" id="calc-gas-var-price" class="m3-input" placeholder="Ej. 0.0800000" step="0.0000001" min="0" />
+                    <div class="m3-field-row">
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-gas-tax">Imp. Hidrocarburos (€/kWh) *</label>
+                        <input type="number" id="calc-gas-tax" class="m3-input" value="0.00234" step="0.0000000001" min="0" />
+                      </div>
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-gas-vat">IVA / IGIC *</label>
+                        <select id="calc-gas-vat" class="m3-input m3-select">
+                          <option value="21">IVA 21%</option>
+                          <option value="10">IVA 10% (Reducido)</option>
+                          <option value="5">IVA 5%</option>
+                          <option value="7">IGIC Canario 7%</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
-                  
-                  <!-- Conceptos Opcionales Gas -->
-                  <div class="m3-field-row" style="margin-top: 12px; border-top: 1px dashed var(--color-outline-variant); padding-top: 12px;">
-                    <div class="m3-field" style="max-width: 50%;">
-                      <label class="m3-label" for="calc-gas-other-concepts">Mantenimientos / Otros conceptos (&euro;/periodo)</label>
-                      <input type="number" id="calc-gas-other-concepts" class="m3-input" placeholder="Ej. 4.95 (opcional)" min="0" step="0.01" />
+
+                  <!-- 4. Conceptos Opcionales Gas -->
+                  <div class="m3-subcard">
+                    <div class="m3-subcard-header m3-subcard-header-muted">
+                      <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                      Otros Conceptos (Opcional)
+                    </div>
+                    <div class="m3-field-row">
+                      <div class="m3-field">
+                        <label class="m3-label" for="calc-gas-other-concepts">Mantenimientos / Otros conceptos (&euro;/periodo)</label>
+                        <input type="number" id="calc-gas-other-concepts" class="m3-input" placeholder="Ej. 4.95 (opcional)" min="0" step="0.01" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1726,11 +1795,11 @@
               <div class="m3-field-row">
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p1-pot">Pot. P1 (&euro;/kW/d&iacute;a) *</label>
-                  <input type="number" id="dialog-light-p1-pot" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" required />
+                  <input type="number" id="dialog-light-p1-pot" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" required />
                 </div>
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p2-pot">Pot. P2 (&euro;/kW/d&iacute;a) *</label>
-                  <input type="number" id="dialog-light-p2-pot" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" required />
+                  <input type="number" id="dialog-light-p2-pot" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" required />
                 </div>
               </div>
   
@@ -1738,34 +1807,34 @@
               <div id="dialog-light-30td-pot-row" class="m3-field-row" style="display: none;">
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p3-pot">Pot. P3 (&euro;/kW/d&iacute;a) *</label>
-                  <input type="number" id="dialog-light-p3-pot" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" />
+                  <input type="number" id="dialog-light-p3-pot" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" />
                 </div>
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p4-pot">Pot. P4 (&euro;/kW/d&iacute;a) *</label>
-                  <input type="number" id="dialog-light-p4-pot" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" />
+                  <input type="number" id="dialog-light-p4-pot" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" />
                 </div>
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p5-pot">Pot. P5 (&euro;/kW/d&iacute;a) *</label>
-                  <input type="number" id="dialog-light-p5-pot" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" />
+                  <input type="number" id="dialog-light-p5-pot" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" />
                 </div>
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p6-pot">Pot. P6 (&euro;/kW/d&iacute;a) *</label>
-                  <input type="number" id="dialog-light-p6-pot" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" />
+                  <input type="number" id="dialog-light-p6-pot" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" />
                 </div>
               </div>
   
               <div class="m3-field-row">
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p1-ene">Ene. P1 (&euro;/kWh) *</label>
-                  <input type="number" id="dialog-light-p1-ene" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" required />
+                  <input type="number" id="dialog-light-p1-ene" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" required />
                 </div>
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p2-ene">Ene. P2 (&euro;/kWh) *</label>
-                  <input type="number" id="dialog-light-p2-ene" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" required />
+                  <input type="number" id="dialog-light-p2-ene" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" required />
                 </div>
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p3-ene">Ene. P3 (&euro;/kWh) *</label>
-                  <input type="number" id="dialog-light-p3-ene" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" required />
+                  <input type="number" id="dialog-light-p3-ene" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" required />
                 </div>
               </div>
   
@@ -1773,21 +1842,21 @@
               <div id="dialog-light-30td-ene-row" class="m3-field-row" style="display: none;">
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p4-ene">Ene. P4 (&euro;/kWh) *</label>
-                  <input type="number" id="dialog-light-p4-ene" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" />
+                  <input type="number" id="dialog-light-p4-ene" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" />
                 </div>
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p5-ene">Ene. P5 (&euro;/kWh) *</label>
-                  <input type="number" id="dialog-light-p5-ene" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" />
+                  <input type="number" id="dialog-light-p5-ene" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" />
                 </div>
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-light-p6-ene">Ene. P6 (&euro;/kWh) *</label>
-                  <input type="number" id="dialog-light-p6-ene" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" />
+                  <input type="number" id="dialog-light-p6-ene" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" />
                 </div>
               </div>
   
               <div class="m3-field">
                 <label class="m3-label" for="dialog-light-excedente">Precio Excedente (&euro;/kWh)</label>
-                <input type="number" id="dialog-light-excedente" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" value="0" />
+                <input type="number" id="dialog-light-excedente" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" value="0" />
               </div>
   
               <div style="font-family: var(--font-title); font-weight: 500; font-size: 14px; color: var(--color-primary); margin: 16px 0 8px 0; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 4px;">Comisiones de la Tarifa</div>
@@ -1860,11 +1929,11 @@
               <div class="m3-field-row">
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-gas-fixed">Término Fijo (€/mes) *</label>
-                  <input type="number" id="dialog-gas-fixed" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" required />
+                  <input type="number" id="dialog-gas-fixed" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" required />
                 </div>
                 <div class="m3-field">
                   <label class="m3-label" for="dialog-gas-var">Término Variable (€/kWh) *</label>
-                  <input type="number" id="dialog-gas-var" class="m3-input" placeholder="0.0000000" step="0.0000001" min="0" required />
+                  <input type="number" id="dialog-gas-var" class="m3-input" placeholder="0.0000000000" step="0.0000000001" min="0" required />
                 </div>
               </div>
   
@@ -1922,8 +1991,8 @@
               <div style="background-color: var(--color-surface-variant); padding: 12px 14px; border-radius: var(--radius-md); margin-bottom: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                   <div>
-                    <label class="m3-label" style="font-weight: 700; margin: 0; color: var(--color-on-surface); font-size: 13px;">Puntos de Suministro (CUPS)</label>
-                    <p class="text-muted" style="font-size: 11px; margin: 2px 0 0 0;">Asocia uno o varios CUPS a este cliente (ej. tienda, nave, oficina).</p>
+                    <label class="m3-label" style="font-weight: 700; margin: 0; color: var(--color-on-surface); font-size: 13px;">Puntos de Suministro (CUPS) *</label>
+                    <p class="text-muted" style="font-size: 11px; margin: 2px 0 0 0;">Indica al menos un CUPS obligatorio y su tipo de suministro (ej. tienda, nave, oficina).</p>
                   </div>
                   <button type="button" id="btn-add-cups-row" class="m3-btn m3-btn-text m3-btn-sm" style="font-weight: 600; color: var(--color-primary); padding: 4px 8px;">
                     + Añadir CUPS
@@ -2629,7 +2698,6 @@
                 <select id="manual-ren-tipo" class="m3-input m3-select">
                   <option value="Luz">Luz</option>
                   <option value="Gas">Gas</option>
-                  <option value="Dual">Dual (Luz + Gas)</option>
                 </select>
               </div>
               <div class="m3-field">

@@ -11,6 +11,7 @@ import {
 } from '../db.js';
 import { generateLopdCertificatePdf } from '../pdf.js';
 import { showToast, showConfirm } from '../ui.js';
+import { isValidSpanishCups, normalizeCups, isValidSpanishId } from '../utils/validators.js';
 
 let currentClientPage = 1;
 const CLIENT_PAGE_SIZE = 25;
@@ -65,30 +66,35 @@ function addCupsRow(cups = '', alias = '', energy = 'LUZ') {
   const container = document.getElementById('client-cups-container');
   if (!container) return;
 
+  const normalizedVal = normalizeCups(cups);
+
   const row = document.createElement('div');
   row.className = 'cups-item-row';
   row.style.cssText = 'display: flex; gap: 10px; align-items: center; margin-bottom: 6px;';
 
   row.innerHTML = `
-    <input type="text" class="m3-input client-cups-input" placeholder="CUPS (ES0021...)" value="${escapeHtml(cups)}" style="flex: 2.2; text-transform: uppercase; font-family: monospace; font-size: 13px; height: 40px;" />
+    <input type="text" class="m3-input client-cups-input" placeholder="CUPS (ES0021...) *" value="${escapeHtml(normalizedVal)}" maxlength="22" required style="flex: 2.2; text-transform: uppercase; font-family: monospace; font-size: 13px; height: 40px;" />
     <input type="text" class="m3-input client-cups-alias" placeholder="Ubicación / Alias (ej. Tienda Centro)" value="${escapeHtml(alias)}" style="flex: 1.8; font-size: 13px; height: 40px;" />
     <select class="m3-input m3-select m3-select-sm client-cups-type" style="width: 110px;">
-      <option value="LUZ" ${energy === 'LUZ' ? 'selected' : ''}>⚡ Luz</option>
+      <option value="LUZ" ${energy === 'GAS' ? '' : 'selected'}>⚡ Luz</option>
       <option value="GAS" ${energy === 'GAS' ? 'selected' : ''}>🔥 Gas</option>
-      <option value="DUAL" ${energy === 'DUAL' ? 'selected' : ''}>⚡🔥 Dual</option>
     </select>
     <button type="button" class="m3-btn-icon btn-remove-cups-row" title="Eliminar este CUPS" style="color: var(--color-error); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); border: 1px solid var(--color-outline-variant); background-color: var(--color-surface); flex-shrink: 0;">
       <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
     </button>
   `;
 
+  const cupsInput = row.querySelector('.client-cups-input');
+  cupsInput.addEventListener('input', () => {
+    cupsInput.value = normalizeCups(cupsInput.value);
+  });
+
   row.querySelector('.btn-remove-cups-row').addEventListener('click', () => {
     const totalRows = container.querySelectorAll('.cups-item-row').length;
     if (totalRows > 1) {
       row.remove();
     } else {
-      row.querySelector('.client-cups-input').value = '';
-      row.querySelector('.client-cups-alias').value = '';
+      showToast("Un cliente debe tener al menos un punto de suministro (CUPS).", "warning");
     }
   });
 
@@ -108,7 +114,8 @@ function getCupsRowsData() {
   const result = [];
 
   rows.forEach(r => {
-    const cups = r.querySelector('.client-cups-input')?.value?.trim()?.toUpperCase() || '';
+    const rawCups = r.querySelector('.client-cups-input')?.value || '';
+    const cups = normalizeCups(rawCups);
     const alias = r.querySelector('.client-cups-alias')?.value?.trim() || 'Principal';
     const energy = r.querySelector('.client-cups-type')?.value || 'LUZ';
 
@@ -221,6 +228,18 @@ function setupFormSubmit() {
     if (!isValidSpanishId(cif)) {
       showToast("Error: El DNI / CIF introducido no es un documento válido.", "error");
       return;
+    }
+
+    if (puntosData.length === 0) {
+      showToast("Error: Debes indicar al menos un código CUPS obligatorio para el cliente.", "error");
+      return;
+    }
+
+    for (const punto of puntosData) {
+      if (!isValidSpanishCups(punto.cups)) {
+        showToast(`Error: El código CUPS "${punto.cups}" no es válido. Debe comenzar por ES y contener 20 o 22 caracteres.`, "error");
+        return;
+      }
     }
 
     try {
@@ -450,12 +469,16 @@ function renderClientsTableRows(clients, query) {
       </button>
     `;
 
+    const cupsBadgeHtml = (client.cups && client.cups.trim())
+      ? `<small class="text-muted" style="font-family: monospace;">${escapeHtml(client.cups)}</small>`
+      : `<span class="m3-chip" style="font-size:11px; height:22px; padding:0 6px; background-color: #fef08a !important; color: #854d0e !important; border: 1px solid #facc15 !important; font-weight: 600;" title="Cliente histórico sin código CUPS asignado">⚠️ Sin CUPS</span>`;
+
     tr.innerHTML = `
       <td><strong>${escapeHtml(client.nombre_empresa)}</strong></td>
       <td><code>${escapeHtml(client.cif)}</code></td>
       <td>${agentChip}</td>
       <td>${escapeHtml(client.representante || '-')}</td>
-      <td><small class="text-muted">${escapeHtml(client.cups || '-')}</small></td>
+      <td>${cupsBadgeHtml}</td>
       <td>${escapeHtml(client.email || '-')}</td>
       <td>${clientTypeHtml}</td>
       <td>${statusBadgeHtml}</td>
@@ -783,61 +806,4 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
-// --- Spanish DNI/NIE/CIF Validation Helpers ---
-function validateDNI(dni) {
-  const match = dni.match(/^(\d{8})([A-Z])$/);
-  if (!match) return false;
-  const num = parseInt(match[1], 10);
-  const letter = match[2];
-  const letters = 'TRWAGMYFPDXBNJZSQVHLCKE';
-  return letters[num % 23] === letter;
-}
 
-function validateNIE(nie) {
-  let cleanNie = nie.replace(/^X/, '0').replace(/^Y/, '1').replace(/^Z/, '2');
-  return validateDNI(cleanNie);
-}
-
-function validateCIF(cif) {
-  const match = cif.match(/^([ABCDEFGHJNPQRSUVW])(\d{7})([0-9A-J])$/);
-  if (!match) return false;
-  
-  const letter = match[1];
-  const digits = match[2];
-  const control = match[3];
-  
-  let oddSum = 0;
-  let evenSum = 0;
-  
-  for (let i = 0; i < 7; i++) {
-    const d = parseInt(digits.charAt(i), 10);
-    if (i % 2 === 0) {
-      let temp = d * 2;
-      if (temp > 9) temp -= 9;
-      oddSum += temp;
-    } else {
-      evenSum += d;
-    }
-  }
-  
-  const totalSum = oddSum + evenSum;
-  const controlDigit = (10 - (totalSum % 10)) % 10;
-  const letters = 'JABCDEFGHI';
-  const controlLetter = letters.charAt(controlDigit);
-  
-  if ('KPQRSNW'.includes(letter)) {
-    return control === controlLetter;
-  } else if ('ABEHMX'.includes(letter)) {
-    return parseInt(control, 10) === controlDigit;
-  } else {
-    return parseInt(control, 10) === controlDigit || control === controlLetter;
-  }
-}
-
-function isValidSpanishId(id) {
-  const cleanId = id.toUpperCase().replace(/[\s-]/g, '');
-  if (/^[XYZ]/.test(cleanId)) return validateNIE(cleanId);
-  if (/^[ABCDEFGHJNPQRSUVW]/.test(cleanId)) return validateCIF(cleanId);
-  if (/^\d/.test(cleanId)) return validateDNI(cleanId);
-  return false;
-}

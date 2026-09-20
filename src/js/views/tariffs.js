@@ -12,6 +12,7 @@ import {
   addTarifaGas,
   updateTarifaGas,
 } from '../db.js';
+import { formatPriceDecimals } from '../calculator.js';
 import { M3DateRangePicker } from '../components/date_range_picker.js';
 import { showToast, showConfirm } from '../ui.js';
 
@@ -148,8 +149,8 @@ function setupTarifasLuz() {
   if (typeSelect) {
     typeSelect.addEventListener('change', () => {
       const is30td = typeSelect.value === '3.0TD';
-      if (extraPotRow) extraPotRow.style.display = is30td ? 'flex' : 'none';
-      if (extraEneRow) extraEneRow.style.display = is30td ? 'flex' : 'none';
+      if (extraPotRow) extraPotRow.style.display = is30td ? 'grid' : 'none';
+      if (extraEneRow) extraEneRow.style.display = is30td ? 'grid' : 'none';
 
       // Configurar campos requeridos
       const extraInputs = [
@@ -308,21 +309,21 @@ async function loadTarifasLuz() {
 
       const dailyP1 = t.potencia_p1 / 365;
       const dailyP2 = t.potencia_p2 / 365;
-      let potHtml = `P1: ${dailyP1.toFixed(7)} &euro;/d&iacute;a (${t.potencia_p1.toFixed(7)} &euro;/a&ntilde;o)<br>P2: ${dailyP2.toFixed(7)} &euro;/d&iacute;a (${t.potencia_p2.toFixed(7)} &euro;/a&ntilde;o)`;
+      let potHtml = `P1: ${formatPriceDecimals(dailyP1)} &euro;/d&iacute;a (${formatPriceDecimals(t.potencia_p1)} &euro;/a&ntilde;o)<br>P2: ${formatPriceDecimals(dailyP2)} &euro;/d&iacute;a (${formatPriceDecimals(t.potencia_p2)} &euro;/a&ntilde;o)`;
       if (t.tipo_tarifa === '3.0TD') {
         const dailyP3 = (t.potencia_p3 || 0) / 365;
         const dailyP4 = (t.potencia_p4 || 0) / 365;
         const dailyP5 = (t.potencia_p5 || 0) / 365;
         const dailyP6 = (t.potencia_p6 || 0) / 365;
-        potHtml += `<br>P3: ${dailyP3.toFixed(7)} &euro;/d&iacute;a (${(t.potencia_p3 || 0).toFixed(7)} &euro;/a&ntilde;o)<br>P4: ${dailyP4.toFixed(7)} &euro;/d&iacute;a (${(t.potencia_p4 || 0).toFixed(7)} &euro;/a&ntilde;o)<br>P5: ${dailyP5.toFixed(7)} &euro;/d&iacute;a (${(t.potencia_p5 || 0).toFixed(7)} &euro;/a&ntilde;o)<br>P6: ${dailyP6.toFixed(7)} &euro;/d&iacute;a (${(t.potencia_p6 || 0).toFixed(7)} &euro;/a&ntilde;o)`;
+        potHtml += `<br>P3: ${formatPriceDecimals(dailyP3)} &euro;/d&iacute;a (${formatPriceDecimals(t.potencia_p3 || 0)} &euro;/a&ntilde;o)<br>P4: ${formatPriceDecimals(dailyP4)} &euro;/d&iacute;a (${formatPriceDecimals(t.potencia_p4 || 0)} &euro;/a&ntilde;o)<br>P5: ${formatPriceDecimals(dailyP5)} &euro;/d&iacute;a (${formatPriceDecimals(t.potencia_p5 || 0)} &euro;/a&ntilde;o)<br>P6: ${formatPriceDecimals(dailyP6)} &euro;/d&iacute;a (${formatPriceDecimals(t.potencia_p6 || 0)} &euro;/a&ntilde;o)`;
       }
 
-      let eneHtml = `P1: ${t.energia_p1.toFixed(7)} &euro;/kWh<br>P2: ${t.energia_p2.toFixed(7)} &euro;/kWh<br>P3: ${t.energia_p3.toFixed(7)} &euro;/kWh`;
+      let eneHtml = `P1: ${formatPriceDecimals(t.energia_p1)} &euro;/kWh<br>P2: ${formatPriceDecimals(t.energia_p2)} &euro;/kWh<br>P3: ${formatPriceDecimals(t.energia_p3)} &euro;/kWh`;
       if (t.tipo_tarifa === '3.0TD') {
-        eneHtml += `<br>P4: ${(t.energia_p4 || 0).toFixed(7)} &euro;/kWh<br>P5: ${(t.energia_p5 || 0).toFixed(7)} &euro;/kWh<br>P6: ${(t.energia_p6 || 0).toFixed(7)} &euro;/kWh`;
+        eneHtml += `<br>P4: ${formatPriceDecimals(t.energia_p4 || 0)} &euro;/kWh<br>P5: ${formatPriceDecimals(t.energia_p5 || 0)} &euro;/kWh<br>P6: ${formatPriceDecimals(t.energia_p6 || 0)} &euro;/kWh`;
       }
       if (t.excedente) {
-        eneHtml += `<br><span class="text-success" style="font-weight: 500;">Exc: ${t.excedente.toFixed(7)} &euro;/kWh</span>`;
+        eneHtml += `<br><span class="text-success" style="font-weight: 500;">Exc: ${formatPriceDecimals(t.excedente)} &euro;/kWh</span>`;
       }
 
       let comHtmlParts = [];
@@ -408,21 +409,21 @@ async function loadTarifasLuz() {
           typeSelect.dispatchEvent(new Event('change'));
         }
 
-        document.getElementById('dialog-light-p1-pot').value = (t.potencia_p1 / 365).toFixed(7);
-        document.getElementById('dialog-light-p2-pot').value = (t.potencia_p2 / 365).toFixed(7);
-        document.getElementById('dialog-light-p3-pot').value = t.potencia_p3 ? (t.potencia_p3 / 365).toFixed(7) : '0.0000000';
-        document.getElementById('dialog-light-p4-pot').value = t.potencia_p4 ? (t.potencia_p4 / 365).toFixed(7) : '0.0000000';
-        document.getElementById('dialog-light-p5-pot').value = t.potencia_p5 ? (t.potencia_p5 / 365).toFixed(7) : '0.0000000';
-        document.getElementById('dialog-light-p6-pot').value = t.potencia_p6 ? (t.potencia_p6 / 365).toFixed(7) : '0.0000000';
+        document.getElementById('dialog-light-p1-pot').value = formatPriceDecimals(t.potencia_p1 / 365);
+        document.getElementById('dialog-light-p2-pot').value = formatPriceDecimals(t.potencia_p2 / 365);
+        document.getElementById('dialog-light-p3-pot').value = formatPriceDecimals(t.potencia_p3 ? (t.potencia_p3 / 365) : 0);
+        document.getElementById('dialog-light-p4-pot').value = formatPriceDecimals(t.potencia_p4 ? (t.potencia_p4 / 365) : 0);
+        document.getElementById('dialog-light-p5-pot').value = formatPriceDecimals(t.potencia_p5 ? (t.potencia_p5 / 365) : 0);
+        document.getElementById('dialog-light-p6-pot').value = formatPriceDecimals(t.potencia_p6 ? (t.potencia_p6 / 365) : 0);
 
-        document.getElementById('dialog-light-p1-ene').value = t.energia_p1.toFixed(7);
-        document.getElementById('dialog-light-p2-ene').value = t.energia_p2.toFixed(7);
-        document.getElementById('dialog-light-p3-ene').value = t.energia_p3.toFixed(7);
-        document.getElementById('dialog-light-p4-ene').value = t.energia_p4 ? t.energia_p4.toFixed(7) : '0.0000000';
-        document.getElementById('dialog-light-p5-ene').value = t.energia_p5 ? t.energia_p5.toFixed(7) : '0.0000000';
-        document.getElementById('dialog-light-p6-ene').value = t.energia_p6 ? t.energia_p6.toFixed(7) : '0.0000000';
+        document.getElementById('dialog-light-p1-ene').value = formatPriceDecimals(t.energia_p1);
+        document.getElementById('dialog-light-p2-ene').value = formatPriceDecimals(t.energia_p2);
+        document.getElementById('dialog-light-p3-ene').value = formatPriceDecimals(t.energia_p3);
+        document.getElementById('dialog-light-p4-ene').value = formatPriceDecimals(t.energia_p4 || 0);
+        document.getElementById('dialog-light-p5-ene').value = formatPriceDecimals(t.energia_p5 || 0);
+        document.getElementById('dialog-light-p6-ene').value = formatPriceDecimals(t.energia_p6 || 0);
 
-        document.getElementById('dialog-light-excedente').value = t.excedente ? t.excedente.toFixed(7) : '0.0000000';
+        document.getElementById('dialog-light-excedente').value = formatPriceDecimals(t.excedente || 0);
 
         const tramosConsumoContainer = document.getElementById('dialog-light-tramos-consumo-container');
         const tramosPotenciaContainer = document.getElementById('dialog-light-tramos-potencia-container');
@@ -618,8 +619,8 @@ async function loadTarifasGas() {
         <td><strong>${escapeHtml(t.comercializadora_nombre)}</strong></td>
         <td>${escapeHtml(t.nombre)}</td>
         <td><span class="m3-chip" style="font-size: 9px; height: 18px; padding: 0 6px;">${t.tipo_tarifa || 'RL.1'}</span></td>
-        <td>${t.termino_fijo.toFixed(7)} €/mes</td>
-        <td>${t.termino_variable.toFixed(7)} €/kWh</td>
+        <td>${formatPriceDecimals(t.termino_fijo)} €/mes</td>
+        <td>${formatPriceDecimals(t.termino_variable)} €/kWh</td>
         <td class="private-value">${comisionHtml}</td>
         <td><small class="text-muted">${escapeHtml(t.notes || t.notas || '-')}</small></td>
         <td style="text-align: right; white-space: nowrap;">
@@ -644,8 +645,8 @@ async function loadTarifasGas() {
         document.getElementById('dialog-gas-com').value = t.comercializadora_id;
         document.getElementById('dialog-gas-name').value = t.nombre;
         document.getElementById('dialog-gas-tariff-type').value = t.tipo_tarifa || "RL.1";
-        document.getElementById('dialog-gas-fixed').value = t.termino_fijo.toFixed(7);
-        document.getElementById('dialog-gas-var').value = t.termino_variable.toFixed(7);
+        document.getElementById('dialog-gas-fixed').value = formatPriceDecimals(t.termino_fijo);
+        document.getElementById('dialog-gas-var').value = formatPriceDecimals(t.termino_variable);
 
         const tramosConsumoContainer = document.getElementById('dialog-gas-tramos-consumo-container');
         tramosConsumoContainer.innerHTML = '';

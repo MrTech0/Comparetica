@@ -1,10 +1,11 @@
 /* src/js/views/calculator_view.js */
 
-import { calculateLightBill, calculateGasBill } from '../calculator.js';
+import { calculateLightBill, calculateGasBill, formatPriceDecimals } from '../calculator.js';
 import { getTarifasLuz, getTarifasGas, addComparativa, getClientes, getComparativas, getPuntosSuministroAll } from '../db.js';
 import { generatePDFReport } from '../pdf.js';
 import { showToast } from '../ui.js';
 import { emitAppEvent, APP_EVENTS } from '../events.js';
+import { isValidSpanishCups, normalizeCups } from '../utils/validators.js';
 
 // Datos temporales de la última comparación realizada
 let lastComparisonData = {
@@ -32,7 +33,7 @@ export function initCalculatorView() {
   const excedenteGroup = document.getElementById('calc-light-excedente-group');
   if (hasExcedenteCheckbox && excedenteGroup) {
     hasExcedenteCheckbox.addEventListener('change', () => {
-      excedenteGroup.style.display = hasExcedenteCheckbox.checked ? 'flex' : 'none';
+      excedenteGroup.style.display = hasExcedenteCheckbox.checked ? 'grid' : 'none';
       const excConsInput = document.getElementById('calc-light-excedente-cons');
       const excPriceInput = document.getElementById('calc-light-excedente-price');
       if (hasExcedenteCheckbox.checked) {
@@ -131,16 +132,17 @@ export function initCalculatorView() {
           const item = document.createElement('div');
           item.className = 'm3-autocomplete-item';
           item.setAttribute('data-index', idx);
-          item.style.display = 'flex';
-          item.style.justifyContent = 'space-between';
-          item.style.alignItems = 'center';
+
+          const cupsDisplay = sug.cups
+            ? escapeHtml(sug.cups)
+            : '<span style="color: var(--color-warning); font-weight: 600;">⚠️ Sin CUPS</span>';
 
           item.innerHTML = `
-            <div>
+            <div class="m3-autocomplete-item-content">
               <strong>${escapeHtml(sug.client.nombre_empresa)}</strong>
-              <small class="text-muted" style="display: block; font-size: 11px;">${escapeHtml(sug.cups || 'Sin CUPS')} ${sug.alias ? `(${escapeHtml(sug.alias)})` : ''}</small>
+              <small class="text-muted">${cupsDisplay} ${sug.alias ? `(${escapeHtml(sug.alias)})` : ''}</small>
             </div>
-            <span class="m3-chip" style="font-size: 10px; height: 20px; padding: 0 6px;">${escapeHtml(sug.tipoEnergia)}</span>
+            <span class="m3-chip m3-autocomplete-item-badge" style="font-size: 10px; height: 22px; padding: 0 8px; font-weight: 600;">${escapeHtml(sug.tipoEnergia)}</span>
           `;
 
           item.addEventListener('click', () => {
@@ -158,18 +160,31 @@ export function initCalculatorView() {
 
     const selectClient = (client, cups = '', tipoEnergia = 'LUZ') => {
       calcClientNameInput.value = client.nombre_empresa;
+      const finalCups = normalizeCups(cups || client.cups || '');
       if (calcClientCupsInput) {
-        calcClientCupsInput.value = cups || client.cups || '';
+        calcClientCupsInput.value = finalCups;
       }
       const energySelect = document.getElementById('calc-energy-type');
       if (energySelect && tipoEnergia) {
         energySelect.value = tipoEnergia.toUpperCase();
         energySelect.dispatchEvent(new Event('change'));
       }
+      if (finalCups && tipoEnergia) {
+        setEnergySelectLocked(true, `Tipo de suministro bloqueado a ${tipoEnergia} conforme al código CUPS`);
+      } else {
+        setEnergySelectLocked(false);
+        showToast("Aviso: Este cliente no tiene ningún CUPS registrado. Por favor, indícalo o actualiza su ficha en Clientes.", "warning");
+        if (calcClientCupsInput) {
+          calcClientCupsInput.focus();
+        }
+      }
       closeAutocomplete();
     };
 
     calcClientNameInput.addEventListener('input', () => {
+      if (calcClientNameInput.value.trim().length === 0 && (!calcClientCupsInput || calcClientCupsInput.value.trim().length === 0)) {
+        setEnergySelectLocked(false);
+      }
       renderSuggestions();
     });
 
@@ -210,7 +225,7 @@ export function initCalculatorView() {
       } else if (e.key === 'Enter') {
         if (activeIndex !== -1 && items[activeIndex]) {
           e.preventDefault();
-          selectClient(currentFilteredClients[activeIndex]);
+          items[activeIndex].click();
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
@@ -228,6 +243,79 @@ export function initCalculatorView() {
         }
       });
     };
+
+    // Búsqueda inversa al escribir o pegar directamente en el campo CUPS
+    if (calcClientCupsInput) {
+      calcClientCupsInput.addEventListener('input', async () => {
+        calcClientCupsInput.value = normalizeCups(calcClientCupsInput.value);
+        const enteredCups = calcClientCupsInput.value;
+
+        if (enteredCups.length === 0 && (!calcClientNameInput || calcClientNameInput.value.trim().length === 0)) {
+          setEnergySelectLocked(false);
+        }
+
+        if (enteredCups.length >= 20) {
+          try {
+            const [allClients, allPuntos] = await Promise.all([
+              getClientes({ soloActivos: true }),
+              getPuntosSuministroAll().catch(() => [])
+            ]);
+
+            // 1. Coincidencia en puntos_suministro
+            const matchedPunto = allPuntos.find(p => normalizeCups(p.cups) === enteredCups);
+            if (matchedPunto) {
+              const matchedClient = allClients.find(c => c.id === matchedPunto.cliente_id);
+              if (matchedClient) {
+                calcClientNameInput.value = matchedClient.nombre_empresa;
+                const energySelect = document.getElementById('calc-energy-type');
+                if (energySelect && matchedPunto.tipo_energia) {
+                  energySelect.value = matchedPunto.tipo_energia.toUpperCase();
+                  energySelect.dispatchEvent(new Event('change'));
+                  setEnergySelectLocked(true, `Tipo de suministro bloqueado a ${matchedPunto.tipo_energia} conforme al código CUPS`);
+                }
+                return;
+              }
+            }
+
+            // 2. Coincidencia en campo cups de clientes legacy
+            const matchedClientLegacy = allClients.find(c => normalizeCups(c.cups) === enteredCups);
+            if (matchedClientLegacy) {
+              calcClientNameInput.value = matchedClientLegacy.nombre_empresa;
+            }
+          } catch (err) {
+            console.error("Error en búsqueda inversa por CUPS:", err);
+          }
+        }
+      });
+    }
+  }
+}
+
+/**
+ * Bloquea o desbloquea el selector de Tipo de Suministro en el Comparador.
+ * @param {boolean} locked - True para bloquear en modo solo lectura, false para habilitar.
+ * @param {string} [reason] - Mensaje explicativo para el tooltip.
+ */
+export function setEnergySelectLocked(locked, reason = '') {
+  const energySelect = document.getElementById('calc-energy-type');
+  if (!energySelect) return;
+  energySelect.disabled = locked;
+
+  const customSelectWrapper = document.getElementById('custom-select-for-calc-energy-type');
+  if (customSelectWrapper) {
+    if (locked) {
+      customSelectWrapper.classList.add('disabled');
+      customSelectWrapper.style.pointerEvents = 'none';
+      customSelectWrapper.style.opacity = '0.75';
+      customSelectWrapper.style.cursor = 'not-allowed';
+      customSelectWrapper.title = reason || 'Tipo de suministro bloqueado por el código CUPS';
+    } else {
+      customSelectWrapper.classList.remove('disabled');
+      customSelectWrapper.style.pointerEvents = '';
+      customSelectWrapper.style.opacity = '';
+      customSelectWrapper.style.cursor = '';
+      customSelectWrapper.removeAttribute('title');
+    }
   }
 }
 
@@ -279,10 +367,10 @@ function setupLightTariffTypeToggle() {
   if (lightTariffTypeSelect) {
     lightTariffTypeSelect.addEventListener('change', () => {
       const is30td = lightTariffTypeSelect.value === '3.0TD';
-      if (extraPotRow) extraPotRow.style.display = is30td ? 'flex' : 'none';
-      if (extraConsRow) extraConsRow.style.display = is30td ? 'flex' : 'none';
-      if (extraPotPriceRow) extraPotPriceRow.style.display = is30td ? 'flex' : 'none';
-      if (extraEnePriceRow) extraEnePriceRow.style.display = is30td ? 'flex' : 'none';
+      if (extraPotRow) extraPotRow.style.display = is30td ? 'grid' : 'none';
+      if (extraConsRow) extraConsRow.style.display = is30td ? 'grid' : 'none';
+      if (extraPotPriceRow) extraPotPriceRow.style.display = is30td ? 'grid' : 'none';
+      if (extraEnePriceRow) extraEnePriceRow.style.display = is30td ? 'grid' : 'none';
 
       // Set required attribute on extra inputs if 3.0TD
       const extraInputs = [
@@ -403,7 +491,21 @@ function setupCalcFormSubmit() {
 
     bypassTariffCheck = false;
 
-    const clientCups = document.getElementById('calc-client-cups').value.trim();
+    const clientCups = normalizeCups(document.getElementById('calc-client-cups')?.value);
+
+    if (!clientCups) {
+      showToast("Debes indicar el código CUPS del suministro para poder realizar la comparativa.", "error");
+      const cupsInput = document.getElementById('calc-client-cups');
+      if (cupsInput) cupsInput.focus();
+      return;
+    }
+
+    if (!isValidSpanishCups(clientCups)) {
+      showToast(`El código CUPS "${clientCups}" no es válido. Debe comenzar por ES y contener 20 o 22 caracteres.`, "error");
+      const cupsInput = document.getElementById('calc-client-cups');
+      if (cupsInput) cupsInput.focus();
+      return;
+    }
 
     // Resetear contenedores de resultados
     document.getElementById('results-light-list').innerHTML = '';
@@ -706,6 +808,7 @@ function setupCalcFormReset() {
     };
 
     bypassTariffCheck = false;
+    setEnergySelectLocked(false);
 
     // 5. Mostrar el formulario y ocultar el botón de modificar
     const formContainer = document.getElementById('calc-form-container');
@@ -788,12 +891,12 @@ function renderResultsList(containerId, results, type) {
           <p class="text-muted" style="font-size: 12px; margin-top: 4px;">
             ${type === 'LUZ' 
               ? (item.tariff.tipo_tarifa === '3.0TD'
-                ? `Precios Pot: P1 ${(item.tariff.potencia_p1/365).toFixed(7)}, P2 ${(item.tariff.potencia_p2/365).toFixed(7)}, P3 ${(item.tariff.potencia_p3/365).toFixed(7)}, P4 ${(item.tariff.potencia_p4/365).toFixed(7)}, P5 ${(item.tariff.potencia_p5/365).toFixed(7)}, P6 ${(item.tariff.potencia_p6/365).toFixed(7)} €/kW/día<br>
-                   Precios Ene: P1 ${item.tariff.energia_p1.toFixed(7)}, P2 ${item.tariff.energia_p2.toFixed(7)}, P3 ${item.tariff.energia_p3.toFixed(7)}, P4 ${item.tariff.energia_p4.toFixed(7)}, P5 ${item.tariff.energia_p5.toFixed(7)}, P6 ${item.tariff.energia_p6.toFixed(7)} €/kWh${item.tariff.excedente ? `<br><span class="text-success" style="font-weight: 500;">Excedente: ${item.tariff.excedente.toFixed(7)} €/kWh</span>` : ''}`
-                : `Precios Pot: P1 ${(item.tariff.potencia_p1/365).toFixed(7)} €/kW/día, P2 ${(item.tariff.potencia_p2/365).toFixed(7)} €/kW/día<br>
-                   Precios Ene: P1 ${item.tariff.energia_p1.toFixed(7)}, P2 ${item.tariff.energia_p2.toFixed(7)}, P3 ${item.tariff.energia_p3.toFixed(7)} €/kWh${item.tariff.excedente ? `<br><span class="text-success" style="font-weight: 500;">Excedente: ${item.tariff.excedente.toFixed(7)} €/kWh</span>` : ''}`
+                ? `Precios Pot: P1 ${formatPriceDecimals(item.tariff.potencia_p1/365)}, P2 ${formatPriceDecimals(item.tariff.potencia_p2/365)}, P3 ${formatPriceDecimals((item.tariff.potencia_p3 || 0)/365)}, P4 ${formatPriceDecimals((item.tariff.potencia_p4 || 0)/365)}, P5 ${formatPriceDecimals((item.tariff.potencia_p5 || 0)/365)}, P6 ${formatPriceDecimals((item.tariff.potencia_p6 || 0)/365)} €/kW/día<br>
+                   Precios Ene: P1 ${formatPriceDecimals(item.tariff.energia_p1)}, P2 ${formatPriceDecimals(item.tariff.energia_p2)}, P3 ${formatPriceDecimals(item.tariff.energia_p3)}, P4 ${formatPriceDecimals(item.tariff.energia_p4 || 0)}, P5 ${formatPriceDecimals(item.tariff.energia_p5 || 0)}, P6 ${formatPriceDecimals(item.tariff.energia_p6 || 0)} €/kWh${item.tariff.excedente ? `<br><span class="text-success" style="font-weight: 500;">Excedente: ${formatPriceDecimals(item.tariff.excedente)} €/kWh</span>` : ''}`
+                : `Precios Pot: P1 ${formatPriceDecimals(item.tariff.potencia_p1/365)} €/kW/día, P2 ${formatPriceDecimals(item.tariff.potencia_p2/365)} €/kW/día<br>
+                   Precios Ene: P1 ${formatPriceDecimals(item.tariff.energia_p1)}, P2 ${formatPriceDecimals(item.tariff.energia_p2)}, P3 ${formatPriceDecimals(item.tariff.energia_p3)} €/kWh${item.tariff.excedente ? `<br><span class="text-success" style="font-weight: 500;">Excedente: ${formatPriceDecimals(item.tariff.excedente)} €/kWh</span>` : ''}`
                 )
-              : `Término Fijo: ${item.tariff.termino_fijo.toFixed(7)} €/mes, Término Variable: ${item.tariff.termino_variable.toFixed(7)} €/kWh`
+              : `Término Fijo: ${formatPriceDecimals(item.tariff.termino_fijo)} €/mes, Término Variable: ${formatPriceDecimals(item.tariff.termino_variable)} €/kWh`
             }
           </p>
         </div>
@@ -1115,11 +1218,16 @@ export async function prefillCalculatorForRenewal(ren) {
   if (energySelect) {
     const rawType = (ren.tipo_energia || '').toUpperCase();
     let targetType = 'LUZ';
-    if (rawType.includes('DUAL')) targetType = 'DUAL';
-    else if (rawType.includes('GAS')) targetType = 'GAS';
+    if (rawType.includes('GAS')) targetType = 'GAS';
+    else targetType = 'LUZ';
     
     energySelect.value = targetType;
     energySelect.dispatchEvent(new Event('change'));
+    if (ren.cups) {
+      setEnergySelectLocked(true, `Tipo de suministro bloqueado a ${targetType} conforme al CUPS de renovación`);
+    } else {
+      setEnergySelectLocked(false);
+    }
   }
 
   // Intentar recuperar los consumos anteriores de este cliente desde el historial
