@@ -1063,25 +1063,12 @@
                 </div>
               </div>
 
-              <!-- Buscador y Filtros del Historial -->
-              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 0;">
-                <div style="flex: 1; min-width: 220px; position: relative;">
-                  <svg viewBox="0 0 24 24" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; fill: var(--color-on-surface-variant); pointer-events: none; opacity: 0.7;">
-                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                  </svg>
-                  <input type="text" id="search-history-input" class="m3-input" placeholder="Buscar comparativa por nombre o CUPS..." style="padding-left: 48px; width: 100%; box-sizing: border-box;" />
-                </div>
-                <select id="filter-history-estado" class="m3-input m3-select" style="width: 170px;">
-                  <option value="ALL">Todos los Estados</option>
-                  <option value="Aceptada">Aceptadas</option>
-                  <option value="Pendiente de aceptación">Pendientes</option>
-                  <option value="Rechazada">Rechazadas</option>
-                </select>
-                <select id="filter-history-cobro" class="m3-input m3-select" style="width: 170px;">
-                  <option value="ALL">Todos los Cobros</option>
-                  <option value="PENDIENTE">🟡 Pendientes de Cobro</option>
-                  <option value="COBRADO">✅ Cobrados</option>
-                </select>
+              <!-- Buscador del Historial -->
+              <div style="position: relative; width: 100%;">
+                <svg viewBox="0 0 24 24" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; fill: var(--color-on-surface-variant); pointer-events: none; opacity: 0.7;">
+                  <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                </svg>
+                <input type="text" id="search-history-input" class="m3-input" placeholder="Buscar comparativa por nombre o CUPS..." style="padding-left: 48px; width: 100%; box-sizing: border-box;" />
               </div>
             </div>
 
@@ -1090,15 +1077,106 @@
               <table class="m3-table" id="table-history">
                 <thead>
                   <tr>
-                    <th>Fecha</th>
+                    <!-- Fecha (Ordenable) -->
+                    <th id="th-history-date" style="cursor: pointer; user-select: none;" title="Ordenar por fecha">
+                      <div style="display: inline-flex; align-items: center; gap: 4px;">
+                        <span>Fecha</span>
+                        <span id="th-history-date-sort-icon" style="display: inline-flex; font-size: 13px; color: var(--color-primary); font-weight: bold;">↓</span>
+                      </div>
+                    </th>
                     <th>Cliente</th>
                     <th>CUPS</th>
                     <th>Tipo</th>
-                    <th>Ahorro Anual</th>
-                    <th>Estado Comparativa</th>
-                    <th>Contrato</th>
+                    <!-- Ahorro Anual (Ordenable) -->
+                    <th id="th-history-savings" style="cursor: pointer; user-select: none;" title="Ordenar por ahorro anual">
+                      <div style="display: inline-flex; align-items: center; gap: 4px;">
+                        <span>Ahorro Anual</span>
+                        <span id="th-history-savings-sort-icon" style="display: inline-flex; font-size: 13px; color: var(--color-on-surface-variant);">↕</span>
+                      </div>
+                    </th>
+                    <!-- Estado Comparativa (Filtrable con menú desplegable) -->
+                    <th id="th-history-estado" style="cursor: pointer; position: relative; user-select: none;">
+                      <div style="display: inline-flex; align-items: center; gap: 4px;">
+                        <span id="th-history-estado-label">Estado</span>
+                        <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: currentColor; transition: transform 0.2s;" id="th-history-estado-arrow">
+                          <path d="M7 10l5 5 5-5z"/>
+                        </svg>
+                      </div>
+                      <div id="dropdown-history-estado-filter" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 180px; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,0.18); z-index: var(--z-dropdown); padding: 4px 0; font-weight: normal; text-transform: none;">
+                        <div class="history-estado-filter-item active" data-estado="ALL" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
+                          <span>● Todos</span>
+                          <span class="history-estado-check" style="font-weight: bold; color: var(--color-primary);">✓</span>
+                        </div>
+                        <div class="history-estado-filter-item" data-estado="Aceptada" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #166534;">
+                          <span>● Aceptadas</span>
+                          <span class="history-estado-check" style="display: none; font-weight: bold; color: #166534;">✓</span>
+                        </div>
+                        <div class="history-estado-filter-item" data-estado="Pendiente de aceptación" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #854d0e;">
+                          <span>● Pendientes</span>
+                          <span class="history-estado-check" style="display: none; font-weight: bold; color: #854d0e;">✓</span>
+                        </div>
+                        <div class="history-estado-filter-item" data-estado="Rechazada" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #991b1b;">
+                          <span>● Rechazadas</span>
+                          <span class="history-estado-check" style="display: none; font-weight: bold; color: #991b1b;">✓</span>
+                        </div>
+                      </div>
+                    </th>
+                    <!-- Contrato (Filtrable con menú desplegable) -->
+                    <th id="th-history-contract" style="cursor: pointer; position: relative; user-select: none;">
+                      <div style="display: inline-flex; align-items: center; gap: 4px;">
+                        <span id="th-history-contract-label">Contrato</span>
+                        <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: currentColor; transition: transform 0.2s;" id="th-history-contract-arrow">
+                          <path d="M7 10l5 5 5-5z"/>
+                        </svg>
+                      </div>
+                      <div id="dropdown-history-contract-filter" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 200px; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,0.18); z-index: var(--z-dropdown); padding: 4px 0; font-weight: normal; text-transform: none;">
+                        <div class="history-contract-filter-item active" data-contract="ALL" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
+                          <span>● Todos los Contratos</span>
+                          <span class="history-contract-check" style="font-weight: bold; color: var(--color-primary);">✓</span>
+                        </div>
+                        <div class="history-contract-filter-item" data-contract="Pendiente" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
+                          <span>● Pendiente</span>
+                          <span class="history-contract-check" style="display: none; font-weight: bold; color: var(--color-primary);">✓</span>
+                        </div>
+                        <div class="history-contract-filter-item" data-contract="En trámite" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #1e40af;">
+                          <span>● En trámite</span>
+                          <span class="history-contract-check" style="display: none; font-weight: bold; color: #1e40af;">✓</span>
+                        </div>
+                        <div class="history-contract-filter-item" data-contract="Firmado y Activado" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #166534;">
+                          <span>● Firmado y Activado</span>
+                          <span class="history-contract-check" style="display: none; font-weight: bold; color: #166534;">✓</span>
+                        </div>
+                        <div class="history-contract-filter-item" data-contract="Rechazado por Scoring" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #991b1b;">
+                          <span>● Rechazado por Scoring</span>
+                          <span class="history-contract-check" style="display: none; font-weight: bold; color: #991b1b;">✓</span>
+                        </div>
+                      </div>
+                    </th>
+                    <!-- Comisión Asesor -->
                     <th class="private-value">Comisión Asesor</th>
-                    <th>Cobro Comisión</th>
+                    <!-- Cobro Comisión (Filtrable con menú desplegable) -->
+                    <th id="th-history-cobro" style="cursor: pointer; position: relative; user-select: none;">
+                      <div style="display: inline-flex; align-items: center; gap: 4px;">
+                        <span id="th-history-cobro-label">Cobro Comisión</span>
+                        <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: currentColor; transition: transform 0.2s;" id="th-history-cobro-arrow">
+                          <path d="M7 10l5 5 5-5z"/>
+                        </svg>
+                      </div>
+                      <div id="dropdown-history-cobro-filter" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; min-width: 195px; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,0.18); z-index: var(--z-dropdown); padding: 4px 0; font-weight: normal; text-transform: none;">
+                        <div class="history-cobro-filter-item active" data-cobro="ALL" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
+                          <span>● Todos los Cobros</span>
+                          <span class="history-cobro-check" style="font-weight: bold; color: var(--color-primary);">✓</span>
+                        </div>
+                        <div class="history-cobro-filter-item" data-cobro="PENDIENTE" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #854d0e;">
+                          <span>● 🟡 Pendiente de cobro</span>
+                          <span class="history-cobro-check" style="display: none; font-weight: bold; color: #854d0e;">✓</span>
+                        </div>
+                        <div class="history-cobro-filter-item" data-cobro="COBRADO" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #166534;">
+                          <span>● ✅ Cobrado</span>
+                          <span class="history-cobro-check" style="display: none; font-weight: bold; color: #166534;">✓</span>
+                        </div>
+                      </div>
+                    </th>
                     <th style="text-align: right;">Acciones</th>
                   </tr>
                 </thead>

@@ -591,6 +591,7 @@ function setupRenewalEventListeners() {
   if (btnAddManual && dialogManual) {
     btnAddManual.onclick = (e) => {
       e.preventDefault();
+      historyRenewalCallbacks = null;
       openManualAddModal();
     };
   }
@@ -598,8 +599,28 @@ function setupRenewalEventListeners() {
   if (btnCancelManual && dialogManual) {
     btnCancelManual.onclick = (e) => {
       e.preventDefault();
-      dialogManual.classList.remove('active');
+      handleRenewalModalCancel();
     };
+  }
+
+  if (dialogManual) {
+    dialogManual.onclick = (e) => {
+      if (e.target === dialogManual) {
+        handleRenewalModalCancel();
+      }
+    };
+  }
+
+  if (!window._renewalEscapeListenerAdded) {
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const dialog = document.getElementById('dialog-renewal-form');
+        if (dialog && dialog.classList.contains('active')) {
+          handleRenewalModalCancel();
+        }
+      }
+    });
+    window._renewalEscapeListenerAdded = true;
   }
 
   if (formManual) {
@@ -625,6 +646,21 @@ function setupRenewalEventListeners() {
   }
 }
 
+let historyRenewalCallbacks = null;
+
+export function handleRenewalModalCancel() {
+  const dialogManual = document.getElementById('dialog-renewal-form');
+  if (dialogManual) dialogManual.classList.remove('active');
+
+  if (historyRenewalCallbacks && typeof historyRenewalCallbacks.onCancelled === 'function') {
+    const cb = historyRenewalCallbacks.onCancelled;
+    historyRenewalCallbacks = null;
+    cb();
+  } else {
+    historyRenewalCallbacks = null;
+  }
+}
+
 // Inicialización directa al cargar el módulo
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {
@@ -634,12 +670,10 @@ if (typeof document !== 'undefined') {
   }
 }
 
-export async function openNewRenewalDialogFromHistory(comp) {
-  // 1. Navegar a la sección de renovaciones
-  const navRenewals = document.querySelector('[data-section="renewals"]');
-  if (navRenewals) navRenewals.click();
+export async function openNewRenewalDialogFromHistory(comp, callbacks = null) {
+  historyRenewalCallbacks = callbacks;
 
-  // 2. Abrir modal manual
+  // Abrir modal manual directamente sobre la vista actual
   await openManualAddModal();
 
   if (!comp) return;
@@ -1044,6 +1078,14 @@ async function saveManualRenewal() {
     document.getElementById('dialog-renewal-form')?.classList.remove('active');
     showToast("Renovación de contrato registrada con éxito.", "success");
     await refreshRenewals();
+
+    if (historyRenewalCallbacks && typeof historyRenewalCallbacks.onSaved === 'function') {
+      const cb = historyRenewalCallbacks.onSaved;
+      historyRenewalCallbacks = null;
+      await cb();
+    } else {
+      historyRenewalCallbacks = null;
+    }
   } catch (err) {
     console.error("Error al guardar renovación manual:", err);
     showToast("Error al guardar la renovación de contrato.", "error");

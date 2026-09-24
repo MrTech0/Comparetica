@@ -56,6 +56,295 @@ async function refreshHistory() {
 }
 
 let cachedHistory = [];
+let currentHistoryDateSort = 'desc'; // 'desc' (más reciente a más antigua) | 'asc' (más antigua a más reciente)
+let currentHistorySavingsSort = null; // 'desc' (mayor a menor) | 'asc' (menor a mayor) | null
+let currentHistoryEstadoFilter = 'ALL';
+let currentHistoryContractFilter = 'ALL';
+let currentHistoryCobroFilter = 'ALL';
+
+function closeAllHistoryHeaderDropdowns() {
+  const tableContainer = document.querySelector('#section-history .table-container');
+  if (tableContainer) tableContainer.classList.remove('has-open-dropdown');
+
+  const estadoDropdown = document.getElementById('dropdown-history-estado-filter');
+  const estadoTh = document.getElementById('th-history-estado');
+  const estadoArrow = document.getElementById('th-history-estado-arrow');
+  if (estadoDropdown) estadoDropdown.style.display = 'none';
+  if (estadoTh) estadoTh.classList.remove('open');
+  if (estadoArrow) estadoArrow.style.transform = 'rotate(0deg)';
+
+  const contractDropdown = document.getElementById('dropdown-history-contract-filter');
+  const contractTh = document.getElementById('th-history-contract');
+  const contractArrow = document.getElementById('th-history-contract-arrow');
+  if (contractDropdown) contractDropdown.style.display = 'none';
+  if (contractTh) contractTh.classList.remove('open');
+  if (contractArrow) contractArrow.style.transform = 'rotate(0deg)';
+
+  const cobroDropdown = document.getElementById('dropdown-history-cobro-filter');
+  const cobroTh = document.getElementById('th-history-cobro');
+  const cobroArrow = document.getElementById('th-history-cobro-arrow');
+  if (cobroDropdown) cobroDropdown.style.display = 'none';
+  if (cobroTh) cobroTh.classList.remove('open');
+  if (cobroArrow) cobroArrow.style.transform = 'rotate(0deg)';
+}
+
+function setupHistoryEstadoFilterDropdown() {
+  const th = document.getElementById('th-history-estado');
+  const dropdown = document.getElementById('dropdown-history-estado-filter');
+  const arrow = document.getElementById('th-history-estado-arrow');
+  const label = document.getElementById('th-history-estado-label');
+  const tableContainer = document.querySelector('#section-history .table-container');
+
+  if (!th || !dropdown) return;
+  if (th.dataset.filterInitialized) return;
+  th.dataset.filterInitialized = 'true';
+
+  th.addEventListener('click', (e) => {
+    if (e.target.closest('#dropdown-history-estado-filter')) return;
+    const isVisible = dropdown.style.display === 'block';
+    closeAllHistoryHeaderDropdowns();
+
+    if (!isVisible) {
+      dropdown.style.display = 'block';
+      th.classList.add('open');
+      if (tableContainer) tableContainer.classList.add('has-open-dropdown');
+      if (arrow) arrow.style.transform = 'rotate(180deg)';
+    }
+  });
+
+  dropdown.querySelectorAll('.history-estado-filter-item').forEach(item => {
+    item.addEventListener('mouseenter', () => {
+      item.style.backgroundColor = 'var(--color-surface-variant)';
+    });
+    item.addEventListener('mouseleave', () => {
+      item.style.backgroundColor = 'transparent';
+    });
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const estado = item.getAttribute('data-estado') || 'ALL';
+      currentHistoryEstadoFilter = estado;
+
+      dropdown.querySelectorAll('.history-estado-filter-item').forEach(el => {
+        const check = el.querySelector('.history-estado-check');
+        if (check) check.style.display = el === item ? 'inline' : 'none';
+      });
+
+      if (label) {
+        if (estado === 'ALL') label.textContent = 'Estado';
+        else if (estado === 'Aceptada') label.textContent = 'Estado: Aceptadas';
+        else if (estado === 'Pendiente de aceptación') label.textContent = 'Estado: Pendientes';
+        else if (estado === 'Rechazada') label.textContent = 'Estado: Rechazadas';
+      }
+
+      closeAllHistoryHeaderDropdowns();
+      applyHistoryFilter();
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!th.contains(e.target)) {
+      dropdown.style.display = 'none';
+      th.classList.remove('open');
+      if (arrow) arrow.style.transform = 'rotate(0deg)';
+      if (tableContainer && !tableContainer.querySelector('th.open')) {
+        tableContainer.classList.remove('has-open-dropdown');
+      }
+    }
+  });
+}
+
+function setupHistoryContractFilterDropdown() {
+  const th = document.getElementById('th-history-contract');
+  const dropdown = document.getElementById('dropdown-history-contract-filter');
+  const arrow = document.getElementById('th-history-contract-arrow');
+  const label = document.getElementById('th-history-contract-label');
+  const tableContainer = document.querySelector('#section-history .table-container');
+
+  if (!th || !dropdown) return;
+  if (th.dataset.filterInitialized) return;
+  th.dataset.filterInitialized = 'true';
+
+  th.addEventListener('click', (e) => {
+    if (e.target.closest('#dropdown-history-contract-filter')) return;
+    const isVisible = dropdown.style.display === 'block';
+    closeAllHistoryHeaderDropdowns();
+
+    if (!isVisible) {
+      dropdown.style.display = 'block';
+      th.classList.add('open');
+      if (tableContainer) tableContainer.classList.add('has-open-dropdown');
+      if (arrow) arrow.style.transform = 'rotate(180deg)';
+    }
+  });
+
+  dropdown.querySelectorAll('.history-contract-filter-item').forEach(item => {
+    item.addEventListener('mouseenter', () => {
+      item.style.backgroundColor = 'var(--color-surface-variant)';
+    });
+    item.addEventListener('mouseleave', () => {
+      item.style.backgroundColor = 'transparent';
+    });
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const contract = item.getAttribute('data-contract') || 'ALL';
+      currentHistoryContractFilter = contract;
+
+      dropdown.querySelectorAll('.history-contract-filter-item').forEach(el => {
+        const check = el.querySelector('.history-contract-check');
+        if (check) check.style.display = el === item ? 'inline' : 'none';
+      });
+
+      if (label) {
+        if (contract === 'ALL') label.textContent = 'Contrato';
+        else label.textContent = `Contrato: ${contract}`;
+      }
+
+      closeAllHistoryHeaderDropdowns();
+      applyHistoryFilter();
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!th.contains(e.target)) {
+      dropdown.style.display = 'none';
+      th.classList.remove('open');
+      if (arrow) arrow.style.transform = 'rotate(0deg)';
+      if (tableContainer && !tableContainer.querySelector('th.open')) {
+        tableContainer.classList.remove('has-open-dropdown');
+      }
+    }
+  });
+}
+
+function setupHistoryCobroFilterDropdown() {
+  const th = document.getElementById('th-history-cobro');
+  const dropdown = document.getElementById('dropdown-history-cobro-filter');
+  const arrow = document.getElementById('th-history-cobro-arrow');
+  const label = document.getElementById('th-history-cobro-label');
+  const tableContainer = document.querySelector('#section-history .table-container');
+
+  if (!th || !dropdown) return;
+  if (th.dataset.filterInitialized) return;
+  th.dataset.filterInitialized = 'true';
+
+  th.addEventListener('click', (e) => {
+    if (e.target.closest('#dropdown-history-cobro-filter')) return;
+    const isVisible = dropdown.style.display === 'block';
+    closeAllHistoryHeaderDropdowns();
+
+    if (!isVisible) {
+      dropdown.style.display = 'block';
+      th.classList.add('open');
+      if (tableContainer) tableContainer.classList.add('has-open-dropdown');
+      if (arrow) arrow.style.transform = 'rotate(180deg)';
+    }
+  });
+
+  dropdown.querySelectorAll('.history-cobro-filter-item').forEach(item => {
+    item.addEventListener('mouseenter', () => {
+      item.style.backgroundColor = 'var(--color-surface-variant)';
+    });
+    item.addEventListener('mouseleave', () => {
+      item.style.backgroundColor = 'transparent';
+    });
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cobro = item.getAttribute('data-cobro') || 'ALL';
+      currentHistoryCobroFilter = cobro;
+
+      dropdown.querySelectorAll('.history-cobro-filter-item').forEach(el => {
+        const check = el.querySelector('.history-cobro-check');
+        if (check) check.style.display = el === item ? 'inline' : 'none';
+      });
+
+      if (label) {
+        if (cobro === 'ALL') label.textContent = 'Cobro Comisión';
+        else if (cobro === 'PENDIENTE') label.textContent = 'Cobro: 🟡 Pendientes';
+        else if (cobro === 'COBRADO') label.textContent = 'Cobro: ✅ Cobrados';
+      }
+
+      closeAllHistoryHeaderDropdowns();
+      applyHistoryFilter();
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!th.contains(e.target)) {
+      dropdown.style.display = 'none';
+      th.classList.remove('open');
+      if (arrow) arrow.style.transform = 'rotate(0deg)';
+      if (tableContainer && !tableContainer.querySelector('th.open')) {
+        tableContainer.classList.remove('has-open-dropdown');
+      }
+    }
+  });
+}
+
+function setupHistoryDateSort() {
+  const th = document.getElementById('th-history-date');
+  if (!th || th.dataset.sortInitialized) return;
+  th.dataset.sortInitialized = 'true';
+
+  th.addEventListener('click', () => {
+    if (currentHistorySavingsSort !== null) {
+      currentHistorySavingsSort = null;
+      currentHistoryDateSort = 'desc';
+    } else {
+      currentHistoryDateSort = currentHistoryDateSort === 'desc' ? 'asc' : 'desc';
+    }
+    updateHistorySortIndicators();
+    applyHistoryFilter();
+  });
+}
+
+function setupHistorySavingsSort() {
+  const th = document.getElementById('th-history-savings');
+  if (!th || th.dataset.sortInitialized) return;
+  th.dataset.sortInitialized = 'true';
+
+  th.addEventListener('click', () => {
+    if (!currentHistorySavingsSort || currentHistorySavingsSort === 'asc') {
+      currentHistorySavingsSort = 'desc';
+    } else {
+      currentHistorySavingsSort = 'asc';
+    }
+    updateHistorySortIndicators();
+    applyHistoryFilter();
+  });
+}
+
+function updateHistorySortIndicators() {
+  const dateIcon = document.getElementById('th-history-date-sort-icon');
+  const savingsIcon = document.getElementById('th-history-savings-sort-icon');
+
+  if (currentHistorySavingsSort !== null) {
+    if (dateIcon) {
+      dateIcon.textContent = '↕';
+      dateIcon.style.color = 'var(--color-on-surface-variant)';
+      dateIcon.style.fontWeight = 'normal';
+      dateIcon.title = 'Haga clic para ordenar por fecha';
+    }
+    if (savingsIcon) {
+      savingsIcon.textContent = currentHistorySavingsSort === 'desc' ? '↓' : '↑';
+      savingsIcon.style.color = 'var(--color-primary)';
+      savingsIcon.style.fontWeight = 'bold';
+      savingsIcon.title = currentHistorySavingsSort === 'desc' ? 'Orden: Mayor a menor ahorro' : 'Orden: Menor a mayor ahorro';
+    }
+  } else {
+    if (savingsIcon) {
+      savingsIcon.textContent = '↕';
+      savingsIcon.style.color = 'var(--color-on-surface-variant)';
+      savingsIcon.style.fontWeight = 'normal';
+      savingsIcon.title = 'Haga clic para ordenar por ahorro anual';
+    }
+    if (dateIcon) {
+      dateIcon.textContent = currentHistoryDateSort === 'desc' ? '↓' : '↑';
+      dateIcon.style.color = 'var(--color-primary)';
+      dateIcon.style.fontWeight = 'bold';
+      dateIcon.title = currentHistoryDateSort === 'desc' ? 'Orden: Más reciente a más antigua' : 'Orden: Más antigua a más reciente';
+    }
+  }
+}
 
 async function loadHistoryTable() {
   clearActiveLockTimers();
@@ -67,7 +356,7 @@ async function loadHistoryTable() {
   try {
     cachedHistory = await getComparativas();
     
-    // Configurar listeners de búsqueda y filtros
+    // Configurar búsqueda
     const searchInput = document.getElementById('search-history-input');
     if (searchInput && !searchInput.dataset.listenerAdded) {
       searchInput.addEventListener('input', () => {
@@ -76,22 +365,20 @@ async function loadHistoryTable() {
       searchInput.dataset.listenerAdded = 'true';
     }
 
-    const filterEstado = document.getElementById('filter-history-estado');
-    if (filterEstado && !filterEstado.dataset.listenerAdded) {
-      filterEstado.addEventListener('change', () => applyHistoryFilter());
-      filterEstado.dataset.listenerAdded = 'true';
-    }
+    // Configurar desplegables de filtrado en cabeceras
+    setupHistoryEstadoFilterDropdown();
+    setupHistoryContractFilterDropdown();
+    setupHistoryCobroFilterDropdown();
 
-    const filterCobro = document.getElementById('filter-history-cobro');
-    if (filterCobro && !filterCobro.dataset.listenerAdded) {
-      filterCobro.addEventListener('change', () => applyHistoryFilter());
-      filterCobro.dataset.listenerAdded = 'true';
-    }
+    // Configurar ordenación en cabeceras
+    setupHistoryDateSort();
+    setupHistorySavingsSort();
 
     const tableContainer = document.querySelector('#section-history .table-container');
     if (tableContainer && !tableContainer.dataset.scrollListenerAdded) {
       tableContainer.addEventListener('scroll', () => {
         document.querySelectorAll('.m3-custom-status-select, .m3-custom-contract-select').forEach(cs => cs.classList.remove('open'));
+        closeAllHistoryHeaderDropdowns();
       });
       tableContainer.dataset.scrollListenerAdded = 'true';
     }
@@ -99,6 +386,7 @@ async function loadHistoryTable() {
     if (!window._historyScrollListenerAdded) {
       window.addEventListener('scroll', () => {
         document.querySelectorAll('.m3-custom-status-select, .m3-custom-contract-select').forEach(cs => cs.classList.remove('open'));
+        closeAllHistoryHeaderDropdowns();
       }, true);
       window._historyScrollListenerAdded = true;
     }
@@ -152,9 +440,6 @@ function applyHistoryFilter() {
   const searchInput = document.getElementById('search-history-input');
   const query = searchInput ? searchInput.value.trim() : '';
 
-  const estadoFilter = document.getElementById('filter-history-estado')?.value || 'ALL';
-  const cobroFilter = document.getElementById('filter-history-cobro')?.value || 'ALL';
-
   const cleanString = (str) => {
     if (!str) return '';
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -169,26 +454,44 @@ function applyHistoryFilter() {
       if (!name.includes(cleanQuery) && !cups.includes(cleanQuery)) return false;
     }
 
-    if (estadoFilter !== 'ALL') {
-      if ((c.estado || 'Pendiente de aceptación') !== estadoFilter) return false;
+    if (currentHistoryEstadoFilter !== 'ALL') {
+      if ((c.estado || 'Pendiente de aceptación') !== currentHistoryEstadoFilter) return false;
     }
 
-    if (cobroFilter !== 'ALL') {
+    if (currentHistoryContractFilter !== 'ALL') {
+      if ((c.estado_contrato || 'Pendiente') !== currentHistoryContractFilter) return false;
+    }
+
+    if (currentHistoryCobroFilter !== 'ALL') {
       const estadoCobro = c.estado_cobro || 'Pendiente';
-      if (cobroFilter === 'COBRADO' && estadoCobro !== 'Cobrado') return false;
-      if (cobroFilter === 'PENDIENTE' && estadoCobro === 'Cobrado') return false;
+      if (currentHistoryCobroFilter === 'COBRADO' && estadoCobro !== 'Cobrado') return false;
+      if (currentHistoryCobroFilter === 'PENDIENTE' && estadoCobro === 'Cobrado') return false;
     }
 
     return true;
   });
 
+  // Aplicar ordenación activa
+  if (currentHistorySavingsSort === 'desc') {
+    filtered.sort((a, b) => ((b.ahorro_luz_anual || 0) + (b.ahorro_gas_anual || 0)) - ((a.ahorro_luz_anual || 0) + (a.ahorro_gas_anual || 0)));
+  } else if (currentHistorySavingsSort === 'asc') {
+    filtered.sort((a, b) => ((a.ahorro_luz_anual || 0) + (a.ahorro_gas_anual || 0)) - ((b.ahorro_luz_anual || 0) + (b.ahorro_gas_anual || 0)));
+  } else {
+    if (currentHistoryDateSort === 'asc') {
+      filtered.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+    } else {
+      filtered.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+    }
+  }
+
   tbody.innerHTML = '';
 
   if (filtered.length === 0) {
+    const hasActiveFilters = query || currentHistoryEstadoFilter !== 'ALL' || currentHistoryContractFilter !== 'ALL' || currentHistoryCobroFilter !== 'ALL';
     tbody.innerHTML = `
       <tr>
-        <td colspan="9" class="text-muted" style="text-align: center; padding: 32px 16px;">
-          ${(query || estadoFilter !== 'ALL' || cobroFilter !== 'ALL') ? 'No se encontraron comparativas con los filtros aplicados.' : 'No se han registrado comparativas aún.'}
+        <td colspan="10" class="text-muted" style="text-align: center; padding: 32px 16px;">
+          ${hasActiveFilters ? 'No se encontraron comparativas con los filtros aplicados.' : 'No se han registrado comparativas aún.'}
         </td>
       </tr>
     `;
@@ -250,27 +553,50 @@ function applyHistoryFilter() {
     }
 
     const currentContract = c.estado_contrato || 'Pendiente';
+    const isContractSignedAndActive = (currentContract === 'Firmado y Activado');
     let contractClass = 'contrato-pendiente';
     if (currentContract === 'En trámite') contractClass = 'contrato-tramite';
     else if (currentContract === 'Firmado y Activado') contractClass = 'contrato-firmado';
     else if (currentContract === 'Rechazado por Scoring') contractClass = 'contrato-scoring';
 
-    const contractCellHtml = `
-      <td>
-        <div class="m3-custom-contract-select" data-id="${c.id}">
-          <div class="status-select-trigger ${contractClass}" style="cursor: pointer;">
+    let contractCellHtml = '';
+    if (!isAceptada) {
+      // 1. Si la comparativa no está aceptada, el contrato no debe ser clicable
+      contractCellHtml = `
+        <td>
+          <div class="status-select-trigger ${contractClass}" style="cursor: not-allowed; opacity: 0.65;" title="El contrato solo es editable cuando la comparativa está aceptada.">
             <span>${escapeHtml(currentContract)}</span>
-            <svg class="status-select-arrow" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
           </div>
-          <div class="status-select-options">
-            <div class="status-select-option contrato-pendiente" data-value="Pendiente">Pendiente</div>
-            <div class="status-select-option contrato-tramite" data-value="En trámite">En trámite</div>
-            <div class="status-select-option contrato-firmado" data-value="Firmado y Activado">✅ Firmado y Activado</div>
-            <div class="status-select-option contrato-scoring" data-value="Rechazado por Scoring">🚫 Rechazado por Scoring</div>
+        </td>
+      `;
+    } else if (isContractSignedAndActive) {
+      // 2. Si el contrato ya está firmado y activado, no se permite cambiar a otro estado
+      contractCellHtml = `
+        <td>
+          <div class="status-select-trigger ${contractClass}" style="cursor: default;" title="Contrato firmado y activado (bloqueado)">
+            <span>✅ Firmado y Activado</span>
           </div>
-        </div>
-      </td>
-    `;
+        </td>
+      `;
+    } else {
+      // 3. Comparativa aceptada y contrato pendiente / en trámite / scoring: editable
+      contractCellHtml = `
+        <td>
+          <div class="m3-custom-contract-select" data-id="${c.id}">
+            <div class="status-select-trigger ${contractClass}" style="cursor: pointer;">
+              <span>${escapeHtml(currentContract)}</span>
+              <svg class="status-select-arrow" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+            </div>
+            <div class="status-select-options">
+              <div class="status-select-option contrato-pendiente" data-value="Pendiente">Pendiente</div>
+              <div class="status-select-option contrato-tramite" data-value="En trámite">En trámite</div>
+              <div class="status-select-option contrato-firmado" data-value="Firmado y Activado">✅ Firmado y Activado</div>
+              <div class="status-select-option contrato-scoring" data-value="Rechazado por Scoring">🚫 Rechazado por Scoring</div>
+            </div>
+          </div>
+        </td>
+      `;
+    }
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -396,6 +722,22 @@ function applyHistoryFilter() {
     const triggerText = trigger.querySelector('span');
     const options = customSelect.querySelectorAll('.status-select-option');
 
+    // Programar bloqueo automático a 1 minuto si está en ventana de gracia tras ser Aceptada o Rechazada
+    if ((currentEstado === 'Aceptada' || currentEstado === 'Rechazada') && !isLocked && c.estado_cambiado_en) {
+      const cambiadoEnMs = new Date(c.estado_cambiado_en).getTime();
+      const diffMs = Date.now() - cambiadoEnMs;
+      const remainingMs = Math.max(0, 60 * 1000 - diffMs);
+      const timer = setTimeout(() => {
+        customSelect.classList.add('disabled');
+        customSelect.setAttribute('title', 'El estado ya no se puede modificar al haber transcurrido el tiempo límite de cambio.');
+        trigger.style.cursor = 'not-allowed';
+        trigger.style.opacity = '0.75';
+        showToast(`El estado de la comparativa de ${c.cliente_nombre} ha quedado fijado de forma definitiva.`, "info");
+      }, remainingMs);
+      customSelect._lockTimer = timer;
+      activeLockTimers.push(timer);
+    }
+
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();
       if (customSelect.classList.contains('disabled')) return;
@@ -414,63 +756,32 @@ function applyHistoryFilter() {
       option.addEventListener('click', async (e) => {
         e.stopPropagation();
         const nuevoEstado = option.getAttribute('data-value');
+        if (nuevoEstado === c.estado) {
+          customSelect.classList.remove('open');
+          return;
+        }
         
         try {
           await updateComparativaEstado(c.id, nuevoEstado);
           
-          // Actualizar el texto del trigger
-          triggerText.textContent = nuevoEstado;
-          
-          // Actualizar la clase de color del trigger y habilitar/deshabilitar el borrado
-          trigger.className = 'status-select-trigger';
-          const deleteBtn = tr.querySelector('.btn-delete-history');
-          
-          if (nuevoEstado === 'Aceptada') {
-            trigger.classList.add('estado-aceptada');
-            deleteBtn.removeAttribute('disabled');
-            deleteBtn.style.opacity = '0.5';
-            deleteBtn.style.cursor = '';
-            deleteBtn.setAttribute('title', 'Ver restricción legal de eliminación');
+          const nowIso = new Date().toISOString();
+          c.estado = nuevoEstado;
+          c.estado_cambiado_en = (nuevoEstado === 'Pendiente de aceptación') ? null : nowIso;
 
-            // Abrir pop-up para programar renovación en el calendario
-            promptRenewalFromHistory(c);
-          } else {
-            deleteBtn.removeAttribute('disabled');
-            deleteBtn.style.opacity = '';
-            deleteBtn.style.cursor = '';
-            deleteBtn.setAttribute('title', 'Eliminar del historial');
-            
-            if (nuevoEstado === 'Rechazada') {
-              trigger.classList.add('estado-rechazada');
-            } else {
-              trigger.classList.add('estado-pendiente');
-            }
-          }
-          
-          // Iniciar un temporizador de 1 minuto para bloquear el selector en la UI
-          if (customSelect._lockTimer) clearTimeout(customSelect._lockTimer);
-          
-          if (nuevoEstado === 'Aceptada' || nuevoEstado === 'Rechazada') {
-            const timer = setTimeout(() => {
-              customSelect.classList.add('disabled');
-              customSelect.setAttribute('title', 'El estado ya no se puede modificar al haber transcurrido el tiempo límite de cambio.');
-              trigger.style.cursor = 'not-allowed';
-              trigger.style.opacity = '0.75';
-              showToast(`El estado de la comparativa de ${c.cliente_nombre} ha quedado fijado de forma definitiva.`, "info");
-            }, 60000); // 60 segundos
-            customSelect._lockTimer = timer;
-            activeLockTimers.push(timer);
-          } else {
-            customSelect._lockTimer = null;
+          const found = cachedHistory.find(item => item.id === c.id);
+          if (found) {
+            found.estado = nuevoEstado;
+            found.estado_cambiado_en = c.estado_cambiado_en;
           }
           
           customSelect.classList.remove('open');
           showToast("Estado de la comparativa actualizado correctamente.", "success");
           
+          await loadHistoryTable();
+          
           // Recargar tabla de clientes si es necesario para refrescar su Tipo Cliente
           const clientsSection = document.getElementById('section-clients');
           if (clientsSection && clientsSection.classList.contains('active')) {
-            // Si la sección de clientes está visible/activa, refrescar la tabla de clientes
             const { loadClientsTable } = await import('./clients.js');
             await loadClientsTable();
           }
@@ -503,15 +814,39 @@ function applyHistoryFilter() {
 
           if (targetValue === 'Rechazado por Scoring') {
             openScoringRejectionDialog(c);
+          } else if (targetValue === 'Firmado y Activado') {
+            await updateComparativaContrato(c.id, 'Firmado y Activado', '');
+            c.estado_contrato = 'Firmado y Activado';
+            const foundInCache = cachedHistory.find(item => item.id === c.id);
+            if (foundInCache) foundInCache.estado_contrato = 'Firmado y Activado';
+
+            await loadHistoryTable();
+
+            openNewRenewalDialogFromHistory(c, {
+              onSaved: async () => {
+                c.estado_contrato = 'Firmado y Activado';
+                const found = cachedHistory.find(item => item.id === c.id);
+                if (found) found.estado_contrato = 'Firmado y Activado';
+                showToast("Contrato firmado y activado. Renovación registrada.", "success");
+                await loadHistoryTable();
+              },
+              onCancelled: async () => {
+                await updateComparativaContrato(c.id, 'En trámite', '');
+                c.estado_contrato = 'En trámite';
+                const found = cachedHistory.find(item => item.id === c.id);
+                if (found) found.estado_contrato = 'En trámite';
+                showToast("Renovación no guardada: el contrato ha vuelto a 'En trámite'.", "info");
+                await loadHistoryTable();
+              }
+            });
           } else {
             await updateComparativaContrato(c.id, targetValue, '');
+            c.estado_contrato = targetValue;
+            const foundInCache = cachedHistory.find(item => item.id === c.id);
+            if (foundInCache) foundInCache.estado_contrato = targetValue;
+
             showToast(`Estado de contrato actualizado a: ${targetValue}`, "success");
-            
-            if (targetValue === 'Firmado y Activado') {
-              openNewRenewalDialogFromHistory(c);
-            } else {
-              await loadHistoryTable();
-            }
+            await loadHistoryTable();
           }
         });
       });
@@ -550,6 +885,13 @@ function openScoringRejectionDialog(c) {
       e.preventDefault();
       const reason = reasonEl ? reasonEl.value.trim() : '';
       await updateComparativaContrato(c.id, 'Rechazado por Scoring', reason);
+      c.estado_contrato = 'Rechazado por Scoring';
+      c.motivo_rechazo_scoring = reason;
+      const foundInCache = cachedHistory.find(item => item.id === c.id);
+      if (foundInCache) {
+        foundInCache.estado_contrato = 'Rechazado por Scoring';
+        foundInCache.motivo_rechazo_scoring = reason;
+      }
       closeDialog();
       showToast("Contrato marcado como Rechazado por Scoring.", "info");
       await loadHistoryTable();
@@ -561,6 +903,13 @@ function openScoringRejectionDialog(c) {
       e.preventDefault();
       const reason = reasonEl ? reasonEl.value.trim() : '';
       await updateComparativaContrato(c.id, 'Rechazado por Scoring', reason);
+      c.estado_contrato = 'Rechazado por Scoring';
+      c.motivo_rechazo_scoring = reason;
+      const foundInCache = cachedHistory.find(item => item.id === c.id);
+      if (foundInCache) {
+        foundInCache.estado_contrato = 'Rechazado por Scoring';
+        foundInCache.motivo_rechazo_scoring = reason;
+      }
       closeDialog();
       await relaunchComparisonForScoring(c);
     };
