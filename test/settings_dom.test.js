@@ -120,6 +120,14 @@ describe('Integridad del DOM y Prototipos', () => {
     assert.ok(css.includes('overflow: visible;'), 'Debe aplicar overflow: visible en el contenedor al estar abierto un desplegable');
     assert.ok(!css.includes('overflow: visible !important'), 'No debe usar !important en el selector de overflow');
   });
+
+  test('la columna Clientes Asignados en Agentes es interactiva para ordenación', () => {
+    const html = fs.readFileSync(path.resolve('src/index.html'), 'utf8');
+
+    assert.ok(html.includes('id="th-agent-clients-count"'), 'Debe existir la cabecera th-agent-clients-count');
+    assert.ok(html.includes('id="th-agent-clients-arrow"'), 'Debe existir el indicador de ordenación th-agent-clients-arrow');
+  });
 });
+
 
 

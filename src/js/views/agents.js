@@ -13,11 +13,13 @@ import { showToast, showConfirm } from '../ui.js';
 
 let cachedAgents = [];
 let agentToDeleteId = null;
+let currentSortClients = null; // 'desc' | 'asc' | null
 
 export async function initAgentsView() {
   setupDialogs();
   setupFormSubmit();
   setupReassignForm();
+  setupClientsSort();
 
   const searchInput = document.getElementById('search-agents-input');
   if (searchInput && !searchInput.dataset.listenerAdded) {
@@ -165,6 +167,12 @@ function renderAgentsTable() {
     return name.includes(query) || phone.includes(query) || email.includes(query);
   });
 
+  if (currentSortClients === 'desc') {
+    filtered.sort((a, b) => (b.num_clientes || 0) - (a.num_clientes || 0));
+  } else if (currentSortClients === 'asc') {
+    filtered.sort((a, b) => (a.num_clientes || 0) - (b.num_clientes || 0));
+  }
+
   tbody.innerHTML = '';
 
   if (filtered.length === 0) {
@@ -182,10 +190,10 @@ function renderAgentsTable() {
     const tr = document.createElement('tr');
 
     const statusChip = agent.activo === 1
-      ? `<span class="m3-chip" style="font-size:11px; height:24px; padding:0 8px; background-color: #bbf7d0 !important; color: #166534 !important; border: 1px solid #4ade80 !important; font-weight: 600;">Activo</span>`
-      : `<span class="m3-chip" style="font-size:11px; height:24px; padding:0 8px; background-color: #f1f5f9 !important; color: #64748b !important; border: 1px solid #cbd5e1 !important; font-weight: 600;">Inactivo</span>`;
+      ? `<span class="m3-chip" style="font-size:11px; height:24px; padding:0 8px; background-color: #bbf7d0; color: #166534; border: 1px solid #4ade80; font-weight: 600;">Activo</span>`
+      : `<span class="m3-chip" style="font-size:11px; height:24px; padding:0 8px; background-color: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; font-weight: 600;">Inactivo</span>`;
 
-    const clientCountBadge = `<span class="m3-chip" style="font-size:11px; height:24px; padding:0 8px; background-color: var(--color-primary-container) !important; color: var(--color-on-primary-container) !important; font-weight: 700;">${agent.num_clientes || 0}</span>`;
+    const clientCountBadge = `<span class="m3-chip" style="font-size:11px; height:24px; padding:0 8px; background-color: var(--color-primary-container); color: var(--color-on-primary-container); font-weight: 700;">${agent.num_clientes || 0}</span>`;
 
     tr.innerHTML = `
       <td><strong>${escapeHtml(agent.nombre)}</strong></td>
@@ -382,6 +390,45 @@ export async function ensureInitialAgentFlow() {
     });
 
     form.dataset.listenerAdded = 'true';
+  }
+}
+
+function setupClientsSort() {
+  const th = document.getElementById('th-agent-clients-count');
+  if (!th || th.dataset.sortInitialized) return;
+  th.dataset.sortInitialized = 'true';
+
+  th.addEventListener('click', () => {
+    if (!currentSortClients) {
+      currentSortClients = 'desc';
+    } else if (currentSortClients === 'desc') {
+      currentSortClients = 'asc';
+    } else {
+      currentSortClients = 'desc';
+    }
+    updateClientsSortIndicator();
+    renderAgentsTable();
+  });
+}
+
+function updateClientsSortIndicator() {
+  const arrow = document.getElementById('th-agent-clients-arrow');
+  if (!arrow) return;
+  if (currentSortClients === 'desc') {
+    arrow.textContent = '↓';
+    arrow.title = 'Orden actual: Mayor a menor';
+    arrow.style.color = 'var(--color-primary)';
+    arrow.style.fontWeight = 'bold';
+  } else if (currentSortClients === 'asc') {
+    arrow.textContent = '↑';
+    arrow.title = 'Orden actual: Menor a mayor';
+    arrow.style.color = 'var(--color-primary)';
+    arrow.style.fontWeight = 'bold';
+  } else {
+    arrow.textContent = '↕';
+    arrow.title = 'Haga clic para ordenar';
+    arrow.style.color = 'var(--color-on-surface-variant)';
+    arrow.style.fontWeight = 'normal';
   }
 }
 

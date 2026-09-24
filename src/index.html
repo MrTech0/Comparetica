@@ -452,7 +452,12 @@
                       <th>Nombre del Agente</th>
                       <th>Teléfono</th>
                       <th>Email</th>
-                      <th>Clientes Asignados</th>
+                      <th id="th-agent-clients-count" style="cursor: pointer; user-select: none;" title="Ordenar por clientes asignados">
+                        <div style="display: inline-flex; align-items: center; gap: 6px;">
+                          <span>Clientes Asignados</span>
+                          <span id="th-agent-clients-arrow" style="display: inline-flex; font-size: 13px; color: var(--color-on-surface-variant); transition: transform 0.2s;">↕</span>
+                        </div>
+                      </th>
                       <th>Estado</th>
                       <th style="text-align: right;">Acciones</th>
                     </tr>
