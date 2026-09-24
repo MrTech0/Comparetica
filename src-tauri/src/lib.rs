@@ -166,14 +166,18 @@ fn import_backup(app_handle: tauri::AppHandle, state: tauri::State<'_, db::Share
                         db_state.mdk = None;
                     }
 
+                    #[cfg(dev)]
+                    {
+                        return Ok("DEV_MODE".to_string());
+                    }
                     #[cfg(not(dev))]
                     {
                         std::thread::spawn(move || {
-                            std::thread::sleep(std::time::Duration::from_millis(500));
-                            app_handle.restart();
+                            std::thread::sleep(std::time::Duration::from_millis(1500));
+                            let _ = relaunch_application(&app_handle);
                         });
+                        return Ok("Copia de seguridad cifrada restaurada con éxito. Reiniciando la aplicación...".to_string());
                     }
-                    return Ok("Copia de seguridad cifrada restaurada con éxito. Reiniciando la aplicación...".to_string());
                 }
             }
         }
@@ -768,16 +772,61 @@ fn factory_reset(app_handle: tauri::AppHandle, state: tauri::State<'_, db::Share
     #[cfg(not(dev))]
     {
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(500));
-            app_handle.restart();
+            std::thread::sleep(std::time::Duration::from_millis(1500));
+            let _ = relaunch_application(&app_handle);
         });
         Ok("Aplicación restablecida con éxito. Reiniciando la aplicación...".to_string())
     }
 }
 
+#[cfg(not(dev))]
+static RELAUNCHING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn relaunch_application(app_handle: &tauri::AppHandle) -> Result<(), String> {
+    #[cfg(dev)]
+    {
+        let _ = app_handle;
+        Ok(())
+    }
+    #[cfg(not(dev))]
+    {
+        use std::sync::atomic::Ordering;
+        if RELAUNCHING.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+            return Ok(());
+        }
+
+        let current_exe = std::env::current_exe().map_err(|e| format!("No se pudo obtener el ejecutable actual: {}", e))?;
+        let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const DETACHED_PROCESS: u32 = 0x00000008;
+            const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+
+            std::process::Command::new(&current_exe)
+                .args(&args)
+                .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+                .spawn()
+                .map_err(|e| format!("Error al iniciar nueva instancia: {}", e))?;
+        }
+
+        #[cfg(not(windows))]
+        {
+            std::process::Command::new(&current_exe)
+                .args(&args)
+                .spawn()
+                .map_err(|e| format!("Error al iniciar nueva instancia: {}", e))?;
+        }
+
+        app_handle.cleanup_before_exit();
+        std::process::exit(0);
+    }
+}
+
 #[tauri::command]
-fn restart_app(app_handle: tauri::AppHandle) {
-    app_handle.restart();
+fn restart_app(app_handle: tauri::AppHandle) -> Result<(), String> {
+    relaunch_application(&app_handle)
 }
 
 #[tauri::command]

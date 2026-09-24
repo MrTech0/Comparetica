@@ -164,6 +164,11 @@ export function initBackupView() {
           }, 1500);
         } else {
           showToast(msg, "success");
+          setTimeout(async () => {
+            if (typeof window !== 'undefined' && window.__TAURI__) {
+              await invoke('restart_app');
+            }
+          }, 1500);
         }
       } catch (error) {
         if (error !== "Cancelado por el usuario") {
