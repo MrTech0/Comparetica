@@ -36,12 +36,32 @@
 
 ## 🛠️ Requisitos e Instalación
 
-### Requisitos del Sistema
+### Configuración Automática en Windows (Recomendado)
+Si estás preparando un equipo nuevo o formateado con Windows 10/11, puedes instalar y configurar automáticamente todas las herramientas necesarias ejecutando el script desatendido incluido en el repositorio desde una consola de PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
+```
+
+Este script se encarga de:
+1. Comprobar y solicitar permisos de Administrador automáticamente si es necesario (conservando la ruta de trabajo actual).
+2. Instalar o verificar **Git**, **Node.js LTS**, **pnpm** y **Microsoft Edge WebView2 Runtime** mediante `winget`.
+3. Detectar e instalar **Visual Studio Build Tools con C++ (MSVC)** si aún no están presentes en el sistema.
+4. Instalar y configurar **Rustup** con la toolchain `stable-x86_64-pc-windows-msvc` de forma desatendida.
+5. Refrescar el `PATH` de la sesión e inicializar las dependencias del proyecto (`pnpm install`) y hooks locales de Git (`.githooks`).
+
+---
+
+### Configuración Manual
+Si prefieres configurar tu entorno manualmente o trabajas en otro sistema operativo:
+
+#### Requisitos del Sistema
 Para compilar y ejecutar el proyecto desde el código fuente, necesitas:
 - **Node.js** (versiones LTS actualmente soportadas) y **pnpm** (versión 11 o superior).
 - **Rust** (entorno de compilación cargo) y herramientas de compilación de C++ (requerido por Tauri).
+- **Microsoft Edge WebView2 Runtime** (en Windows).
 
-### Instalación de Dependencias
+#### Instalación de Dependencias
 Ejecuta el siguiente comando en la raíz del proyecto para descargar las librerías necesarias:
 ```bash
 pnpm install
@@ -131,7 +151,12 @@ La aplicación sigue una arquitectura desacoplada, reactiva y modular, dividida 
 ├── test/                              # Suite de pruebas automatizadas (Node.js test runner)
 │   ├── calculator.test.js             # Verificación del motor de facturación (luz, gas, autoconsumo, bono)
 │   ├── ipc_and_ui.test.js             # Verificación de capa IPC, bus de eventos y notificaciones UI
-│   └── settings_dom.test.js           # Verificación de integridad del DOM y selectores personalizados
+│   ├── settings_dom.test.js           # Verificación de integridad del DOM y selectores personalizados
+│   └── wizard_steps.test.js           # Verificación del asistente inicial de configuración en 3 pasos
+│
+├── scripts/                           # Scripts de soporte, automatización y compilación
+│   ├── build.js                       # Empaquetado y distribución del instalador MSI
+│   └── setup-windows.ps1              # Preparación automatizada del entorno en Windows
 │
 └── docs/                              # Especificaciones de diseño, arquitectura y planes de ejecución
 ```
