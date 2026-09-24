@@ -19,6 +19,7 @@ let currentClientTotalPages = 1;
 let currentClientTotalCount = 0;
 let currentLoadedClients = [];
 let currentStatusFilter = ''; // '' | 'activo' | 'inactivo' | 'bloqueado'
+let currentAgentFilter = null; // null | agentId string
 let pendingLopdClient = null;
 
 export async function initClientsView() {
@@ -26,6 +27,7 @@ export async function initClientsView() {
   setupDialogs();
   setupFormSubmit();
   setupStatusFilterDropdown();
+  setupAgentFilterDropdown();
   setupLopdBlockDialog();
 
   const searchInput = document.getElementById('search-clients-input');
@@ -43,7 +45,7 @@ export async function initClientsView() {
     console.warn("No se pudo ejecutar la sincronización automática de inactividad:", eSync);
   }
 
-  await populateAgentFilter();
+  await populateAgentFilterDropdown();
   await loadClientsTable(1);
 }
 
@@ -127,29 +129,68 @@ function getCupsRowsData() {
   return result;
 }
 
-async function populateAgentFilter() {
-  const filterSelect = document.getElementById('filter-client-agent');
-  if (!filterSelect) return;
+async function populateAgentFilterDropdown() {
+  const dropdown = document.getElementById('dropdown-client-agent-filter');
+  const label = document.getElementById('th-client-agent-label');
+  if (!dropdown) return;
 
-  const currentVal = filterSelect.value;
   const agents = await getAgentes(false);
-  filterSelect.innerHTML = '<option value="">Todos los Agentes</option>';
+  dropdown.innerHTML = '';
+
+  // Opción por defecto: Todos los Agentes
+  const allItem = document.createElement('div');
+  allItem.className = 'agent-filter-item' + (currentAgentFilter === null ? ' active' : '');
+  allItem.setAttribute('data-id', '');
+  allItem.style.cssText = 'padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px;';
+  allItem.innerHTML = `
+    <span>● Todos los Agentes</span>
+    <span class="agent-filter-check" style="font-weight: bold; color: var(--color-primary); display: ${currentAgentFilter === null ? 'inline' : 'none'};">✓</span>
+  `;
+  dropdown.appendChild(allItem);
 
   agents.forEach(a => {
-    const opt = document.createElement('option');
-    opt.value = a.id;
-    opt.textContent = a.nombre + (a.activo === 0 ? ' (Inactivo)' : '');
-    filterSelect.appendChild(opt);
+    const item = document.createElement('div');
+    const isSelected = currentAgentFilter === String(a.id);
+    item.className = 'agent-filter-item' + (isSelected ? ' active' : '');
+    item.setAttribute('data-id', a.id);
+    item.setAttribute('data-name', a.nombre);
+    item.style.cssText = 'padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px;';
+    item.innerHTML = `
+      <span>● ${escapeHtml(a.nombre)}${a.activo === 0 ? ' <small class="text-muted">(Inactivo)</small>' : ''}</span>
+      <span class="agent-filter-check" style="font-weight: bold; color: var(--color-primary); display: ${isSelected ? 'inline' : 'none'};">✓</span>
+    `;
+    dropdown.appendChild(item);
   });
 
-  if (currentVal) filterSelect.value = currentVal;
+  dropdown.querySelectorAll('.agent-filter-item').forEach(item => {
+    item.addEventListener('mouseenter', () => { item.style.backgroundColor = 'var(--color-surface-variant)'; });
+    item.addEventListener('mouseleave', () => { item.style.backgroundColor = 'transparent'; });
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const agentId = item.getAttribute('data-id') || null;
+      const agentName = item.getAttribute('data-name') || '';
+      currentAgentFilter = agentId ? String(agentId) : null;
 
-  if (!filterSelect.dataset.listenerAdded) {
-    filterSelect.addEventListener('change', () => {
+      dropdown.querySelectorAll('.agent-filter-item').forEach(el => {
+        const check = el.querySelector('.agent-filter-check');
+        if (check) check.style.display = el === item ? 'inline' : 'none';
+      });
+
+      if (label) {
+        label.textContent = currentAgentFilter ? `Agente: ${agentName}` : 'Agente Comercial';
+      }
+
+      dropdown.style.display = 'none';
+      const th = document.getElementById('th-client-agent');
+      if (th) th.classList.remove('open');
+      const arrow = document.getElementById('th-client-agent-arrow');
+      if (arrow) arrow.style.transform = 'rotate(0deg)';
+      const tableContainer = document.querySelector('#section-clients .table-container');
+      if (tableContainer) tableContainer.classList.remove('has-open-dropdown');
+
       loadClientsTable(1);
     });
-    filterSelect.dataset.listenerAdded = 'true';
-  }
+  });
 }
 
 async function populateClientDialogAgentSelector(selectedAgentId = null) {
@@ -303,8 +344,7 @@ export async function loadClientsTable(page = 1) {
     currentClientPage = Math.max(1, page);
     const searchInput = document.getElementById('search-clients-input');
     const query = searchInput ? searchInput.value.trim() : '';
-    const agentFilterSelect = document.getElementById('filter-client-agent');
-    const agentIdFilter = agentFilterSelect && agentFilterSelect.value ? parseInt(agentFilterSelect.value, 10) : null;
+    const agentIdFilter = currentAgentFilter ? parseInt(currentAgentFilter, 10) : null;
 
     const res = await getClientesPaginated(currentClientPage, CLIENT_PAGE_SIZE, query, agentIdFilter, currentStatusFilter || null);
     currentLoadedClients = res.clients;
@@ -683,11 +723,31 @@ function setupLopdBlockDialog() {
   });
 }
 
+function closeAllClientsHeaderDropdowns() {
+  const tableContainer = document.querySelector('#section-clients .table-container');
+  if (tableContainer) tableContainer.classList.remove('has-open-dropdown');
+
+  const statusDropdown = document.getElementById('dropdown-client-status-filter');
+  const statusTh = document.getElementById('th-client-status');
+  const statusArrow = document.getElementById('th-client-status-arrow');
+  if (statusDropdown) statusDropdown.style.display = 'none';
+  if (statusTh) statusTh.classList.remove('open');
+  if (statusArrow) statusArrow.style.transform = 'rotate(0deg)';
+
+  const agentDropdown = document.getElementById('dropdown-client-agent-filter');
+  const agentTh = document.getElementById('th-client-agent');
+  const agentArrow = document.getElementById('th-client-agent-arrow');
+  if (agentDropdown) agentDropdown.style.display = 'none';
+  if (agentTh) agentTh.classList.remove('open');
+  if (agentArrow) agentArrow.style.transform = 'rotate(0deg)';
+}
+
 function setupStatusFilterDropdown() {
   const th = document.getElementById('th-client-status');
   const dropdown = document.getElementById('dropdown-client-status-filter');
   const arrow = document.getElementById('th-client-status-arrow');
   const label = document.getElementById('th-client-status-label');
+  const tableContainer = document.querySelector('#section-clients .table-container');
 
   if (!th || !dropdown) return;
   if (th.dataset.filterInitialized) return;
@@ -696,9 +756,13 @@ function setupStatusFilterDropdown() {
   th.addEventListener('click', (e) => {
     if (e.target.closest('#dropdown-client-status-filter')) return;
     const isVisible = dropdown.style.display === 'block';
-    dropdown.style.display = isVisible ? 'none' : 'block';
-    if (arrow) {
-      arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+    closeAllClientsHeaderDropdowns();
+
+    if (!isVisible) {
+      dropdown.style.display = 'block';
+      th.classList.add('open');
+      if (tableContainer) tableContainer.classList.add('has-open-dropdown');
+      if (arrow) arrow.style.transform = 'rotate(180deg)';
     }
   });
 
@@ -728,9 +792,7 @@ function setupStatusFilterDropdown() {
         else if (status === 'bloqueado') label.textContent = 'Estado: Bloqueados';
       }
 
-      dropdown.style.display = 'none';
-      if (arrow) arrow.style.transform = 'rotate(0deg)';
-
+      closeAllClientsHeaderDropdowns();
       loadClientsTable(1);
     });
   });
@@ -738,7 +800,46 @@ function setupStatusFilterDropdown() {
   document.addEventListener('click', (e) => {
     if (!th.contains(e.target)) {
       dropdown.style.display = 'none';
+      th.classList.remove('open');
       if (arrow) arrow.style.transform = 'rotate(0deg)';
+      if (tableContainer && !tableContainer.querySelector('th.open')) {
+        tableContainer.classList.remove('has-open-dropdown');
+      }
+    }
+  });
+}
+
+function setupAgentFilterDropdown() {
+  const th = document.getElementById('th-client-agent');
+  const dropdown = document.getElementById('dropdown-client-agent-filter');
+  const arrow = document.getElementById('th-client-agent-arrow');
+  const tableContainer = document.querySelector('#section-clients .table-container');
+
+  if (!th || !dropdown) return;
+  if (th.dataset.filterInitialized) return;
+  th.dataset.filterInitialized = 'true';
+
+  th.addEventListener('click', (e) => {
+    if (e.target.closest('#dropdown-client-agent-filter')) return;
+    const isVisible = dropdown.style.display === 'block';
+    closeAllClientsHeaderDropdowns();
+
+    if (!isVisible) {
+      dropdown.style.display = 'block';
+      th.classList.add('open');
+      if (tableContainer) tableContainer.classList.add('has-open-dropdown');
+      if (arrow) arrow.style.transform = 'rotate(180deg)';
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!th.contains(e.target)) {
+      dropdown.style.display = 'none';
+      th.classList.remove('open');
+      if (arrow) arrow.style.transform = 'rotate(0deg)';
+      if (tableContainer && !tableContainer.querySelector('th.open')) {
+        tableContainer.classList.remove('has-open-dropdown');
+      }
     }
   });
 }

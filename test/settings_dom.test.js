@@ -102,4 +102,24 @@ describe('Integridad del DOM y Prototipos', () => {
     assert.ok(legalPanelMatch, 'Debe encontrarse el panel legal');
     assert.ok(legalPanelMatch[1].includes('Retención Legal de los Datos'), 'El panel legal debe contener el bloque de retención legal');
   });
+
+  test('el filtro de Agente Comercial está integrado en la columna de la tabla y no en la barra superior', () => {
+    const html = fs.readFileSync(path.resolve('src/index.html'), 'utf8');
+
+    assert.ok(!html.includes('id="filter-client-agent"'), 'No debe existir el selector filter-client-agent en la barra superior');
+    assert.ok(html.includes('id="th-client-agent"'), 'La columna de Agente Comercial debe tener id="th-client-agent"');
+    assert.ok(html.includes('id="dropdown-client-agent-filter"'), 'Debe existir el dropdown dropdown-client-agent-filter dentro de la cabecera');
+    assert.ok(html.includes('id="dropdown-client-status-filter"'), 'Debe existir el dropdown dropdown-client-status-filter en la cabecera de Estado');
+  });
+
+  test('components.css permite que los desplegables de tabla floten sin recortes verticales mediante overflow visible', () => {
+    const css = fs.readFileSync(path.resolve('src/styles/components.css'), 'utf8');
+
+    assert.ok(css.includes('.table-container:has(.open)'), 'Debe incluir regla para .table-container:has(.open)');
+    assert.ok(css.includes('.table-container.has-open-dropdown'), 'Debe incluir clase de respaldo .table-container.has-open-dropdown');
+    assert.ok(css.includes('overflow: visible;'), 'Debe aplicar overflow: visible en el contenedor al estar abierto un desplegable');
+    assert.ok(!css.includes('overflow: visible !important'), 'No debe usar !important en el selector de overflow');
+  });
 });
+
+

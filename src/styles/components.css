@@ -291,6 +291,21 @@
   border-radius: var(--radius-md);
   background-color: var(--color-surface);
   margin-top: 16px;
+  position: relative;
+}
+
+/* Permitir que los menús desplegables de cabeceras floten libremente sin ser recortados */
+.table-container:has(.open),
+.table-container.has-open-dropdown {
+  overflow: visible;
+}
+
+.m3-table th:has(.open),
+.m3-table th.open,
+.m3-table td:has(.open),
+.m3-table td.open {
+  position: relative;
+  z-index: var(--z-dropdown);
 }
 
 .m3-table {

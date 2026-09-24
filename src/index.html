@@ -342,11 +342,6 @@
                   </svg>
                   <input type="text" id="search-clients-input" class="m3-input" placeholder="Buscar cliente por nombre, CIF/DNI o CUPS..." style="padding-left: 48px;" />
                 </div>
-                <div style="width: 220px;">
-                  <select id="filter-client-agent" class="m3-input m3-select">
-                    <option value="">Todos los Agentes</option>
-                  </select>
-                </div>
               </div>
 
               <div class="table-container">
@@ -355,7 +350,17 @@
                     <tr>
                       <th>Empresa / Particular</th>
                       <th>CIF / DNI</th>
-                      <th>Agente Comercial</th>
+                      <th id="th-client-agent" style="cursor: pointer; position: relative; user-select: none;">
+                        <div style="display: inline-flex; align-items: center; gap: 4px;">
+                          <span id="th-client-agent-label">Agente Comercial</span>
+                          <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: currentColor; transition: transform 0.2s;" id="th-client-agent-arrow">
+                            <path d="M7 10l5 5 5-5z"/>
+                          </svg>
+                        </div>
+                        <div id="dropdown-client-agent-filter" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 190px; max-height: 280px; overflow-y: auto; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,0.18); z-index: var(--z-dropdown); padding: 4px 0; font-weight: normal; text-transform: none;">
+                          <!-- Agentes inyectados dinámicamente -->
+                        </div>
+                      </th>
                       <th>Representante</th>
                       <th>CUPS</th>
                       <th>Email</th>
