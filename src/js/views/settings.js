@@ -323,7 +323,11 @@ function setupCleanup() {
         }, 1500);
       } else if (msg) {
         showToast(msg, "success");
-        // El proceso nativo se reiniciará automáticamente, no necesitamos hacer reload()
+        setTimeout(async () => {
+          if (typeof window !== 'undefined' && window.__TAURI__) {
+            await invoke('restart_app');
+          }
+        }, 1500);
       } else {
         showToast("Aplicación restablecida con éxito. Recargando...", "success");
         setTimeout(() => {
@@ -528,7 +532,21 @@ export async function loadSettings() {
   if (warnInput) warnInput.value = thresholds.warning;
   if (radInput) radInput.value = thresholds.radar;
 
-  return { config, logo: logoDataUri, thresholds };
+  // Llenar inputs de parámetros de inactividad de clientes
+  let inactivityParams = { mesesNuevo: 3, diasVencimiento: 30 };
+  try {
+    inactivityParams = await getClientInactivityParams();
+  } catch (e) {
+    console.error("Error al cargar client_inactivity_params en loadSettings:", e);
+  }
+
+  const newMonthsInput = document.getElementById('settings-client-inactive-new-months');
+  const expiryDaysInput = document.getElementById('settings-client-inactive-expiry-days');
+
+  if (newMonthsInput) newMonthsInput.value = inactivityParams.mesesNuevo ?? 3;
+  if (expiryDaysInput) expiryDaysInput.value = inactivityParams.diasVencimiento ?? 30;
+
+  return { config, logo: logoDataUri, thresholds, inactivityParams };
 }
 
 // Helper para compatibilidad interna
@@ -771,10 +789,14 @@ async function setupClientInactivitySettings() {
 
   try {
     const params = await getClientInactivityParams();
-    if (newMonthsInput) newMonthsInput.value = params.cliente_inactivo_meses_nuevo;
-    if (expiryDaysInput) expiryDaysInput.value = params.cliente_inactivo_dias_vencimiento;
+    const meses = params?.mesesNuevo ?? params?.cliente_inactivo_meses_nuevo ?? 3;
+    const dias = params?.diasVencimiento ?? params?.cliente_inactivo_dias_vencimiento ?? 30;
+    if (newMonthsInput) newMonthsInput.value = meses;
+    if (expiryDaysInput) expiryDaysInput.value = dias;
   } catch (e) {
     console.error("Error al cargar parámetros de inactividad de clientes:", e);
+    if (newMonthsInput && !newMonthsInput.value) newMonthsInput.value = 3;
+    if (expiryDaysInput && !expiryDaysInput.value) expiryDaysInput.value = 30;
   }
 
   if (btnSave && !btnSave.dataset.listenerAdded) {
@@ -792,8 +814,8 @@ async function setupClientInactivitySettings() {
       }
 
       await saveClientInactivityParams({
-        cliente_inactivo_meses_nuevo: mesesNuevo,
-        cliente_inactivo_dias_vencimiento: diasVencimiento
+        mesesNuevo,
+        diasVencimiento
       });
 
       showToast("Parámetros de inactividad de clientes guardados con éxito.", "success");

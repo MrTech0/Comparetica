@@ -1264,33 +1264,57 @@ export async function saveRenewalThresholds(thresholds = {}) {
 
 /**
  * Obtiene los parámetros de inactividad de clientes (meses de cortesía y margen de vencimiento).
- * @returns {Promise<{mesesNuevo: number, diasVencimiento: number}>}
+ * @returns {Promise<{mesesNuevo: number, diasVencimiento: number, cliente_inactivo_meses_nuevo: number, cliente_inactivo_dias_vencimiento: number}>}
  */
 export async function getClientInactivityParams() {
   const params = await getAjuste('client_inactivity_params', null);
-  if (params && typeof params.mesesNuevo === 'number' && typeof params.diasVencimiento === 'number') {
-    return params;
+  if (params) {
+    const meses = typeof params.mesesNuevo === 'number'
+      ? params.mesesNuevo
+      : (typeof params.cliente_inactivo_meses_nuevo === 'number' ? params.cliente_inactivo_meses_nuevo : null);
+    const dias = typeof params.diasVencimiento === 'number'
+      ? params.diasVencimiento
+      : (typeof params.cliente_inactivo_dias_vencimiento === 'number' ? params.cliente_inactivo_dias_vencimiento : null);
+    if (meses !== null && dias !== null) {
+      return {
+        mesesNuevo: meses,
+        diasVencimiento: dias,
+        cliente_inactivo_meses_nuevo: meses,
+        cliente_inactivo_dias_vencimiento: dias
+      };
+    }
   }
   const defaultParams = {
     mesesNuevo: 3,
-    diasVencimiento: 30
+    diasVencimiento: 30,
+    cliente_inactivo_meses_nuevo: 3,
+    cliente_inactivo_dias_vencimiento: 30
   };
-  await setAjuste('client_inactivity_params', defaultParams);
+  await setAjuste('client_inactivity_params', { mesesNuevo: 3, diasVencimiento: 30 });
   return defaultParams;
 }
 
 /**
  * Guarda los parámetros de inactividad de clientes en SQLite.
  * @param {Object} params
- * @param {number} params.mesesNuevo
- * @param {number} params.diasVencimiento
- * @returns {Promise<{mesesNuevo: number, diasVencimiento: number}>}
+ * @param {number} [params.mesesNuevo]
+ * @param {number} [params.diasVencimiento]
+ * @param {number} [params.cliente_inactivo_meses_nuevo]
+ * @param {number} [params.cliente_inactivo_dias_vencimiento]
+ * @returns {Promise<{mesesNuevo: number, diasVencimiento: number, cliente_inactivo_meses_nuevo: number, cliente_inactivo_dias_vencimiento: number}>}
  */
 export async function saveClientInactivityParams(params = {}) {
-  const mesesNuevo = Math.max(1, parseInt(params.mesesNuevo, 10) || 3);
-  const diasVencimiento = Math.max(1, parseInt(params.diasVencimiento, 10) || 30);
-  const cleanParams = { mesesNuevo, diasVencimiento };
-  await setAjuste('client_inactivity_params', cleanParams);
+  const rawMeses = params.mesesNuevo ?? params.cliente_inactivo_meses_nuevo;
+  const rawDias = params.diasVencimiento ?? params.cliente_inactivo_dias_vencimiento;
+  const mesesNuevo = Math.max(1, parseInt(rawMeses, 10) || 3);
+  const diasVencimiento = Math.max(1, parseInt(rawDias, 10) || 30);
+  const cleanParams = {
+    mesesNuevo,
+    diasVencimiento,
+    cliente_inactivo_meses_nuevo: mesesNuevo,
+    cliente_inactivo_dias_vencimiento: diasVencimiento
+  };
+  await setAjuste('client_inactivity_params', { mesesNuevo, diasVencimiento });
   return cleanParams;
 }
 

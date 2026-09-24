@@ -1,5 +1,7 @@
 import test, { describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { invoke, listen } from '../src/js/ipc.js';
 import { APP_EVENTS, emitAppEvent, onAppEvent } from '../src/js/events.js';
 import { showToast, showActionToast, showConfirm } from '../src/js/ui.js';
@@ -693,5 +695,97 @@ describe('UI Notifications & Confirmation Module (src/js/ui.js)', () => {
       await p2;
     });
   });
+
+  describe('Tipografía y salto de línea en notificaciones y alertas', () => {
+    test('.m3-toast no divide palabras a la mitad (word-break: normal y overflow-wrap: break-word)', () => {
+      const cssPath = path.resolve('src/styles/components.css');
+      const css = fs.readFileSync(cssPath, 'utf8');
+
+      const toastMatch = css.match(/\.m3-toast\s*\{([^}]+)\}/);
+      assert.ok(toastMatch, 'Debe existir la regla .m3-toast');
+      const toastRules = toastMatch[1];
+
+      assert.ok(!toastRules.includes('word-break: break-all'), '.m3-toast NO debe contener word-break: break-all');
+      assert.ok(toastRules.includes('word-break: normal'), '.m3-toast debe especificar word-break: normal');
+      assert.ok(toastRules.includes('overflow-wrap: break-word'), '.m3-toast debe especificar overflow-wrap: break-word');
+      assert.ok(toastRules.includes('hyphens: none'), '.m3-toast debe especificar hyphens: none');
+      // Verificación de sintaxis válida de 4 argumentos para la función de temporización cubic-bezier
+      assert.ok(toastRules.includes('cubic-bezier(0.2, 0, 0, 1)'), '.m3-toast debe tener una curva bezier válida de 4 argumentos para animarse correctamente');
+    });
+
+    test('#toast-container dispone de ancho responsivo y z-index tipificado mediante tokens', () => {
+      const cssPath = path.resolve('src/styles/components.css');
+      const css = fs.readFileSync(cssPath, 'utf8');
+
+      const containerMatch = css.match(/#toast-container\s*\{([^}]+)\}/);
+      assert.ok(containerMatch, 'Debe existir la regla #toast-container');
+      const containerRules = containerMatch[1];
+
+      assert.ok(containerRules.includes('max-width: min(540px, calc(100vw - 32px))'), '#toast-container debe tener un max-width flexible y amplio');
+      assert.ok(containerRules.includes('z-index: var(--z-toast);'), '#toast-container debe utilizar var(--z-toast)');
+    });
+
+    test('el sistema de capas z-index está normalizado con variables y sin números inflados ni !important', () => {
+      const mainCss = fs.readFileSync(path.resolve('src/styles/main.css'), 'utf8');
+      const compCss = fs.readFileSync(path.resolve('src/styles/components.css'), 'utf8');
+      const html = fs.readFileSync(path.resolve('src/index.html'), 'utf8');
+
+      // 1. Verificar tokens en :root de main.css
+      const tokens = {
+        sticky: parseInt(mainCss.match(/--z-sticky:\s*(\d+)/)?.[1], 10),
+        dropdown: parseInt(mainCss.match(/--z-dropdown:\s*(\d+)/)?.[1], 10),
+        modal: parseInt(mainCss.match(/--z-modal:\s*(\d+)/)?.[1], 10),
+        modalPriority: parseInt(mainCss.match(/--z-modal-priority:\s*(\d+)/)?.[1], 10),
+        auth: parseInt(mainCss.match(/--z-auth:\s*(\d+)/)?.[1], 10),
+        toast: parseInt(mainCss.match(/--z-toast:\s*(\d+)/)?.[1], 10),
+      };
+
+      assert.ok(tokens.toast > tokens.auth, 'Toast debe estar por encima de Auth');
+      assert.ok(tokens.auth > tokens.modalPriority, 'Auth debe estar por encima de Modal Priority');
+      assert.ok(tokens.modalPriority > tokens.modal, 'Modal Priority debe estar por encima de Modal estándar');
+      assert.ok(tokens.modal > tokens.dropdown, 'Modal debe estar por encima de Dropdown');
+      assert.ok(tokens.dropdown > tokens.sticky, 'Dropdown debe estar por encima de Sticky');
+
+      // 2. Ningún z-index debe llevar !important
+      assert.ok(!compCss.match(/z-index:[^;]+!important/i), 'components.css no debe contener !important en z-index');
+      assert.ok(!mainCss.match(/z-index:[^;]+!important/i), 'main.css no debe contener !important en z-index');
+      assert.ok(!html.match(/z-index:[^;"]+!important/i), 'index.html no debe contener !important en z-index');
+
+      // 3. Ningún z-index numérico debe ser superior a 9999
+      const allZIndexNumbers = [
+        ...(compCss.match(/z-index:\s*(\d+)/g) || []),
+        ...(mainCss.match(/z-index:\s*(\d+)/g) || []),
+        ...(html.match(/z-index:\s*(\d+)/g) || [])
+      ].map(str => parseInt(str.replace(/\D/g, ''), 10));
+
+      for (const num of allZIndexNumbers) {
+        assert.ok(num <= 1100, `Ningún z-index numérico debe superar 1100 (encontrado: ${num})`);
+      }
+    });
+
+    test('.m3-toast.warning define color de acento amber/amarillo', () => {
+      const cssPath = path.resolve('src/styles/components.css');
+      const css = fs.readFileSync(cssPath, 'utf8');
+
+      const warningMatch = css.match(/\.m3-toast\.warning\s*\{([^}]+)\}/);
+      assert.ok(warningMatch, 'Debe existir la regla .m3-toast.warning');
+      assert.ok(warningMatch[1].includes('border-left-color: var(--color-warning, #f59e0b)'), 'Debe definir el color de advertencia');
+    });
+
+    test('.auth-alert no divide palabras a la mitad con overflow-wrap agresivo', () => {
+      const cssPath = path.resolve('src/styles/components.css');
+      const css = fs.readFileSync(cssPath, 'utf8');
+
+      const alertMatch = css.match(/\.auth-alert\s*\{([^}]+)\}/);
+      assert.ok(alertMatch, 'Debe existir la regla .auth-alert');
+      const alertRules = alertMatch[1];
+
+      assert.ok(!alertRules.includes('overflow-wrap: anywhere'), '.auth-alert NO debe tener overflow-wrap: anywhere');
+      assert.ok(alertRules.includes('word-break: normal'), '.auth-alert debe especificar word-break: normal');
+      assert.ok(alertRules.includes('overflow-wrap: break-word'), '.auth-alert debe especificar overflow-wrap: break-word');
+      assert.ok(alertRules.includes('hyphens: none'), '.auth-alert debe especificar hyphens: none');
+    });
+  });
 });
+
 

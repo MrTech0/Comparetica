@@ -367,7 +367,7 @@
                             <path d="M7 10l5 5 5-5z"/>
                           </svg>
                         </div>
-                        <div id="dropdown-client-status-filter" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 165px; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,0.18); z-index: 100; padding: 4px 0; font-weight: normal; text-transform: none;">
+                        <div id="dropdown-client-status-filter" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 165px; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,0.18); z-index: var(--z-dropdown); padding: 4px 0; font-weight: normal; text-transform: none;">
                           <div class="status-filter-item active" data-status="" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
                             <span>● Todos</span>
                             <span class="status-filter-check" style="font-weight: bold; color: var(--color-primary);">✓</span>
@@ -1637,22 +1637,22 @@
                   <div class="m3-field" style="margin-bottom: 0;">
                     <label class="m3-label" for="settings-client-inactive-new-months">Plazo para clientes nuevos sin actividad *</label>
                     <div style="display: flex; gap: 8px; align-items: center;">
-                      <input type="number" id="settings-client-inactive-new-months" class="m3-input" min="1" max="24" value="3" style="width: 110px;" />
+                      <input type="number" id="settings-client-inactive-new-months" class="m3-input" min="1" max="24" value="3" placeholder="3" style="width: 110px;" />
                       <span class="text-muted" style="font-size: 13px;">meses</span>
                     </div>
                     <small class="text-muted" style="display: block; font-size: 11.5px; margin-top: 6px; line-height: 1.4;">
-                      Si se da de alta a un cliente nuevo potencial y transcurre este plazo sin contratos ni comparativas, pasará automáticamente a Inactivo.
+                      Si se da de alta a un cliente nuevo potencial y transcurre este plazo sin contratos ni comparativas, pasará automáticamente a Inactivo. <strong>(Por defecto: 3 meses)</strong>.
                     </small>
                   </div>
 
                   <div class="m3-field" style="margin-bottom: 0;">
                     <label class="m3-label" for="settings-client-inactive-expiry-days">Margen tras vencimiento de contratos *</label>
                     <div style="display: flex; gap: 8px; align-items: center;">
-                      <input type="number" id="settings-client-inactive-expiry-days" class="m3-input" min="1" max="180" value="30" style="width: 110px;" />
+                      <input type="number" id="settings-client-inactive-expiry-days" class="m3-input" min="1" max="180" value="30" placeholder="30" style="width: 110px;" />
                       <span class="text-muted" style="font-size: 13px;">días</span>
                     </div>
                     <small class="text-muted" style="display: block; font-size: 11.5px; margin-top: 6px; line-height: 1.4;">
-                      Para clientes con suministros (CUPS): si todos sus contratos vencen y transcurren estos días de gracia sin renovación, pasará automáticamente a Inactivo.
+                      Para clientes con suministros (CUPS): si todos sus contratos vencen y transcurren estos días de gracia sin renovación, pasará automáticamente a Inactivo. <strong>(Por defecto: 30 días)</strong>.
                     </small>
                   </div>
                 </div>
@@ -1660,26 +1660,6 @@
                 <button type="button" id="btn-save-client-inactivity-params" class="m3-btn">
                   <span>Guardar Parámetros de Inactividad</span>
                 </button>
-              </div>
-
-              <div class="m3-card margin-top-md">
-                <h3 style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-outline); margin-bottom: 12px;">Retención legal de los datos</h3>
-                <p class="text-muted" style="margin-bottom: 16px; font-size: 13px; line-height: 1.6;">
-                  De acuerdo con el Reglamento General de Protección de Datos (RGPD), la LOPDGDD y el Código de Comercio de España, la aplicación aplica plazos automáticos y fijos de retención de la información para garantizar el cumplimiento normativo. Los datos de comparativas e historial se depuran conforme a las siguientes reglas:
-                </p>
-                <div style="margin-bottom: 0; font-size: 12.5px; line-height: 1.6; color: var(--color-on-surface-variant); background-color: var(--color-surface-variant); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--color-outline-variant);">
-                  <ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px;">
-                    <li><strong>Comparativas Aceptadas (Aprobadas):</strong> Se conservan obligatoriamente durante <strong>6 años (72 meses)</strong> tras su aceptación. Actúan como justificación mercantil de la transacción comercial y la base de cálculo de las comisiones (según lo exigido por el Art. 30 del Código de Comercio).</li>
-                    <li><strong>Comparativas Pendientes de aceptación:</strong> Se conservan activas durante un período fijo de <strong>12 meses (365 días)</strong> al tratarse de propuestas y estimaciones comerciales precontractuales.</li>
-                    <li><strong>Comparativas Rechazadas (no aceptadas):</strong> Se conservan durante <strong>12 meses (365 días)</strong> tras haber sido descartadas para control comercial y auditoría de ofertas comerciales.</li>
-                    <li><strong>Datos de Clientes:</strong> 
-                      <ul>
-                        <li style="margin-top: 4px;"><strong>Cliente Real:</strong> Es aquel que cuenta con al menos una comparativa en estado <em>Aceptada</em> activa en el sistema. Se conservará durante 6 años.</li>
-                        <li style="margin-top: 4px;"><strong>Cliente Potencial:</strong> Es aquel que no tiene comparativas aceptadas (solo pendientes o rechazadas). Se purgará automáticamente de la base de datos tras 12 meses desde su registro.</li>
-                      </ul>
-                    </li>
-                  </ul>
-                </div>
               </div>
             </div>
 
@@ -1704,6 +1684,26 @@
                   <li><strong>Consulta de Precios del Mercado Diario (PVPC):</strong> Conexión a la API oficial de Red Eléctrica de España (REE) en <code>apidatos.ree.es</code>.</li>
                   <li><strong>Actualizaciones de Software:</strong> Conexión a los servidores de GitHub en <code>raw.githubusercontent.com</code> para verificar si hay nuevas versiones de la aplicación disponibles y descargar sus respectivos instaladores.</li>
                 </ul>
+              </div>
+
+              <div class="m3-card margin-top-md">
+                <h3 class="m3-card-title">Retención Legal de los Datos</h3>
+                <p class="text-muted" style="margin-bottom: 16px; font-size: 13px; line-height: 1.6; text-align: justify;">
+                  De acuerdo con el Reglamento General de Protección de Datos (RGPD), la LOPDGDD y el Código de Comercio de España, la aplicación aplica plazos automáticos y fijos de retención de la información para garantizar el cumplimiento normativo. Los datos de comparativas e historial se depuran conforme a las siguientes reglas:
+                </p>
+                <div style="margin-bottom: 0; font-size: 12.5px; line-height: 1.6; color: var(--color-on-surface-variant); background-color: var(--color-surface-variant); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--color-outline-variant);">
+                  <ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px;">
+                    <li><strong>Comparativas Aceptadas (Aprobadas):</strong> Se conservan obligatoriamente durante <strong>6 años (72 meses)</strong> tras su aceptación. Actúan como justificación mercantil de la transacción comercial y la base de cálculo de las comisiones (según lo exigido por el Art. 30 del Código de Comercio).</li>
+                    <li><strong>Comparativas Pendientes de aceptación:</strong> Se conservan activas durante un período fijo de <strong>12 meses (365 días)</strong> al tratarse de propuestas y estimaciones comerciales precontractuales.</li>
+                    <li><strong>Comparativas Rechazadas (no aceptadas):</strong> Se conservan durante <strong>12 meses (365 días)</strong> tras haber sido descartadas para control comercial y auditoría de ofertas comerciales.</li>
+                    <li><strong>Datos de Clientes:</strong> 
+                      <ul>
+                        <li style="margin-top: 4px;"><strong>Cliente Real:</strong> Es aquel que cuenta con al menos una comparativa en estado <em>Aceptada</em> activa en el sistema. Se conservará durante 6 años.</li>
+                        <li style="margin-top: 4px;"><strong>Cliente Potencial:</strong> Es aquel que no tiene comparativas aceptadas (solo pendientes o rechazadas). Se purgará automáticamente de la base de datos tras 12 meses desde su registro.</li>
+                      </ul>
+                    </li>
+                  </ul>
+                </div>
               </div>
 
               <div class="m3-card margin-top-md">
@@ -2205,18 +2205,18 @@
         </div>
       </div>
 
-      <!-- DIÁLOGO: WIZARD DE CONFIGURACIÓN INICIAL (2 PASOS) -->
-      <div id="dialog-welcome-wizard" class="m3-dialog-overlay" style="z-index: 999998;">
+      <!-- DIÁLOGO: WIZARD DE CONFIGURACIÓN INICIAL (3 PASOS) -->
+      <div id="dialog-welcome-wizard" class="m3-dialog-overlay">
         <div class="m3-dialog" style="max-width: 640px;">
           <!-- Encabezado con Indicador de Pasos -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--color-outline-variant);">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="m3-chip" id="wizard-step-chip" style="font-weight: 700; background-color: var(--color-primary-container); color: var(--color-on-primary-container);">Paso 1 de 2</span>
+              <span class="m3-chip" id="wizard-step-chip" style="font-weight: 700; background-color: var(--color-primary-container); color: var(--color-on-primary-container);">Paso 1 de 3</span>
               <span style="font-size: 14px; font-weight: 600;" id="wizard-step-title">Datos de tu Consultora Energética</span>
             </div>
           </div>
 
-          <form id="wizard-form">
+          <form id="wizard-form" novalidate>
             <!-- PASO 1: DATOS CORPORATIVOS DE LA CONSULTORA -->
             <div id="wizard-step-1" class="wizard-step-container">
               <p class="text-muted" style="font-size: 13px; margin-bottom: 16px; line-height: 1.4;">
@@ -2290,15 +2290,52 @@
 
               <div class="m3-field" style="margin-bottom: 20px;">
                 <label class="m3-label" for="wizard-backup-path-input">Ruta Destino de Copias de Seguridad</label>
-                <div style="display: flex; gap: 8px;">
+                <div style="display: flex; gap: 8px; align-items: center;">
                   <input type="text" id="wizard-backup-path-input" class="m3-input" readonly style="flex: 1; background-color: var(--color-surface-variant); font-family: monospace; font-size: 12px;" />
-                  <button type="button" id="wizard-backup-browse-btn" class="m3-btn-outline" style="white-space: nowrap;">📁 Examinar...</button>
+                  <button type="button" id="wizard-backup-browse-btn" class="m3-btn m3-btn-outlined" style="height: 48px; flex-shrink: 0; padding: 0 16px; white-space: nowrap;">
+                    <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                    Examinar...
+                  </button>
                 </div>
               </div>
 
-              <div style="display: flex; gap: 12px; margin-top: 24px;">
-                <button type="button" id="wizard-back-step-btn" class="m3-btn-outline" style="flex: 1;">⬅️ Atrás</button>
-                <button type="submit" id="wizard-submit-btn" class="m3-btn" style="flex: 2;">Finalizar Configuración 🚀</button>
+              <div class="m3-dialog-actions" style="margin-top: 24px; display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" id="wizard-back-step-btn" class="m3-btn m3-btn-outlined">
+                  <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                  Atrás
+                </button>
+                <button type="button" id="wizard-step-2-next-btn" class="m3-btn">Siguiente: Comercial Principal ➔</button>
+              </div>
+            </div>
+
+            <!-- PASO 3: CONFIGURACIÓN DE COMERCIAL PRINCIPAL -->
+            <div id="wizard-step-3" class="wizard-step-container" style="display: none;">
+              <p class="text-muted" style="font-size: 13px; margin-bottom: 16px; line-height: 1.4;">
+                Introduce los datos de tu <strong>Comercial Principal</strong>. Este agente será el responsable de la cartera y todos los clientes que gestiones se vincularán inicialmente a su perfil para garantizar la trazabilidad comercial.
+              </p>
+
+              <div class="m3-field">
+                <label class="m3-label" for="wizard-agent-name">Nombre y Apellidos del Comercial Principal *</label>
+                <input type="text" id="wizard-agent-name" class="m3-input" placeholder="Ej. Juan Pérez García" required />
+              </div>
+
+              <div class="m3-field-row" style="display: flex; gap: 12px;">
+                <div class="m3-field" style="flex: 1;">
+                  <label class="m3-label" for="wizard-agent-phone">Teléfono de Contacto</label>
+                  <input type="tel" id="wizard-agent-phone" class="m3-input" placeholder="Ej. 612345678" />
+                </div>
+                <div class="m3-field" style="flex: 1;">
+                  <label class="m3-label" for="wizard-agent-email">Email de Contacto</label>
+                  <input type="email" id="wizard-agent-email" class="m3-input" placeholder="Ej. comercial@empresa.com" />
+                </div>
+              </div>
+
+              <div class="m3-dialog-actions" style="margin-top: 24px; display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" id="wizard-step-3-back-btn" class="m3-btn m3-btn-outlined">
+                  <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                  Atrás
+                </button>
+                <button type="submit" id="wizard-submit-btn" class="m3-btn">Finalizar</button>
               </div>
             </div>
           </form>
@@ -2306,7 +2343,7 @@
       </div>
 
       <!-- DIÁLOGO: CONFIGURACIÓN INICIAL DEL AGENTE PRINCIPAL -->
-      <div id="dialog-initial-agent-setup" class="m3-dialog-overlay" style="z-index: 999999;">
+      <div id="dialog-initial-agent-setup" class="m3-dialog-overlay">
         <div class="m3-dialog" style="max-width: 520px;">
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
             <div style="background-color: var(--color-primary-container); color: var(--color-on-primary-container); padding: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
@@ -2689,7 +2726,7 @@
               <label class="m3-label" for="manual-ren-client-search">Buscar Cliente Existente *</label>
               <input type="text" id="manual-ren-client-search" class="m3-input" placeholder="🔍 Escribe nombre de empresa, particular o CIF..." autocomplete="off" required />
               <input type="hidden" id="manual-ren-client-id" value="" />
-              <div id="manual-ren-client-suggestions" class="m3-autocomplete-suggestions" style="display:none; position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: var(--shadow-2);"></div>
+              <div id="manual-ren-client-suggestions" class="m3-autocomplete-suggestions" style="display:none; position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); max-height: 180px; overflow-y: auto; z-index: var(--z-dropdown); box-shadow: var(--shadow-2);"></div>
             </div>
 
             <div class="m3-field-row">
@@ -2710,12 +2747,12 @@
               <div class="m3-field" style="position: relative;">
                 <label class="m3-label" for="manual-ren-comercializadora">Comercializadora Actual</label>
                 <input type="text" id="manual-ren-comercializadora" class="m3-input" placeholder="🔍 Buscar comercializadora..." autocomplete="off" />
-                <div id="manual-ren-comercializadora-suggestions" class="m3-autocomplete-suggestions" style="display:none; position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: var(--shadow-2);"></div>
+                <div id="manual-ren-comercializadora-suggestions" class="m3-autocomplete-suggestions" style="display:none; position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); max-height: 180px; overflow-y: auto; z-index: var(--z-dropdown); box-shadow: var(--shadow-2);"></div>
               </div>
               <div class="m3-field" style="position: relative;">
                 <label class="m3-label" for="manual-ren-tarifa">Tarifa Actual</label>
                 <input type="text" id="manual-ren-tarifa" class="m3-input" placeholder="🔍 Buscar tarifa..." autocomplete="off" />
-                <div id="manual-ren-tarifa-suggestions" class="m3-autocomplete-suggestions" style="display:none; position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: var(--shadow-2);"></div>
+                <div id="manual-ren-tarifa-suggestions" class="m3-autocomplete-suggestions" style="display:none; position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); max-height: 180px; overflow-y: auto; z-index: var(--z-dropdown); box-shadow: var(--shadow-2);"></div>
               </div>
             </div>
 

@@ -25,6 +25,17 @@
   --radius-lg: 16px;
   --radius-xl: 24px;
   --radius-full: 9999px;
+
+  /* Stacking Context & Layers (Z-Index Scale) */
+  --z-below: -1;
+  --z-base: 0;
+  --z-sticky: 100;
+  --z-dropdown: 200;
+  --z-modal: 500;
+  --z-modal-priority: 600;
+  --z-auth: 800;
+  --z-toast: 1000;
+  --z-tooltip: 1100;
 }
 
 /* Light Theme Variables (Default) */
@@ -224,7 +235,7 @@ aside.app-navigation {
   padding: 24px 12px;
   justify-content: space-between;
   height: 100vh;
-  z-index: 10;
+  z-index: var(--z-sticky);
   transition: width var(--transition-medium), background-color var(--transition-medium);
 }
 
@@ -298,7 +309,7 @@ aside.app-navigation {
   opacity: 0;
   transform: scaleX(0.85);
   transition: all var(--transition-medium);
-  z-index: -1;
+  z-index: var(--z-below);
 }
 
 .nav-item:hover {

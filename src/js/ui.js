@@ -20,9 +20,15 @@ export function showToast(message, type = 'success') {
   // Auto-eliminar después de 4 segundos
   setTimeout(() => {
     toast.classList.add('m3-toast-fadeout');
-    toast.addEventListener('animationend', () => {
-      toast.remove();
-    });
+    let removed = false;
+    const safeRemove = () => {
+      if (!removed) {
+        removed = true;
+        toast.remove();
+      }
+    };
+    toast.addEventListener('animationend', safeRemove, { once: true });
+    setTimeout(safeRemove, 350);
   }, 4000);
 }
 
@@ -55,9 +61,15 @@ export function showActionToast(message, actions = []) {
     btn.addEventListener('click', () => {
       if (action.callback) action.callback();
       toast.classList.add('m3-toast-fadeout');
-      toast.addEventListener('animationend', () => {
-        toast.remove();
-      });
+      let removed = false;
+      const safeRemove = () => {
+        if (!removed) {
+          removed = true;
+          toast.remove();
+        }
+      };
+      toast.addEventListener('animationend', safeRemove, { once: true });
+      setTimeout(safeRemove, 350);
     });
     actionsDiv.appendChild(btn);
   });

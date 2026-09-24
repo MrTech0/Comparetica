@@ -1,5 +1,7 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 
 describe('Integridad del DOM y Prototipos', () => {
   test('HTMLSelectElement.prototype no debe ser mutado con propiedades custom', () => {
@@ -70,5 +72,34 @@ describe('Integridad del DOM y Prototipos', () => {
     assert.strictEqual(currentProtoDescriptor.get, origProtoDescriptor.get);
     assert.strictEqual(currentProtoDescriptor.set, origProtoDescriptor.set);
     assert.strictEqual(DummySelect.prototype._customValueHooked, undefined);
+  });
+
+  test('los campos de inactividad de clientes en index.html definen valores y placeholders por defecto', () => {
+    const html = fs.readFileSync(path.resolve('src/index.html'), 'utf8');
+
+    const monthsInputMatch = html.match(/id="settings-client-inactive-new-months"[^>]+/);
+    assert.ok(monthsInputMatch, 'Debe existir #settings-client-inactive-new-months');
+    assert.ok(monthsInputMatch[0].includes('value="3"'), 'Debe tener value="3" por defecto');
+    assert.ok(monthsInputMatch[0].includes('placeholder="3"'), 'Debe tener placeholder="3"');
+
+    const daysInputMatch = html.match(/id="settings-client-inactive-expiry-days"[^>]+/);
+    assert.ok(daysInputMatch, 'Debe existir #settings-client-inactive-expiry-days');
+    assert.ok(daysInputMatch[0].includes('value="30"'), 'Debe tener value="30" por defecto');
+    assert.ok(daysInputMatch[0].includes('placeholder="30"'), 'Debe tener placeholder="30"');
+
+    assert.ok(html.includes('(Por defecto: 3 meses)'), 'Debe incluir texto explicativo de 3 meses');
+    assert.ok(html.includes('(Por defecto: 30 días)'), 'Debe incluir texto explicativo de 30 días');
+  });
+
+  test('el bloque de Retención Legal de los Datos está ubicado dentro del panel de Información Legal', () => {
+    const html = fs.readFileSync(path.resolve('src/index.html'), 'utf8');
+
+    const paramsPanelMatch = html.match(/id="panel-settings-params"[^>]*>([\s\S]*?)id="panel-settings-legal"/);
+    assert.ok(paramsPanelMatch, 'Debe encontrarse el panel de parámetros antes del panel legal');
+    assert.ok(!paramsPanelMatch[1].includes('Retención Legal de los Datos'), 'El panel de parámetros NO debe contener el bloque de retención legal');
+
+    const legalPanelMatch = html.match(/id="panel-settings-legal"[^>]*>([\s\S]*?)id="panel-settings-about"/);
+    assert.ok(legalPanelMatch, 'Debe encontrarse el panel legal');
+    assert.ok(legalPanelMatch[1].includes('Retención Legal de los Datos'), 'El panel legal debe contener el bloque de retención legal');
   });
 });

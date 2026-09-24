@@ -1,6 +1,6 @@
 /* src/js/views/wizard.js */
 import { loadBackupConfig } from './backup.js';
-import { saveCompanyConfig, saveCompanyLogo } from '../db.js';
+import { saveCompanyConfig, saveCompanyLogo, addAgente, reassignAgenteClientes } from '../db.js';
 
 export async function initWizard() {
   const wizardOverlay = document.getElementById('dialog-welcome-wizard');
@@ -8,11 +8,14 @@ export async function initWizard() {
 
   const step1 = document.getElementById('wizard-step-1');
   const step2 = document.getElementById('wizard-step-2');
+  const step3 = document.getElementById('wizard-step-3');
   const stepChip = document.getElementById('wizard-step-chip');
   const stepTitle = document.getElementById('wizard-step-title');
 
   const nextBtn = document.getElementById('wizard-next-step-btn');
   const backBtn = document.getElementById('wizard-back-step-btn');
+  const step2NextBtn = document.getElementById('wizard-step-2-next-btn');
+  const step3BackBtn = document.getElementById('wizard-step-3-back-btn');
   const browseBtn = document.getElementById('wizard-backup-browse-btn');
   const pathInput = document.getElementById('wizard-backup-path-input');
 
@@ -56,40 +59,110 @@ export async function initWizard() {
     });
   }
 
+  // Validación defensiva del Paso 1 (Datos Consultora)
+  function validateStep1() {
+    const name = document.getElementById('wizard-company-name')?.value.trim();
+    const email = document.getElementById('wizard-company-email')?.value.trim();
+    const phone = document.getElementById('wizard-company-phone')?.value.trim();
+
+    if (!name) {
+      window.showToast("El Nombre de la Consultora es obligatorio.", "error");
+      document.getElementById('wizard-company-name')?.focus();
+      return false;
+    }
+
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        window.showToast("El formato del correo electrónico no es válido.", "error");
+        document.getElementById('wizard-company-email')?.focus();
+        return false;
+      }
+    }
+
+    if (phone) {
+      const phoneRegex = /^\+?[0-9\s\-]{9,15}$/;
+      if (!phoneRegex.test(phone)) {
+        window.showToast("El formato del teléfono no es válido (debe tener entre 9 y 15 dígitos).", "error");
+        document.getElementById('wizard-company-phone')?.focus();
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // Validación defensiva del Paso 3 (Comercial Principal)
+  function validateStep3() {
+    const agentName = document.getElementById('wizard-agent-name')?.value.trim();
+    const agentPhone = document.getElementById('wizard-agent-phone')?.value.trim() || null;
+    const agentEmail = document.getElementById('wizard-agent-email')?.value.trim() || null;
+
+    if (!agentName) {
+      window.showToast("El Nombre y Apellidos del Comercial Principal es obligatorio.", "error");
+      document.getElementById('wizard-agent-name')?.focus();
+      return false;
+    }
+
+    if (agentEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(agentEmail)) {
+        window.showToast("El formato del correo electrónico del comercial no es válido.", "error");
+        document.getElementById('wizard-agent-email')?.focus();
+        return false;
+      }
+    }
+
+    if (agentPhone) {
+      const phoneRegex = /^\+?[0-9\s\-]{9,15}$/;
+      if (!phoneRegex.test(agentPhone)) {
+        window.showToast("El formato del teléfono del comercial no es válido (debe tener entre 9 y 15 dígitos).", "error");
+        document.getElementById('wizard-agent-phone')?.focus();
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // Navegación fluida de pasos
+  function showStep1() {
+    if (step1 && step2) {
+      step1.style.display = 'block';
+      step2.style.display = 'none';
+      if (step3) step3.style.display = 'none';
+      if (stepChip) stepChip.textContent = 'Paso 1 de 3';
+      if (stepTitle) stepTitle.textContent = 'Datos de tu Consultora Energética';
+    }
+  }
+
+  function showStep2() {
+    if (step1 && step2) {
+      step1.style.display = 'none';
+      step2.style.display = 'block';
+      if (step3) step3.style.display = 'none';
+      if (stepChip) stepChip.textContent = 'Paso 2 de 3';
+      if (stepTitle) stepTitle.textContent = 'Ubicación de Copias de Seguridad';
+    }
+  }
+
+  function showStep3() {
+    if (step2 && step3) {
+      step1.style.display = 'none';
+      step2.style.display = 'none';
+      step3.style.display = 'block';
+      if (stepChip) stepChip.textContent = 'Paso 3 de 3';
+      if (stepTitle) stepTitle.textContent = 'Configuración de Comercial Principal';
+      const agentInput = document.getElementById('wizard-agent-name');
+      if (agentInput) agentInput.focus();
+    }
+  }
+
   // Transición Paso 1 -> Paso 2
   if (nextBtn) {
     nextBtn.addEventListener('click', () => {
-      const name = document.getElementById('wizard-company-name').value.trim();
-      const email = document.getElementById('wizard-company-email').value.trim();
-      const phone = document.getElementById('wizard-company-phone').value.trim();
-
-      if (!name) {
-        window.showToast("El Nombre de la Consultora es obligatorio.", "error");
-        document.getElementById('wizard-company-name').focus();
-        return;
-      }
-
-      if (email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          window.showToast("El formato del correo electrónico no es válido.", "error");
-          return;
-        }
-      }
-
-      if (phone) {
-        const phoneRegex = /^\+?[0-9\s\-]{9,15}$/;
-        if (!phoneRegex.test(phone)) {
-          window.showToast("El formato del teléfono no es válido (debe tener entre 9 y 15 dígitos).", "error");
-          return;
-        }
-      }
-
-      if (step1 && step2) {
-        step1.style.display = 'none';
-        step2.style.display = 'block';
-        if (stepChip) stepChip.textContent = 'Paso 2 de 2';
-        if (stepTitle) stepTitle.textContent = 'Ubicación de Copias de Seguridad';
+      if (validateStep1()) {
+        showStep2();
       }
     });
   }
@@ -97,12 +170,21 @@ export async function initWizard() {
   // Transición Paso 2 -> Paso 1
   if (backBtn) {
     backBtn.addEventListener('click', () => {
-      if (step1 && step2) {
-        step2.style.display = 'none';
-        step1.style.display = 'block';
-        if (stepChip) stepChip.textContent = 'Paso 1 de 2';
-        if (stepTitle) stepTitle.textContent = 'Datos de tu Consultora Energética';
-      }
+      showStep1();
+    });
+  }
+
+  // Transición Paso 2 -> Paso 3
+  if (step2NextBtn) {
+    step2NextBtn.addEventListener('click', () => {
+      showStep3();
+    });
+  }
+
+  // Transición Paso 3 -> Paso 2
+  if (step3BackBtn) {
+    step3BackBtn.addEventListener('click', () => {
+      showStep2();
     });
   }
 
@@ -112,10 +194,36 @@ export async function initWizard() {
     wizardOverlay.classList.add('active');
   }
 
-  // Envío final del formulario (Paso 2 Submit)
+  // Envío final del formulario (Paso 3 Submit)
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+
+      // Si el usuario pulsa Enter en los pasos 1 o 2, avanzar al siguiente paso
+      if (step1 && step1.style.display !== 'none') {
+        if (validateStep1()) {
+          showStep2();
+        }
+        return;
+      }
+      if (step2 && step2.style.display !== 'none') {
+        showStep3();
+        return;
+      }
+
+      // Validar datos de los pasos requeridos
+      if (!validateStep1()) {
+        showStep1();
+        return;
+      }
+
+      if (!validateStep3()) {
+        return;
+      }
+
+      const agentName = document.getElementById('wizard-agent-name')?.value.trim();
+      const agentPhone = document.getElementById('wizard-agent-phone')?.value.trim() || null;
+      const agentEmail = document.getElementById('wizard-agent-email')?.value.trim() || null;
 
       const name = document.getElementById('wizard-company-name').value.trim();
       const street = document.getElementById('wizard-company-street').value.trim();
@@ -144,22 +252,20 @@ export async function initWizard() {
         const submitBtn = document.getElementById('wizard-submit-btn');
         if (submitBtn) {
           submitBtn.disabled = true;
-          submitBtn.innerText = "Configurando...";
+          submitBtn.innerText = "Finalizando...";
         }
 
-        // 1. Guardar Configuración de Texto
+        // 1. Guardar Configuración de Texto de la Consultora
         await saveCompanyConfig(configData);
 
+        // 2. Configurar directorio de copias de seguridad
         if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-          // Configurar directorio de copias de seguridad (renombrando existente si corresponde)
           const parentArg = customSelectedParent ? customSelectedParent : null;
           await window.__TAURI__.core.invoke('setup_backup_directory', { parentPath: parentArg });
-
-          // Refrescar inmediatamente la vista de backup
           await loadBackupConfig();
         }
 
-        // 2. Guardar Logotipo si se ha subido
+        // 3. Guardar Logotipo si se ha subido
         if (logoInput && logoInput.files && logoInput.files[0]) {
           const file = logoInput.files[0];
           const extension = file.name.split('.').pop().toLowerCase();
@@ -178,18 +284,22 @@ export async function initWizard() {
           }
         }
 
-        // Finalizar primer inicio
+        // 4. Crear el Comercial Principal y asignar posibles clientes
+        try {
+          const res = await addAgente(agentName, agentPhone, agentEmail);
+          const newAgentId = res && res.lastInsertId ? res.lastInsertId : 1;
+          await reassignAgenteClientes(null, newAgentId);
+
+          const { loadAgentsTable } = await import('./agents.js');
+          await loadAgentsTable();
+        } catch (errAgent) {
+          console.error("Error al registrar agente comercial principal en el asistente:", errAgent);
+        }
+
+        // 5. Finalizar primer inicio
         localStorage.setItem('first_run_completed', 'true');
         wizardOverlay.classList.remove('active');
         window.showToast("Configuración inicial completada correctamente.", "success");
-
-        // Disparar la comprobación del Comercial Principal
-        try {
-          const { ensureInitialAgentFlow } = await import('./agents.js');
-          await ensureInitialAgentFlow();
-        } catch (errAgent) {
-          console.error("Error al iniciar flujo de agente principal:", errAgent);
-        }
 
       } catch (error) {
         console.error("Error al guardar la configuración inicial:", error);
@@ -198,7 +308,7 @@ export async function initWizard() {
         const submitBtn = document.getElementById('wizard-submit-btn');
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.innerText = "Finalizar Configuración 🚀";
+          submitBtn.innerText = "Finalizar";
         }
       }
     });
