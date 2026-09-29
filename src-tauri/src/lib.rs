@@ -32,8 +32,34 @@ fn save_pdf(filename: String, base64_data: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn read_text_file(path: String) -> Result<String, String> {
-    std::fs::read_to_string(&path).map_err(|e| format!("Error al leer el archivo: {}", e))
+fn read_text_file(path: String) -> Result<Vec<u8>, String> {
+    // La interfaz detecta la codificación antes de convertir el contenido a texto.
+    std::fs::read(&path).map_err(|e| format!("Error al leer el archivo: {}", e))
+}
+
+#[cfg(test)]
+mod csv_reader_tests {
+    use super::read_text_file;
+
+    #[test]
+    fn native_reader_accepts_windows1252_csv() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../test/fixtures/clientes-windows1252.csv");
+        let bytes = std::fs::read(&path).unwrap();
+        assert!(std::str::from_utf8(&bytes).is_err(), "fixture must require conversion");
+        let result = read_text_file(path.to_string_lossy().into_owned());
+        assert!(result.is_ok(), "native reader must not reject Windows-1252 before conversion: {:?}", result);
+        assert_eq!(result.unwrap(), bytes, "native reader must preserve original bytes");
+    }
+
+    #[test]
+    fn native_reader_preserves_utf8_csv() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../test/fixtures/clientes-utf8.csv");
+        let bytes = std::fs::read(&path).unwrap();
+        assert!(std::str::from_utf8(&bytes).is_ok());
+        assert_eq!(read_text_file(path.to_string_lossy().into_owned()).unwrap(), bytes);
+    }
 }
 
 #[tauri::command]

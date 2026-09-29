@@ -194,10 +194,8 @@ async function readAndProcessFilePath(filePath) {
   try {
     const fileName = filePath.split(/[/\\]/).pop() || "archivo.csv";
 
-    const text = await invoke('read_text_file', { path: filePath });
-    // Convert string to bytes for encoding inspection
-    const encoder = new TextEncoder();
-    const buffer = encoder.encode(text);
+    const bytes = await invoke('read_text_file', { path: filePath });
+    const buffer = new Uint8Array(bytes);
     await inspectAndProcessArrayBuffer(buffer, fileName);
   } catch (err) {
     console.error("Error al procesar el archivo arrastrado:", err);
