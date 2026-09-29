@@ -387,6 +387,13 @@ async function setupCompanySettings() {
       }
     }
 
+    const logoFile = logoInput?.files?.[0];
+    const extension = logoFile?.name.split('.').pop().toLowerCase();
+    if (logoFile && !['svg', 'png', 'jpg', 'jpeg', 'webp', 'avif'].includes(extension)) {
+      showToast("Formato de imagen no soportado. Selecciona un archivo SVG, PNG, JPG, JPEG, WebP o AVIF.", "error");
+      return;
+    }
+
     const configData = {
       consultora_nombre: name,
       consultora_calle: street,
@@ -408,21 +415,15 @@ async function setupCompanySettings() {
       await saveCompanyConfig(configData);
 
       // 2. Guardar Logotipo si se ha seleccionado uno nuevo
-      if (logoInput && logoInput.files && logoInput.files[0]) {
-        const file = logoInput.files[0];
-        const extension = file.name.split('.').pop().toLowerCase();
-        const base64Data = await fileToBase64(file);
+      if (logoFile) {
+        const base64Data = await fileToBase64(logoFile);
         const dataUri = `data:image/${extension === 'svg' ? 'svg+xml' : extension};base64,${base64Data}`;
 
-        await saveCompanyLogo(dataUri);
-
         if (typeof window !== 'undefined' && window.__TAURI__) {
-          try {
-            await invoke('save_company_logo', { base64Data, extension });
-          } catch (errLogo) {
-            console.warn("No se pudo invocar save_company_logo en backend:", errLogo);
-          }
+          await invoke('save_company_logo', { base64Data, extension });
         }
+
+        await saveCompanyLogo(dataUri);
       }
 
       showToast("Configuración de la consultora guardada correctamente.", "success");

@@ -638,21 +638,15 @@ fn delete_all_logos(app_data_dir: &std::path::Path) {
 
 #[tauri::command]
 fn save_company_logo(app_handle: tauri::AppHandle, base64_data: String, extension: String) -> Result<String, String> {
+    use tauri::Manager;
+    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    save_company_logo_file(&app_data_dir, &base64_data, &extension)
+}
+
+fn save_company_logo_file(app_data_dir: &std::path::Path, base64_data: &str, extension: &str) -> Result<String, String> {
     use base64::{Engine as _, engine::general_purpose};
     use std::fs;
-    use tauri::Manager;
-
-    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
-    if !app_data_dir.exists() {
-        fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
-    }
-
-    // Limpiar logos previos
-    delete_all_logos(&app_data_dir);
-
-    let bytes = general_purpose::STANDARD
-        .decode(&base64_data)
-        .map_err(|e| e.to_string())?;
+    use std::io::Write;
 
     let ext = extension.to_lowercase();
     let supported = ["svg", "png", "jpg", "jpeg", "webp", "avif"];
@@ -660,9 +654,36 @@ fn save_company_logo(app_handle: tauri::AppHandle, base64_data: String, extensio
         return Err("Formato de imagen no soportado".to_string());
     }
 
+    let bytes = general_purpose::STANDARD
+        .decode(base64_data)
+        .map_err(|e| e.to_string())?;
+    fs::create_dir_all(app_data_dir).map_err(|e| e.to_string())?;
+
     let file_name = format!("logo.{}", ext);
     let logo_path = app_data_dir.join(&file_name);
-    fs::write(&logo_path, &bytes).map_err(|e| e.to_string())?;
+    let temporary_path = app_data_dir.join(format!(".logo-{}.tmp", rand::random::<u64>()));
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary_path)
+        .map_err(|e| e.to_string())?;
+
+    // Completar la escritura antes de reemplazar o retirar el logo anterior.
+    let write_result = (|| {
+        file.write_all(&bytes)?;
+        file.sync_all()
+    })();
+    drop(file);
+    if let Err(error) = write_result.and_then(|_| fs::rename(&temporary_path, &logo_path)) {
+        let _ = fs::remove_file(&temporary_path);
+        return Err(error.to_string());
+    }
+
+    for previous_ext in supported {
+        if previous_ext != ext {
+            let _ = fs::remove_file(app_data_dir.join(format!("logo.{}", previous_ext)));
+        }
+    }
 
     Ok(file_name)
 }
@@ -949,4 +970,81 @@ fn get_about_info(app_handle: tauri::AppHandle) -> Result<serde_json::Value, Str
         "rust_version": rust_version,
         "tauri_version": tauri_version
     }))
+}
+
+#[cfg(test)]
+mod company_logo_tests {
+    use super::save_company_logo_file;
+    use base64::{engine::general_purpose, Engine as _};
+    use std::{fs, path::PathBuf};
+
+    struct TestDirectory(PathBuf);
+
+    impl TestDirectory {
+        fn new() -> Self {
+            let path = std::env::temp_dir().join(format!("comparetica_logo_test_{}", rand::random::<u64>()));
+            fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for TestDirectory {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn invalid_base64_preserves_the_previous_logo() {
+        let dir = TestDirectory::new();
+        let previous = dir.0.join("logo.png");
+        fs::write(&previous, b"previous logo").unwrap();
+        assert!(save_company_logo_file(&dir.0, "not base64!", "png").is_err());
+        assert_eq!(fs::read(&previous).unwrap(), b"previous logo");
+    }
+
+    #[test]
+    fn unsupported_extension_preserves_the_previous_logo() {
+        let dir = TestDirectory::new();
+        let previous = dir.0.join("logo.png");
+        fs::write(&previous, b"previous logo").unwrap();
+        let data = general_purpose::STANDARD.encode(b"new logo");
+        assert!(save_company_logo_file(&dir.0, &data, "gif").is_err());
+        assert_eq!(fs::read(&previous).unwrap(), b"previous logo");
+    }
+
+    #[test]
+    fn a_failed_replacement_preserves_the_previous_logo_and_removes_temporary_files() {
+        let dir = TestDirectory::new();
+        let previous = dir.0.join("logo.png");
+        fs::write(&previous, b"previous logo").unwrap();
+        fs::create_dir(dir.0.join("logo.webp")).unwrap();
+        let data = general_purpose::STANDARD.encode(b"new logo");
+        assert!(save_company_logo_file(&dir.0, &data, "webp").is_err());
+        assert_eq!(fs::read(&previous).unwrap(), b"previous logo");
+        assert_eq!(fs::read_dir(&dir.0).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn a_successful_format_change_removes_only_previous_logos() {
+        let dir = TestDirectory::new();
+        fs::write(dir.0.join("logo.svg"), b"previous svg").unwrap();
+        fs::write(dir.0.join("logo.png"), b"previous png").unwrap();
+        fs::write(dir.0.join("keep.txt"), b"unrelated file").unwrap();
+        let data = general_purpose::STANDARD.encode(b"new logo");
+        assert_eq!(save_company_logo_file(&dir.0, &data, "WEBP").unwrap(), "logo.webp");
+        assert_eq!(fs::read(dir.0.join("logo.webp")).unwrap(), b"new logo");
+        assert_eq!(fs::read(dir.0.join("keep.txt")).unwrap(), b"unrelated file");
+        assert_eq!(fs::read_dir(&dir.0).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn an_existing_logo_can_be_replaced_with_the_same_format() {
+        let dir = TestDirectory::new();
+        fs::write(dir.0.join("logo.png"), b"previous logo").unwrap();
+        let data = general_purpose::STANDARD.encode(b"new logo");
+        assert_eq!(save_company_logo_file(&dir.0, &data, "png").unwrap(), "logo.png");
+        assert_eq!(fs::read(dir.0.join("logo.png")).unwrap(), b"new logo");
+        assert_eq!(fs::read_dir(&dir.0).unwrap().count(), 1);
+    }
 }

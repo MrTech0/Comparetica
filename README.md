@@ -169,6 +169,7 @@ El frontend usa módulos de JavaScript y estilos CSS; Tauri conecta la interfaz 
 │   ├── renewals_html.test.js          # Texto seguro en renovaciones
 │   ├── settings_dom.test.js           # Estructura y comportamiento del DOM
 │   ├── settings_logo_html.test.js     # Vista previa segura del logo de empresa
+│   ├── settings_logo_save.test.js     # Guardado del logo y conservación ante errores
 │   └── wizard_steps.test.js           # Asistente inicial
 │
 ├── scripts/                           # Preparación y distribución
