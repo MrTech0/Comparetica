@@ -517,7 +517,12 @@ export async function loadSettings() {
   const logoPreview = document.getElementById('settings-company-logo-preview');
   if (logoPreview) {
     if (logoDataUri) {
-      logoPreview.innerHTML = `<img src="${logoDataUri}" style="width: 100%; height: 100%; object-fit: contain;" />`;
+      const image = document.createElement('img');
+      image.src = logoDataUri;
+      image.style.width = '100%';
+      image.style.height = '100%';
+      image.style.objectFit = 'contain';
+      logoPreview.replaceChildren(image);
     } else {
       logoPreview.innerHTML = `<span class="text-muted" style="font-size: 9px; text-align: center; padding: 4px;">Bombilla (Defecto)</span>`;
     }
