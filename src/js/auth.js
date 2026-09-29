@@ -76,7 +76,7 @@ function hideAlert() {
 
 function showAlert(message, type = 'error') {
   if (!authAlertEl) return;
-  authAlertEl.innerHTML = message;
+  authAlertEl.textContent = message;
   authAlertEl.className = `auth-alert ${type}`;
   authAlertEl.classList.remove('hidden');
 }
@@ -413,7 +413,11 @@ async function generateRecoveryPdf(key) {
         filename: "Comparetica_Clave_Recuperacion_Emergencia.pdf",
         base64Data: base64Data
       });
-      showAlert(`📄 PDF de clave guardado con éxito en:<br><span style="font-family: monospace; font-size: 11px; word-break: break-all; opacity: 0.95; display: block; margin-top: 4px; line-height: 1.3;">${savedPath}</span>`, 'success');
+      showAlert('📄 PDF de clave guardado con éxito en:', 'success');
+      const pathEl = document.createElement('span');
+      pathEl.className = 'auth-saved-path';
+      pathEl.textContent = savedPath;
+      authAlertEl.appendChild(pathEl);
     } catch (err) {
       if (err !== "Cancelado por el usuario") {
         showAlert(`Error al guardar el PDF: ${err}`);
