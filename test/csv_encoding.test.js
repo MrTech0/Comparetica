@@ -22,7 +22,7 @@ function element() {
   };
 }
 
-test('native CSV drop and file selection preserve accents and offer Windows-1252 conversion', async () => {
+test('CSV drop and file selection preserve encoding, multiline records and reject malformed quoting', async () => {
   const original = {
     document: globalThis.document,
     window: globalThis.window,
@@ -86,10 +86,35 @@ test('native CSV drop and file selection preserve accents and offer Windows-1252
     assertPreview();
 
     get('btn-csv-reset').onclick();
+    const multiline = fs.readFileSync(new URL('fixtures/clientes-multilinea.csv', import.meta.url));
+    const newline = multiline.toString('utf8').includes('\r\n') ? '\r\n' : '\n';
+    get('csv-file-input').onchange({ target: { files: [{ name: 'clientes.csv', bytes: multiline }] } });
+    await fileRead;
+    const headings = get('csv-preview-thead').children[0].children.map(cell => cell.textContent);
+    const preview = get('csv-preview-tbody').children;
+    assert.equal(preview.length, 2);
+    assert.match(get('csv-file-info').textContent, /2 filas encontradas/);
+    assert.equal(preview[0].children[headings.indexOf('Nombre / Empresa')].textContent, 'Consultoría "Muñoz"');
+    assert.equal(preview[0].children[headings.indexOf('Representante')].textContent, `José${newline}Núñez`);
+    assert.equal(preview[1].children[headings.indexOf('Nombre / Empresa')].textContent, 'Luz, Gas y Servicios; S.L.');
+
+    get('btn-csv-reset').onclick();
     get('csv-file-input').onchange({ target: { files: [{ name: 'clientes.csv', bytes: windows1252 }] } });
     await fileRead;
     assert.ok(get('dialog-csv-encoding').classList.contains('active'), 'file selection must also offer conversion');
     await get('btn-csv-encoding-convert').onclick();
+    assertPreview();
+
+    get('btn-csv-reset').onclick();
+    droppedBytes = fs.readFileSync(new URL('fixtures/clientes-comillas-sin-cerrar.csv', import.meta.url));
+    await drop();
+    assert.ok(!get('csv-step-1').classList.contains('hidden'), 'an invalid CSV must not reach the preview');
+    assert.ok(get('csv-step-2').classList.contains('hidden'));
+    assert.ok(!get('dialog-csv-encoding').classList.contains('active'), 'invalid quoting must not be treated as an encoding problem');
+    assert.match(get('toast-container').children.at(-1)?.innerText || '', /comillas sin cerrar/);
+
+    droppedBytes = utf8;
+    await drop();
     assertPreview();
   } finally {
     for (const [key, value] of Object.entries(original)) {

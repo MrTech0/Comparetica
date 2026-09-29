@@ -239,7 +239,13 @@ async function inspectAndProcessArrayBuffer(buffer, fileName) {
 }
 
 async function processCsvContent(text, fileName) {
-  parsedCsvData = parseCSVText(text);
+  try {
+    parsedCsvData = parseCSVText(text);
+  } catch (error) {
+    parsedCsvData = { headers: [], rows: [] };
+    showToast(error.message, "error");
+    return;
+  }
 
   if (!parsedCsvData.headers || parsedCsvData.headers.length === 0 || parsedCsvData.rows.length === 0) {
     showToast("El archivo CSV está vacío o no tiene un formato válido.", "error");
@@ -279,54 +285,70 @@ function normalizeHeader(str) {
  * Parsea texto CSV detectando automáticamente el delimitador (;, ,, tab).
  */
 export function parseCSVText(text) {
-  const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
-  if (lines.length === 0) return { headers: [], rows: [] };
+  const source = text.replace(/^\uFEFF/, '');
+  if (!source.trim()) return { headers: [], rows: [] };
 
-  // Detectar delimitador inspeccionando la primera línea
-  const firstLine = lines[0];
-  let delimiter = ';';
-  if ((firstLine.match(/,/g) || []).length > (firstLine.match(/;/g) || []).length) {
-    delimiter = ',';
-  } else if ((firstLine.match(/\t/g) || []).length > (firstLine.match(/;/g) || []).length) {
-    delimiter = '\t';
+  // Contar separadores fuera de comillas en la primera fila completa.
+  const delimiterCounts = { ';': 0, ',': 0, '\t': 0 };
+  let inQuotes = false;
+  let recordStart = 0;
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (char === '"') {
+      if (inQuotes && source[i + 1] === '"') i++;
+      else inQuotes = !inQuotes;
+    } else if (!inQuotes && (char === '\r' || char === '\n')) {
+      if (source.slice(recordStart, i).trim()) break;
+      for (const candidate of Object.keys(delimiterCounts)) delimiterCounts[candidate] = 0;
+      if (char === '\r' && source[i + 1] === '\n') i++;
+      recordStart = i + 1;
+    } else if (!inQuotes && Object.hasOwn(delimiterCounts, char)) {
+      delimiterCounts[char]++;
+    }
   }
 
-  const parseLine = (line) => {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
+  let delimiter = ';';
+  for (const candidate of [',', '\t']) {
+    if (delimiterCounts[candidate] > delimiterCounts[delimiter]) delimiter = candidate;
+  }
 
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (char === delimiter && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    result.push(current.trim());
-    return result;
+  const records = [];
+  let row = [];
+  let current = '';
+  inQuotes = false;
+  recordStart = 0;
+  const finishRecord = end => {
+    row.push(current.trim());
+    if (source.slice(recordStart, end).trim()) records.push(row);
+    row = [];
+    current = '';
   };
 
-  const headers = parseLine(lines[0]);
-  const rows = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const parsedRow = parseLine(lines[i]);
-    if (parsedRow.some(val => val.length > 0)) {
-      rows.push(parsedRow);
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (char === '"') {
+      if (inQuotes && source[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === delimiter && !inQuotes) {
+      row.push(current.trim());
+      current = '';
+    } else if (!inQuotes && (char === '\r' || char === '\n')) {
+      finishRecord(i);
+      if (char === '\r' && source[i + 1] === '\n') i++;
+      recordStart = i + 1;
+    } else {
+      current += char;
     }
   }
 
-  return { headers, rows };
+  if (inQuotes) throw new Error('El archivo CSV tiene un campo entre comillas sin cerrar.');
+  finishRecord(source.length);
+  const [headers = [], ...rows] = records;
+  return { headers, rows: rows.filter(record => record.some(value => value.length > 0)) };
 }
 
 /**

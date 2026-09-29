@@ -160,6 +160,7 @@ El frontend usa módulos de JavaScript y estilos CSS; Tauri conecta la interfaz 
 │   ├── client_lifecycle.test.js       # Estados y ciclo de vida de clientes
 │   ├── csv_encoding.test.js           # Codificación de archivos seleccionados y arrastrados
 │   ├── csv_mapping.test.js            # Asociación automática de columnas del CSV
+│   ├── csv_parser.test.js             # Separadores, comillas y campos con saltos de línea
 │   ├── cups_validation.test.js        # Identificadores y CUPS
 │   ├── fixtures/                      # Archivos de ejemplo utilizados por las pruebas
 │   ├── home_market.test.js            # Precios del panel de Inicio
