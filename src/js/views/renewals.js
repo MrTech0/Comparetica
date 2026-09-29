@@ -21,6 +21,15 @@ let currentThresholds = { critical: 30, warning: 60, radar: 90 };
 let currentRenewalPage = 1;
 const RENEWALS_PER_PAGE = 25;
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 let isListenersInitialized = false;
 
 export async function initRenewalsView() {
@@ -241,16 +250,16 @@ function renderRenewalsTable(thresholds = currentThresholds) {
 
     tr.innerHTML = `
       <td>
-        <strong style="color: var(--color-on-surface); display: block;">${ren.cliente_nombre || 'Cliente sin nombre'}</strong>
-        <span style="font-size: 11px; color: var(--color-on-surface-variant);">${ren.cliente_cif || ''}</span>
+        <strong style="color: var(--color-on-surface); display: block;">${escapeHtml(ren.cliente_nombre || 'Cliente sin nombre')}</strong>
+        <span style="font-size: 11px; color: var(--color-on-surface-variant);">${escapeHtml(ren.cliente_cif || '')}</span>
       </td>
       <td>
-        <span style="font-weight: 600; font-size: 12px; display: block;">${ren.tipo_energia || 'Luz'}</span>
-        <span style="font-size: 11px; color: var(--color-on-surface-variant); font-family: monospace;">${ren.cups || '-'}</span>
+        <span style="font-weight: 600; font-size: 12px; display: block;">${escapeHtml(ren.tipo_energia || 'Luz')}</span>
+        <span style="font-size: 11px; color: var(--color-on-surface-variant); font-family: monospace;">${escapeHtml(ren.cups || '-')}</span>
       </td>
       <td>
-        <span style="display: block; font-size: 13px;">${ren.comercializadora_actual || 'No especificada'}</span>
-        <span style="font-size: 11px; color: var(--color-on-surface-variant);">${ren.tarifa_actual || ''}</span>
+        <span style="display: block; font-size: 13px;">${escapeHtml(ren.comercializadora_actual || 'No especificada')}</span>
+        <span style="font-size: 11px; color: var(--color-on-surface-variant);">${escapeHtml(ren.tarifa_actual || '')}</span>
       </td>
       <td style="font-size: 12.5px;">${new Date(ren.fecha_firma).toLocaleDateString('es-ES')}</td>
       <td style="font-size: 12.5px; font-weight: 600;">${new Date(ren.fecha_vencimiento).toLocaleDateString('es-ES')}</td>
@@ -434,12 +443,12 @@ function openCalendarDayModal(dateStr, day, monthName, year, dayEvents, threshol
 
     tr.innerHTML = `
       <td>
-        <strong style="color: var(--color-on-surface); display: block;">${ren.cliente_nombre || 'Cliente sin nombre'}</strong>
-        <span style="font-size: 11px; color: var(--color-on-surface-variant);">${ren.cliente_cif || ''}</span>
+        <strong style="color: var(--color-on-surface); display: block;">${escapeHtml(ren.cliente_nombre || 'Cliente sin nombre')}</strong>
+        <span style="font-size: 11px; color: var(--color-on-surface-variant);">${escapeHtml(ren.cliente_cif || '')}</span>
       </td>
       <td>
-        <span style="font-weight: 600; font-size: 12px; display: block;">${ren.tipo_energia || 'Luz'} - ${ren.comercializadora_actual || 'No esp.'}</span>
-        <span style="font-size: 11px; color: var(--color-on-surface-variant); font-family: monospace;">${ren.cups || '-'}</span>
+        <span style="font-weight: 600; font-size: 12px; display: block;">${escapeHtml(ren.tipo_energia || 'Luz')} - ${escapeHtml(ren.comercializadora_actual || 'No esp.')}</span>
+        <span style="font-size: 11px; color: var(--color-on-surface-variant); font-family: monospace;">${escapeHtml(ren.cups || '-')}</span>
       </td>
       <td>${statusBadge}</td>
       <td style="text-align: right;">
@@ -818,7 +827,9 @@ export async function openManualAddModal() {
               item.style.cursor = 'pointer';
               item.style.fontSize = '13px';
               item.style.borderBottom = '1px solid var(--color-outline-variant)';
-              item.innerHTML = `<strong>${c.nombre_empresa}</strong>`;
+              const label = document.createElement('strong');
+              label.textContent = c.nombre_empresa;
+              item.appendChild(label);
 
               item.onmouseenter = () => { item.style.backgroundColor = 'var(--color-surface-variant)'; };
               item.onmouseleave = () => { item.style.backgroundColor = 'transparent'; };
@@ -901,7 +912,9 @@ export async function openManualAddModal() {
           item.style.cursor = 'pointer';
           item.style.fontSize = '13px';
           item.style.borderBottom = '1px solid var(--color-outline-variant)';
-          item.innerHTML = `<strong>${c.nombre}</strong>`;
+          const label = document.createElement('strong');
+          label.textContent = c.nombre;
+          item.appendChild(label);
 
           item.onmouseenter = () => { item.style.backgroundColor = 'var(--color-surface-variant)'; };
           item.onmouseleave = () => { item.style.backgroundColor = 'transparent'; };
@@ -987,7 +1000,9 @@ export async function openManualAddModal() {
           item.style.cursor = 'pointer';
           item.style.fontSize = '13px';
           item.style.borderBottom = '1px solid var(--color-outline-variant)';
-          item.innerHTML = `<strong>${t.nombre}</strong>`;
+          const label = document.createElement('strong');
+          label.textContent = t.nombre;
+          item.appendChild(label);
 
           item.onmouseenter = () => { item.style.backgroundColor = 'var(--color-surface-variant)'; };
           item.onmouseleave = () => { item.style.backgroundColor = 'transparent'; };
