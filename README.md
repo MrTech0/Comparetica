@@ -18,18 +18,18 @@
 ## 🚀 Características Principales
 
 - **Comparador y Motor de Cálculo**: Proyecta consumos y calcula el gasto anualizado estimado del cliente (incluyendo alquiler de contador, impuestos y cargos regulados) frente a las tarifas disponibles en el mercado.
-- **Precisión de hasta 6 Decimales**: Soporte completo para introducir precios de potencia (€/kW/año) y energía (€/kWh) con una precisión de hasta 6 decimales. Si no se especifican todos, los dígitos restantes se rellenan automáticamente con ceros (ej. `0.15` se calcula y muestra como `0.150000`).
-- **Precios de la Energía Regulada (PVPC) en Tiempo Real**: Pantalla de inicio que consulta directamente a la API oficial de Red Eléctrica de España (REE) para mostrar el precio medio diario del PVPC, el precio del mercado pool diario (OMIE) y el desglose de precios regulados por horas en formato visual e interactivo.
+- **Precisión de hasta 10 Decimales**: Los precios de potencia (€/kW/año) y energía (€/kWh) se muestran con hasta 10 decimales cuando hacen falta, con un mínimo de 2 y sin ceros finales redundantes (por ejemplo, `0.15` se muestra como `0.15`).
+- **Precios de la Energía Regulada (PVPC)**: La pantalla de inicio consulta la API oficial de Red Eléctrica de España (REE) para mostrar el precio medio diario del PVPC y el desglose por horas. También muestra el precio medio mayorista cuando REE facilita ese indicador; en caso contrario indica «No disponible».
 - **Gestión de Tarifas (CRUD)**: Panel interno para registrar, editar y dar de baja comercializadoras y tarifas de luz o gas.
 - **Modo Privado (Confidencialidad)**: Interruptor en la barra lateral que oculta visualmente (difumina) las comisiones del asesor de cara al cliente en todas las vistas de la aplicación durante presentaciones en vivo.
-- **Seguridad y Cifrado Local Zero-Plaintext**: Base de datos SQLite cifrada en reposo mediante ChaCha20-Poly1305 con derivación de clave por Argon2id (`vault.json`). Operaciones de descifrado y guardado 100% en memoria (`rusqlite::serialize`/`deserialize`) sin persistir ficheros de base de datos planos en disco. Persistencia atómica (`fs::rename` con sincronización física) para máxima tolerancia a fallos ante caídas o apagados inesperados.
+- **Seguridad y Cifrado Local**: Base de datos SQLite cifrada en reposo mediante AES-256-GCM, con derivación de claves por Argon2id y metadatos de bóveda en `vault.json`. Las operaciones habituales de descifrado y guardado usan memoria (`rusqlite::serialize`/`deserialize`); el archivo cifrado se escribe primero en un temporal sincronizado y después se sustituye mediante `fs::rename`.
 - **Gestión Integral de Cartera y Renovaciones**: Módulos completos para administración de clientes, agentes comerciales, panel de alertas de vencimiento de contratos y asistente guiado (*wizard*) para nuevos estudios.
 - **Reportes Ejecutivos en PDF**:
   - **Previsualización en Pantalla**: Permite ver el diseño del reporte en tiempo real en un visor integrado sin necesidad de guardarlo en disco.
   - **Exportación Local**: Generación nativa de un PDF estético y estructurado con el desglose de conceptos para entregar al cliente.
 - **Copias de Seguridad (Backups)**:
-  - **Manuales**: Posibilidad de exportar e importar la base de datos de forma segura en cualquier ruta del equipo.
-  - **Automáticas**: Copia de seguridad generada automáticamente en el directorio `home` (o ruta personalizada definida por el usuario) al cerrar la aplicación.
+  - **Manuales**: Exportación de copias cifradas `.bak` e importación con verificación de la contraseña y del contenido antes de sustituir los datos actuales. También se pueden importar bases SQLite antiguas `.db` sin cifrar.
+  - **Automáticas**: Copia `.bak` generada al cerrar la aplicación en `Comparetica_backups` dentro del directorio personal (o en la ruta personalizada definida por el usuario).
   - **Política de Retención**: Limpieza automática de copias de seguridad antiguas basada en el número de días definidos por el usuario (por defecto, 7 días).
 
 ---
@@ -109,56 +109,71 @@ pnpm tauri build
 
 ## 📂 Estructura del Código
 
-La aplicación sigue una arquitectura desacoplada, reactiva y modular, dividida entre el frontend en ES Modules (vanilla JavaScript con Material Design 3) y el backend nativo en Rust orquestado por Tauri:
+El frontend usa módulos de JavaScript y estilos CSS; Tauri conecta la interfaz con el backend nativo en Rust. Estos son los directorios y archivos principales:
 
 ```
-├── src/                               # Frontend de la aplicación (Webview)
-│   ├── index.html                     # Contenedor principal, navegación y plantillas de modales M3
-│   ├── css/                           # Estilos globales y variables de diseño Material Design 3
+├── src/                               # Interfaz de la aplicación
+│   ├── index.html                     # Navegación, vistas y diálogos
+│   ├── styles/
+│   │   ├── main.css                   # Estilos globales y variables de diseño
+│   │   └── components.css             # Componentes y estados visuales
+│   ├── assets/                        # Imágenes y biblioteca jsPDF incluida
 │   └── js/
-│       ├── app.js                     # Ciclo de vida, router SPA y listeners globales
-│       ├── ipc.js                     # Capa de abstracción centralizada para IPC con Tauri (v1 y v2)
-│       ├── events.js                  # Catálogo inmutable (APP_EVENTS) y bus de eventos desacoplado
-│       ├── ui.js                      # Sistema de notificaciones toast y diálogo modal interactivo
-│       ├── db.js                      # Capa de acceso a datos SQLite cifrados y tabla ajustes
-│       ├── auth.js                    # Autenticación, control de sesión maestra y agente activo
-│       ├── calculator.js              # Motor matemático de facturación (2.0TD, 3.0TD, gas, autoconsumo)
-│       ├── pdf.js                     # Generación nativa y previsualizador dinámico de reportes PDF
-│       ├── csv_importer.js            # Importación y normalización masiva de tarifas desde CSV
-│       ├── components/                # Componentes reutilizables de UI
-│       │   └── date_range_picker.js   # Selector de rangos de fechas interactivo
-│       └── views/                     # Controladores de vista modulares e independientes
-│           ├── home.js                # Precios PVPC y mercado mayorista (OMIE) en tiempo real
-│           ├── calculator_view.js     # Comparador dinámico de ofertas y estudios energéticos
-│           ├── wizard.js              # Asistente guiado paso a paso para nuevos estudios
-│           ├── history.js             # Historial, filtrado y gestión de comparativas guardadas
-│           ├── tariffs.js             # Catálogo y mantenimiento de comercializadoras y tarifas (CRUD)
-│           ├── clients.js             # Gestión de la cartera de clientes y contratos asociados
-│           ├── agents.js              # Gestión y asignación de agentes comerciales
-│           ├── renewals.js            # Panel de alertas y control de vencimientos de contratos
-│           ├── settings.js            # Configuración de empresa, logotipo y umbrales de alerta
-│           └── backup.js              # Gestión de copias de seguridad manuales y programadas
+│       ├── app.js                     # Inicio de la aplicación y navegación entre vistas
+│       ├── auth.js                    # Acceso con contraseña maestra y recuperación
+│       ├── db.js                      # Acceso a datos mediante comandos nativos
+│       ├── ipc.js                     # Puente de llamadas y eventos de Tauri
+│       ├── events.js                  # Eventos internos de la interfaz
+│       ├── ui.js                      # Notificaciones y diálogos comunes
+│       ├── calculator.js              # Cálculos de facturación de luz y gas
+│       ├── pdf.js                     # Generación y vista previa de PDF con jsPDF
+│       ├── csv_importer.js            # Importación CSV de clientes y renovaciones
+│       ├── utils/validators.js        # Validación de DNI, CIF, NIE y CUPS
+│       ├── components/date_range_picker.js
+│       └── views/                     # Controladores de cada pantalla
+│           ├── home.js                # Precios PVPC y mayoristas
+│           ├── calculator_view.js     # Comparador de tarifas
+│           ├── wizard.js              # Configuración inicial guiada
+│           ├── history.js             # Historial de comparativas
+│           ├── tariffs.js             # Comercializadoras y tarifas
+│           ├── clients.js             # Clientes y puntos de suministro
+│           ├── agents.js              # Agentes comerciales
+│           ├── renewals.js            # Renovaciones y calendario
+│           ├── settings.js            # Ajustes y datos de la consultora
+│           └── backup.js              # Pantalla de copias de seguridad
 │
-├── src-tauri/                         # Backend nativo en Rust (Tauri)
-│   ├── Cargo.toml                     # Dependencias nativas (rusqlite, chacha20poly1305, argon2, etc.)
-│   ├── tauri.conf.json                # Configuración de ventana, capacidades y CSP estricta
+├── src-tauri/                         # Backend nativo
+│   ├── Cargo.toml                     # Dependencias Rust, entre ellas rusqlite, aes-gcm y argon2
+│   ├── build.rs                       # Preparación de la compilación Tauri
+│   ├── tauri.conf.json                # Ventana, empaquetado, actualizaciones y CSP
+│   ├── capabilities/default.json      # Permisos de la ventana principal
+│   ├── icons/                         # Iconos para los instaladores
 │   └── src/
-│       ├── main.rs                    # Punto de entrada y runtime nativo de Tauri
-│       ├── lib.rs                     # Registro de comandos IPC, diálogos y eventos de la aplicación
-│       └── db.rs                      # Persistencia SQLite cifrada en memoria (serialize/deserialize),
-│                                      # escrituras atómicas (fs::rename), vault y copias de seguridad
+│       ├── main.rs                    # Punto de entrada de escritorio
+│       ├── lib.rs                     # Comandos Tauri, archivos y copias de seguridad
+│       └── db.rs                      # SQLite en memoria, cifrado, bóveda y restauración
 │
-├── test/                              # Suite de pruebas automatizadas (Node.js test runner)
-│   ├── calculator.test.js             # Verificación del motor de facturación (luz, gas, autoconsumo, bono)
-│   ├── ipc_and_ui.test.js             # Verificación de capa IPC, bus de eventos y notificaciones UI
-│   ├── settings_dom.test.js           # Verificación de integridad del DOM y selectores personalizados
-│   └── wizard_steps.test.js           # Verificación del asistente inicial de configuración en 3 pasos
+├── test/                              # Pruebas de JavaScript con node --test
+│   ├── calculator.test.js             # Facturación y formato de precios
+│   ├── client_lifecycle.test.js       # Estados y ciclo de vida de clientes
+│   ├── cups_validation.test.js        # Identificadores y CUPS
+│   ├── home_market.test.js            # Precios del panel de Inicio
+│   ├── ipc_and_ui.test.js             # IPC, eventos y componentes comunes
+│   ├── renewals_calendar.test.js      # Navegación del calendario
+│   ├── renewals_html.test.js          # Texto seguro en renovaciones
+│   ├── settings_dom.test.js           # Estructura y comportamiento del DOM
+│   └── wizard_steps.test.js           # Asistente inicial
 │
-├── scripts/                           # Scripts de soporte, automatización y compilación
-│   ├── build.js                       # Empaquetado y distribución del instalador MSI
-│   └── setup-windows.ps1              # Preparación automatizada del entorno en Windows
+├── scripts/                           # Preparación y distribución
+│   ├── build.js                       # Compilación y copia del instalador MSI
+│   ├── setup-windows.ps1              # Preparación del entorno en Windows
+│   └── update-latest-json.js          # Metadatos de actualización
 │
-└── docs/                              # Especificaciones de diseño, arquitectura y planes de ejecución
+├── docs/superpowers/                 # Diseños y planes de desarrollo
+├── updates/                          # Metadatos de versiones publicadas
+├── .githooks/pre-push                # Comprobaciones antes de subir cambios
+├── package.json                      # Comandos y dependencias de JavaScript
+└── pnpm-lock.yaml                     # Versiones fijadas de dependencias
 ```
 
 ---
