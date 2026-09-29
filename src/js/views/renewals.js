@@ -33,10 +33,7 @@ function escapeHtml(value) {
 let isListenersInitialized = false;
 
 export async function initRenewalsView() {
-  if (!isListenersInitialized) {
-    setupRenewalEventListeners();
-    isListenersInitialized = true;
-  }
+  setupRenewalEventListeners();
   await loadRenewals();
 }
 
@@ -486,6 +483,9 @@ function openCalendarDayModal(dateStr, day, monthName, year, dayEvents, threshol
 }
 
 function setupRenewalEventListeners() {
+  if (isListenersInitialized) return;
+  isListenersInitialized = true;
+
   const btnList = document.getElementById('btn-renewals-view-list');
   const btnCalendar = document.getElementById('btn-renewals-view-calendar');
 
@@ -518,7 +518,7 @@ function setupRenewalEventListeners() {
 
   if (btnPrev) {
     btnPrev.addEventListener('click', () => {
-      currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+      currentCalendarDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() - 1, 1);
       renderRenewalsCalendar();
     });
   }
@@ -562,7 +562,7 @@ function setupRenewalEventListeners() {
 
   if (btnNext) {
     btnNext.addEventListener('click', () => {
-      currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+      currentCalendarDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() + 1, 1);
       renderRenewalsCalendar();
     });
   }
