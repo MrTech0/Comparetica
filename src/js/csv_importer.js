@@ -1,6 +1,7 @@
 // src/js/csv_importer.js
 import { getClientesSchemaColumns, importClientesBatch } from './db.js';
-import { invoke, listen } from './ipc.js';
+import { invoke } from './ipc.js';
+import { setupFileDropzone } from './utils/file_drop.js';
 import { showToast } from './ui.js';
 
 let parsedCsvData = { headers: [], rows: [] };
@@ -19,65 +20,13 @@ export async function initCsvImporter() {
 
   setupEncodingModals();
 
-  // Eventos de Drag & Drop en HTML5
-  ['dragenter', 'dragover'].forEach(eventName => {
-    dropzone.addEventListener(eventName, (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dropzone.classList.add('drag-over');
-    }, false);
-  });
-
-  ['dragleave', 'drop'].forEach(eventName => {
-    dropzone.addEventListener(eventName, (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dropzone.classList.remove('drag-over');
-    }, false);
-  });
-
-  dropzone.addEventListener('drop', (e) => {
-    dropzone.classList.remove('drag-over');
-    const dt = e.dataTransfer;
-    if (dt && dt.files && dt.files.length > 0) {
-      handleCsvFile(dt.files[0]);
+  await setupFileDropzone(dropzone, {
+    onFile: handleCsvFile,
+    onPaths: async paths => {
+      const step1 = document.getElementById('csv-step-1');
+      if (step1 && !step1.classList.contains('hidden')) await readAndProcessFilePath(paths[0]);
     }
   });
-
-  // Eventos nativos de drag & drop en Tauri 2 (escuchando eventos del sistema)
-  try {
-    await listen('tauri://drag-enter', () => {
-      dropzone.classList.add('drag-over');
-    });
-    await listen('tauri://drag-over', () => {
-      dropzone.classList.add('drag-over');
-    });
-    await listen('tauri://drag-leave', () => {
-      dropzone.classList.remove('drag-over');
-    });
-    await listen('tauri://drag-drop', async (event) => {
-      dropzone.classList.remove('drag-over');
-      const step1 = document.getElementById('csv-step-1');
-      if (step1 && !step1.classList.contains('hidden')) {
-        const paths = event.payload?.paths || (Array.isArray(event.payload) ? event.payload : []);
-        if (paths.length > 0) {
-          await readAndProcessFilePath(paths[0]);
-        }
-      }
-    });
-    await listen('tauri://file-drop', async (event) => {
-      dropzone.classList.remove('drag-over');
-      const step1 = document.getElementById('csv-step-1');
-      if (step1 && !step1.classList.contains('hidden')) {
-        const paths = Array.isArray(event.payload) ? event.payload : (event.payload?.paths || []);
-        if (paths.length > 0) {
-          await readAndProcessFilePath(paths[0]);
-        }
-      }
-    });
-  } catch (e) {
-    console.warn("No se pudieron registrar eventos nativos de drag-drop:", e);
-  }
 
   if (btnSelectFile) {
     btnSelectFile.addEventListener('click', () => fileInput.click());

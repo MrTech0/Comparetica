@@ -9,6 +9,8 @@ function element() {
     children: [],
     dataset: {},
     style: {},
+    getClientRects() { return [{ left: 0, top: 0, right: 500, bottom: 500 }]; },
+    getBoundingClientRect() { return this.getClientRects()[0]; },
     classList: {
       add: name => classes.add(name),
       remove: name => classes.delete(name),

@@ -1,7 +1,7 @@
 #![allow(linker_messages)]
 
 mod db;
-mod csv_files;
+mod dropped_files;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -33,9 +33,15 @@ fn save_pdf(filename: String, base64_data: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn read_text_file(window: tauri::Window, state: tauri::State<'_, csv_files::SharedCsvDropState>, path: String) -> Result<Vec<u8>, String> {
+fn read_text_file(window: tauri::Window, state: tauri::State<'_, dropped_files::SharedDroppedFileState>, path: String) -> Result<Vec<u8>, String> {
     let files = state.lock().map_err(|e| e.to_string())?;
-    files.read(window.label(), std::path::Path::new(&path))
+    files.read_csv(window.label(), std::path::Path::new(&path))
+}
+
+#[tauri::command]
+fn read_dropped_logo_file(window: tauri::Window, state: tauri::State<'_, dropped_files::SharedDroppedFileState>, path: String) -> Result<Vec<u8>, String> {
+    let files = state.lock().map_err(|e| e.to_string())?;
+    files.read_logo(window.label(), std::path::Path::new(&path))
 }
 
 #[tauri::command]
@@ -196,7 +202,7 @@ fn import_backup(app_handle: tauri::AppHandle, state: tauri::State<'_, db::Share
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(csv_files::SharedCsvDropState::default())
+        .manage(dropped_files::SharedDroppedFileState::default())
         .setup(|app| {
             use tauri::Manager;
             if let Ok(app_data_dir) = app.path().app_data_dir() {
@@ -230,13 +236,13 @@ pub fn run() {
             use tauri::Manager;
             match event {
                 tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
-                    let state = window.state::<csv_files::SharedCsvDropState>();
+                    let state = window.state::<dropped_files::SharedDroppedFileState>();
                     if let Ok(mut files) = state.lock() {
                         files.register_drop(window.label(), paths);
                     };
                 }
                 tauri::WindowEvent::Destroyed => {
-                    let state = window.state::<csv_files::SharedCsvDropState>();
+                    let state = window.state::<dropped_files::SharedDroppedFileState>();
                     if let Ok(mut files) = state.lock() {
                         files.clear_window(window.label());
                     };
@@ -248,6 +254,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet, 
             read_text_file,
+            read_dropped_logo_file,
             save_pdf, 
             export_backup, 
             import_backup,

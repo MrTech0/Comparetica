@@ -16,6 +16,7 @@ import {
 } from '../db.js';
 import { initCsvImporter } from '../csv_importer.js';
 import { invoke } from '../ipc.js';
+import { setupFileDropzone } from '../utils/file_drop.js';
 import { showToast, showConfirm } from '../ui.js';
 
 export async function initSettingsView() {
@@ -348,7 +349,7 @@ function setupCleanup() {
 async function setupCompanySettings() {
   const form = document.getElementById('settings-company-form');
   const logoInput = document.getElementById('settings-company-logo');
-  const logoPreview = document.getElementById('settings-company-logo-preview');
+  const logoDropzone = document.getElementById('settings-company-logo-dropzone');
   const clearLogoBtn = document.getElementById('settings-company-logo-clear-btn');
 
   if (!form) return;
@@ -365,7 +366,38 @@ async function setupCompanySettings() {
     }
     return true;
   };
-  logoInput?.addEventListener('change', () => validateLogoFile(logoInput.files?.[0]));
+  let selectionVersion = 0;
+  logoInput?.addEventListener('change', () => {
+    selectionVersion++;
+    validateLogoFile(logoInput.files?.[0]);
+  });
+  const selectDroppedLogo = file => {
+    if (!logoInput || !validateLogoFile(file)) return;
+    const selection = new DataTransfer();
+    selection.items.add(file);
+    logoInput.files = selection.files;
+  };
+  await setupFileDropzone(logoDropzone, {
+    onFile: file => {
+      selectionVersion++;
+      selectDroppedLogo(file);
+    },
+    onPaths: async paths => {
+      const version = ++selectionVersion;
+      const path = paths[0];
+      const name = path.split(/[/\\]/).pop();
+      if (!validateLogoFile({ name })) return;
+      try {
+        const bytes = await invoke('read_dropped_logo_file', { path });
+        if (version !== selectionVersion) return;
+        selectDroppedLogo(new File([new Uint8Array(bytes)], name));
+      } catch (error) {
+        if (version !== selectionVersion) return;
+        if (logoInput) logoInput.value = '';
+        showToast("Error al leer el logotipo arrastrado.", "error");
+      }
+    }
+  });
 
   // Escuchar envío del formulario
   form.addEventListener('submit', async (e) => {
@@ -459,6 +491,7 @@ async function setupCompanySettings() {
       try {
         await deleteCompanyLogo();
         
+        selectionVersion++;
         logoInput.value = ''; // Limpiar input file
         showToast("Logotipo eliminado con éxito. Ahora se usará el icono por defecto.", "success");
         await loadSettings(); // Refrescar vista previa

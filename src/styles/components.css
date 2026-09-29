@@ -1679,6 +1679,18 @@ input[type="password"]::-ms-clear {
   color: var(--color-primary);
 }
 
+.logo-dropzone {
+  padding: 12px;
+  border: 2px dashed var(--color-outline);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.logo-dropzone.drag-over {
+  border-color: var(--color-primary);
+  background-color: var(--color-surface-variant);
+}
+
 /* Animación visual Drag & Drop para el importador CSV */
 #csv-dropzone {
   transition: border-color 0.25s ease, background-color 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;

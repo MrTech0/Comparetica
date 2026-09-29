@@ -129,6 +129,7 @@ El frontend usa módulos de JavaScript y estilos CSS; Tauri conecta la interfaz 
 │       ├── pdf.js                     # Generación y vista previa de PDF con jsPDF
 │       ├── csv_importer.js            # Importación CSV de clientes y renovaciones
 │       ├── utils/validators.js        # Validación de DNI, CIF, NIE y CUPS
+│       ├── utils/file_drop.js         # Arrastre de archivos en navegador y Tauri
 │       ├── components/date_range_picker.js
 │       └── views/                     # Controladores de cada pantalla
 │           ├── home.js                # Precios PVPC y mayoristas
@@ -151,7 +152,7 @@ El frontend usa módulos de JavaScript y estilos CSS; Tauri conecta la interfaz 
 │   └── src/
 │       ├── main.rs                    # Punto de entrada de escritorio
 │       ├── lib.rs                     # Comandos Tauri, archivos y copias de seguridad
-│       ├── csv_files.rs               # Lectura de CSV/TXT limitada a archivos arrastrados
+│       ├── dropped_files.rs           # Lectura de CSV/TXT y logos limitada a archivos arrastrados
 │       └── db.rs                      # SQLite en memoria, cifrado, bóveda y restauración
 │
 ├── test/                              # Pruebas de JavaScript con node --test
@@ -169,8 +170,12 @@ El frontend usa módulos de JavaScript y estilos CSS; Tauri conecta la interfaz 
 │   ├── renewals_html.test.js          # Texto seguro en renovaciones
 │   ├── settings_dom.test.js           # Estructura y comportamiento del DOM
 │   ├── settings_logo_html.test.js     # Vista previa segura del logo de empresa
+│   ├── settings_logo_drop.test.js     # Arrastre de logos y separación del importador CSV
 │   ├── settings_logo_save.test.js     # Guardado del logo y conservación ante errores
 │   └── wizard_steps.test.js           # Asistente inicial
+│
+├── test-support/                      # Utilidades compartidas de las pruebas
+│   └── company_settings.js            # Entorno de pruebas de los datos y el logo de consultora
 │
 ├── scripts/                           # Preparación y distribución
 │   ├── build.js                       # Compilación y copia del instalador MSI
