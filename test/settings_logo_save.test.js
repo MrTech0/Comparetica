@@ -33,6 +33,15 @@ async function setup(t, { failNative = false, extension = 'png' } = {}) {
     nodes.set(id, element());
   }
   const get = id => nodes.get(id) || null;
+  const logoInput = get('settings-company-logo');
+  let selectedFiles = [];
+  Object.defineProperties(logoInput, {
+    files: { get: () => selectedFiles, set: files => { selectedFiles = files; } },
+    value: {
+      get: () => selectedFiles[0] ? `C:\\fakepath\\${selectedFiles[0].name}` : '',
+      set: value => { assert.equal(value, ''); selectedFiles = []; }
+    }
+  });
   const submitButton = element();
   get('settings-company-form').querySelector = selector => {
     assert.equal(selector, 'button[type="submit"]');
@@ -109,6 +118,27 @@ test('an unsupported logo format preserves the stored logo', async t => {
   assert.equal(local.get('company_logo'), previousLogo);
   assert.ok(get('toast-container').children.some(toast => toast.className === 'm3-toast error'));
   assert.ok(!get('toast-container').children.some(toast => toast.className === 'm3-toast success'));
+  assert.equal(get('settings-company-logo').files.length, 0, 'an invalid file must be removed from the picker');
+  assert.equal(get('settings-company-logo').value, '');
+});
+
+test('the picker clears an invalid logo immediately and accepts a later valid selection', async t => {
+  const { get, settings, submit } = await setup(t);
+  const input = get('settings-company-logo');
+  input.files = [{ name: 'invalido.txt' }];
+  assert.equal(typeof input.onchange, 'function', 'file selection must validate the chosen logo');
+  input.onchange({ target: input });
+  assert.equal(input.files.length, 0);
+  assert.equal(input.value, '');
+  assert.equal(settings.get('company_logo'), previousLogo);
+  assert.equal(get('settings-company-logo-preview').children[0].src, previousLogo);
+  assert.match(get('toast-container').children.at(-1).innerText, /Formato de imagen no soportado/);
+
+  input.files = [{ name: 'nuevo.png' }];
+  input.onchange({ target: input });
+  assert.equal(input.files.length, 1);
+  await submit();
+  assert.equal(settings.get('company_logo'), newLogo);
 });
 
 test('saving company text without a new logo preserves the existing logo', async t => {

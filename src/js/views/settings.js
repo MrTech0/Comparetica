@@ -356,6 +356,17 @@ async function setupCompanySettings() {
   // Cargar datos actuales
   await loadCurrentCompanyData();
 
+  const validateLogoFile = file => {
+    const extension = file?.name.split('.').pop().toLowerCase();
+    if (file && !['svg', 'png', 'jpg', 'jpeg', 'webp', 'avif'].includes(extension)) {
+      showToast("Formato de imagen no soportado. Selecciona un archivo SVG, PNG, JPG, JPEG, WebP o AVIF.", "error");
+      if (logoInput) logoInput.value = '';
+      return false;
+    }
+    return true;
+  };
+  logoInput?.addEventListener('change', () => validateLogoFile(logoInput.files?.[0]));
+
   // Escuchar envío del formulario
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -388,11 +399,8 @@ async function setupCompanySettings() {
     }
 
     const logoFile = logoInput?.files?.[0];
+    if (!validateLogoFile(logoFile)) return;
     const extension = logoFile?.name.split('.').pop().toLowerCase();
-    if (logoFile && !['svg', 'png', 'jpg', 'jpeg', 'webp', 'avif'].includes(extension)) {
-      showToast("Formato de imagen no soportado. Selecciona un archivo SVG, PNG, JPG, JPEG, WebP o AVIF.", "error");
-      return;
-    }
 
     const configData = {
       consultora_nombre: name,
