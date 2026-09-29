@@ -151,17 +151,23 @@ El frontend usa módulos de JavaScript y estilos CSS; Tauri conecta la interfaz 
 │   └── src/
 │       ├── main.rs                    # Punto de entrada de escritorio
 │       ├── lib.rs                     # Comandos Tauri, archivos y copias de seguridad
+│       ├── csv_files.rs               # Lectura de CSV/TXT limitada a archivos arrastrados
 │       └── db.rs                      # SQLite en memoria, cifrado, bóveda y restauración
 │
 ├── test/                              # Pruebas de JavaScript con node --test
+│   ├── auth_alert_html.test.js        # Texto seguro en avisos de autenticación
 │   ├── calculator.test.js             # Facturación y formato de precios
 │   ├── client_lifecycle.test.js       # Estados y ciclo de vida de clientes
+│   ├── csv_encoding.test.js           # Codificación de archivos seleccionados y arrastrados
+│   ├── csv_mapping.test.js            # Asociación automática de columnas del CSV
 │   ├── cups_validation.test.js        # Identificadores y CUPS
+│   ├── fixtures/                      # Archivos de ejemplo utilizados por las pruebas
 │   ├── home_market.test.js            # Precios del panel de Inicio
 │   ├── ipc_and_ui.test.js             # IPC, eventos y componentes comunes
 │   ├── renewals_calendar.test.js      # Navegación del calendario
 │   ├── renewals_html.test.js          # Texto seguro en renovaciones
 │   ├── settings_dom.test.js           # Estructura y comportamiento del DOM
+│   ├── settings_logo_html.test.js     # Vista previa segura del logo de empresa
 │   └── wizard_steps.test.js           # Asistente inicial
 │
 ├── scripts/                           # Preparación y distribución

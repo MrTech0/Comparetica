@@ -1,6 +1,7 @@
 #![allow(linker_messages)]
 
 mod db;
+mod csv_files;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -32,34 +33,9 @@ fn save_pdf(filename: String, base64_data: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn read_text_file(path: String) -> Result<Vec<u8>, String> {
-    // La interfaz detecta la codificación antes de convertir el contenido a texto.
-    std::fs::read(&path).map_err(|e| format!("Error al leer el archivo: {}", e))
-}
-
-#[cfg(test)]
-mod csv_reader_tests {
-    use super::read_text_file;
-
-    #[test]
-    fn native_reader_accepts_windows1252_csv() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../test/fixtures/clientes-windows1252.csv");
-        let bytes = std::fs::read(&path).unwrap();
-        assert!(std::str::from_utf8(&bytes).is_err(), "fixture must require conversion");
-        let result = read_text_file(path.to_string_lossy().into_owned());
-        assert!(result.is_ok(), "native reader must not reject Windows-1252 before conversion: {:?}", result);
-        assert_eq!(result.unwrap(), bytes, "native reader must preserve original bytes");
-    }
-
-    #[test]
-    fn native_reader_preserves_utf8_csv() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../test/fixtures/clientes-utf8.csv");
-        let bytes = std::fs::read(&path).unwrap();
-        assert!(std::str::from_utf8(&bytes).is_ok());
-        assert_eq!(read_text_file(path.to_string_lossy().into_owned()).unwrap(), bytes);
-    }
+fn read_text_file(window: tauri::Window, state: tauri::State<'_, csv_files::SharedCsvDropState>, path: String) -> Result<Vec<u8>, String> {
+    let files = state.lock().map_err(|e| e.to_string())?;
+    files.read(window.label(), std::path::Path::new(&path))
 }
 
 #[tauri::command]
@@ -220,6 +196,7 @@ fn import_backup(app_handle: tauri::AppHandle, state: tauri::State<'_, db::Share
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(csv_files::SharedCsvDropState::default())
         .setup(|app| {
             use tauri::Manager;
             if let Ok(app_data_dir) = app.path().app_data_dir() {
@@ -250,10 +227,22 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                use tauri::Manager;
-                let app_handle = window.app_handle();
-                perform_auto_backup(&app_handle);
+            use tauri::Manager;
+            match event {
+                tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                    let state = window.state::<csv_files::SharedCsvDropState>();
+                    if let Ok(mut files) = state.lock() {
+                        files.register_drop(window.label(), paths);
+                    };
+                }
+                tauri::WindowEvent::Destroyed => {
+                    let state = window.state::<csv_files::SharedCsvDropState>();
+                    if let Ok(mut files) = state.lock() {
+                        files.clear_window(window.label());
+                    };
+                }
+                tauri::WindowEvent::CloseRequested { .. } => perform_auto_backup(window.app_handle()),
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
