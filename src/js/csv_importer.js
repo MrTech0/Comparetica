@@ -338,25 +338,23 @@ function autoMatchColumns() {
   const synonymsMap = {
     nombre_empresa: ['nombre', 'empresa', 'razonsocial', 'cliente', 'name', 'company', 'titular', 'nombreempresa', 'clienteempresa'],
     cif: ['cif', 'dni', 'nif', 'documento', 'taxid', 'identificacion', 'cifdni', 'cifnif', 'nifcif'],
+    agente_nombre: ['agente', 'comercial', 'agentenombre', 'nombreagente', 'agentecomercial', 'nombrecomercial'],
     representante: ['representante', 'contacto', 'personadecontacto', 'contact', 'representantelegal', 'persona'],
     cups: ['cups', 'codigocups', 'suministro', 'cupsluz', 'cupsgas', 'punto'],
-    email: ['email', 'correo', 'emaildecontacto', 'mail', 'correoelectronico', 'contactoemail']
+    email: ['email', 'correo', 'emaildecontacto', 'mail', 'correoelectronico', 'contactoemail'],
+    fecha_firma: ['fechafirma', 'fechadefirma', 'firma'],
+    fecha_vencimiento: ['fechavencimiento', 'fechadevencimiento', 'vencimiento']
   };
+  const normalizedHeaders = parsedCsvData.headers.map(normalizeHeader);
 
   crmColumns.forEach(crmCol => {
     const normCrmName = normalizeHeader(crmCol.name);
     const normCrmLabel = normalizeHeader(crmCol.label);
     const knownSynonyms = synonymsMap[crmCol.name] || [normCrmName, normCrmLabel];
 
-    let bestIndex = -1;
-
-    for (let i = 0; i < parsedCsvData.headers.length; i++) {
-      const normCsvHeader = normalizeHeader(parsedCsvData.headers[i]);
-
-      if (knownSynonyms.includes(normCsvHeader) || normCsvHeader.includes(normCrmName) || normCrmName.includes(normCsvHeader)) {
-        bestIndex = i;
-        break;
-      }
+    let bestIndex = normalizedHeaders.findIndex(header => header && knownSynonyms.includes(header));
+    if (bestIndex === -1) {
+      bestIndex = normalizedHeaders.findIndex(header => header && header.includes(normCrmName));
     }
 
     columnMappings[crmCol.name] = bestIndex;
