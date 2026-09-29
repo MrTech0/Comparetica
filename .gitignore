@@ -12,6 +12,15 @@ dist
 dist-ssr
 *.local
 
+# Generated binaries and installers
+*.exe
+*.msi
+*.dll
+*.pdb
+
+# Local package manager cache
+.pnpm-store/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
