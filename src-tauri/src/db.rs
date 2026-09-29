@@ -45,6 +45,12 @@ pub struct VaultConfig {
     pub encrypted_mdk_recovery: String,
 }
 
+#[derive(Serialize, Deserialize)]
+struct RestoreJournal {
+    had_db: bool,
+    had_vault: bool,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DbStatus {
     pub is_initialized: bool,
@@ -117,6 +123,18 @@ fn encrypt_aes_gcm(key: &[u8; 32], plaintext: &[u8]) -> Result<String, String> {
 fn decrypt_aes_gcm(key: &[u8; 32], encoded: &str) -> Result<Vec<u8>, String> {
     let combined = general_purpose::STANDARD.decode(encoded).map_err(|e| e.to_string())?;
     decrypt_bytes(key, &combined)
+}
+
+fn write_synced(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
+    let mut file = fs::File::create(path).map_err(|e| e.to_string())?;
+    file.write_all(bytes).map_err(|e| e.to_string())?;
+    file.sync_all().map_err(|e| e.to_string())
+}
+
+fn copy_synced(source: &std::path::Path, destination: &std::path::Path) -> Result<(), String> {
+    fs::copy(source, destination).map_err(|e| e.to_string())?;
+    fs::OpenOptions::new().write(true).open(destination).map_err(|e| e.to_string())?
+        .sync_all().map_err(|e| e.to_string())
 }
 
 fn deserialize_into_conn(conn: &mut Connection, bytes: &[u8]) -> Result<(), String> {
@@ -300,6 +318,146 @@ impl DbState {
             // Caso 3: Bóveda configurada pero aplicación bloqueada
             Err("Debes desbloquear la aplicación con tu Contraseña Maestra antes de importar una copia de seguridad sin cifrar.".to_string())
         }
+    }
+
+    fn validate_encrypted_backup(&self, db_bytes: &[u8], vault_bytes: &[u8], password: &str) -> Result<(), String> {
+        let vault: VaultConfig = serde_json::from_slice(vault_bytes)
+            .map_err(|_| "La bóveda de la copia no tiene un formato válido".to_string())?;
+        if !vault.is_initialized {
+            return Err("La bóveda de la copia no está inicializada".to_string());
+        }
+        let recovery_salt = general_purpose::STANDARD.decode(&vault.salt_recovery)
+            .map_err(|_| "La sal de recuperación de la copia es inválida".to_string())?;
+        let encrypted_recovery_key = general_purpose::STANDARD.decode(&vault.encrypted_mdk_recovery)
+            .map_err(|_| "La clave de recuperación cifrada es inválida".to_string())?;
+        if recovery_salt.len() != 32 || encrypted_recovery_key.len() != 60 {
+            return Err("Los datos de recuperación de la copia están incompletos".to_string());
+        }
+        let salt = general_purpose::STANDARD.decode(&vault.salt_password)
+            .map_err(|_| "La bóveda de la copia contiene una sal inválida".to_string())?;
+        let key = derive_key(password, &salt)?;
+        let mdk_bytes = decrypt_aes_gcm(&key, &vault.encrypted_mdk_password)
+            .map_err(|_| "La contraseña de la copia es incorrecta o la bóveda está dañada".to_string())?;
+        let mdk: [u8; 32] = mdk_bytes.try_into()
+            .map_err(|_| "La clave de la copia tiene una longitud inválida".to_string())?;
+        let plaintext = decrypt_bytes(&mdk, db_bytes)
+            .map_err(|_| "La base cifrada de la copia está dañada o no corresponde a la bóveda".to_string())?;
+        if !plaintext.starts_with(b"SQLite format 3\0") {
+            return Err("La copia no contiene una base SQLite válida".to_string());
+        }
+        let mut conn = Connection::open_in_memory().map_err(|e| e.to_string())?;
+        deserialize_into_conn(&mut conn, &plaintext)?;
+        let integrity: String = conn.query_row("PRAGMA integrity_check;", [], |row| row.get(0))
+            .map_err(|e| format!("No se pudo comprobar la integridad de la copia: {}", e))?;
+        if integrity != "ok" {
+            return Err(format!("La base de la copia no supera la comprobación de integridad: {}", integrity));
+        }
+        Ok(())
+    }
+
+    pub fn recover_interrupted_restore(&self) -> Result<(), String> {
+        let marker = self.app_data_dir.join("restore-in-progress.json");
+        if !marker.exists() {
+            return Ok(());
+        }
+        let journal: RestoreJournal = serde_json::from_slice(&fs::read(&marker).map_err(|e| e.to_string())?)
+            .map_err(|e| format!("Registro de restauración inválido: {}", e))?;
+        let db_old = self.app_data_dir.join("comparetica.db.enc.restore-old");
+        let vault_old = self.app_data_dir.join("vault.json.restore-old");
+        if (journal.had_db && !db_old.exists()) || (journal.had_vault && !vault_old.exists()) {
+            return Err("No se puede recuperar la restauración interrumpida: faltan archivos originales".to_string());
+        }
+        if journal.had_db {
+            copy_synced(&db_old, &self.enc_db_path())?;
+        } else if self.enc_db_path().exists() {
+            fs::remove_file(self.enc_db_path()).map_err(|e| e.to_string())?;
+        }
+        if journal.had_vault {
+            copy_synced(&vault_old, &self.vault_path())?;
+        } else if self.vault_path().exists() {
+            fs::remove_file(self.vault_path()).map_err(|e| e.to_string())?;
+        }
+        fs::remove_file(&marker).map_err(|e| e.to_string())?;
+        let _ = fs::remove_file(db_old);
+        let _ = fs::remove_file(vault_old);
+        let _ = fs::remove_file(self.app_data_dir.join("comparetica.db.enc.restore-new"));
+        let _ = fs::remove_file(self.app_data_dir.join("vault.json.restore-new"));
+        let _ = fs::remove_file(self.app_data_dir.join("restore-in-progress.json.restore-new"));
+        Ok(())
+    }
+
+    pub fn discard_restore_artifacts(&self) -> Result<(), String> {
+        for name in [
+            "restore-in-progress.json",
+            "restore-in-progress.json.restore-new",
+            "comparetica.db.enc.restore-old",
+            "vault.json.restore-old",
+            "comparetica.db.enc.restore-new",
+            "vault.json.restore-new",
+        ] {
+            let path = self.app_data_dir.join(name);
+            if path.exists() {
+                fs::remove_file(path).map_err(|e| e.to_string())?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn restore_encrypted_backup(&mut self, db_bytes: &[u8], vault_bytes: &[u8], password: &str) -> Result<(), String> {
+        self.validate_encrypted_backup(db_bytes, vault_bytes, password)?;
+        fs::create_dir_all(&self.app_data_dir).map_err(|e| e.to_string())?;
+
+        let db_path = self.enc_db_path();
+        let vault_path = self.vault_path();
+        let db_new = self.app_data_dir.join("comparetica.db.enc.restore-new");
+        let vault_new = self.app_data_dir.join("vault.json.restore-new");
+        let db_old = self.app_data_dir.join("comparetica.db.enc.restore-old");
+        let vault_old = self.app_data_dir.join("vault.json.restore-old");
+        let marker = self.app_data_dir.join("restore-in-progress.json");
+        let marker_new = self.app_data_dir.join("restore-in-progress.json.restore-new");
+
+        if marker.exists() {
+            return Err("Hay una restauración pendiente de recuperación; reinicia la aplicación".to_string());
+        }
+        for path in [&db_new, &vault_new, &db_old, &vault_old, &marker_new] {
+            if path.exists() {
+                fs::remove_file(path).map_err(|e| e.to_string())?;
+            }
+        }
+
+        write_synced(&db_new, db_bytes)?;
+        write_synced(&vault_new, vault_bytes)?;
+        let journal = RestoreJournal { had_db: db_path.exists(), had_vault: vault_path.exists() };
+        if journal.had_db {
+            copy_synced(&db_path, &db_old)?;
+        }
+        if journal.had_vault {
+            copy_synced(&vault_path, &vault_old)?;
+        }
+        let marker_bytes = serde_json::to_vec(&journal).map_err(|e| e.to_string())?;
+        write_synced(&marker_new, &marker_bytes)?;
+        fs::rename(&marker_new, &marker).map_err(|e| e.to_string())?;
+
+        let swap_result = fs::rename(&db_new, &db_path)
+            .and_then(|_| fs::rename(&vault_new, &vault_path))
+            .map_err(|e| e.to_string());
+        if let Err(error) = swap_result {
+            return match self.recover_interrupted_restore() {
+                Ok(()) => Err(format!("No se pudo instalar la copia; se conservaron los datos anteriores: {}", error)),
+                Err(recovery_error) => Err(format!("Falló la restauración y la recuperación: {}; {}", error, recovery_error)),
+            };
+        }
+        if let Err(error) = fs::remove_file(&marker) {
+            return match self.recover_interrupted_restore() {
+                Ok(()) => Err(format!("No se pudo completar la restauración; se conservaron los datos anteriores: {}", error)),
+                Err(recovery_error) => Err(format!("Falló la finalización y la recuperación: {}; {}", error, recovery_error)),
+            };
+        }
+        let _ = fs::remove_file(db_old);
+        let _ = fs::remove_file(vault_old);
+        self.conn = None;
+        self.mdk = None;
+        Ok(())
     }
 
     pub fn setup_master_password(&mut self, password: &str) -> Result<String, String> {
@@ -1203,5 +1361,201 @@ mod tests {
         assert_eq!(updated_rows[0].get("bloqueado_hasta").unwrap().as_str(), Some("2032-09-20"));
 
         let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_restore_rejects_wrong_password_without_changing_active_data() {
+        let source_dir = setup_test_dir("restore_source_wrong_password");
+        let target_dir = setup_test_dir("restore_target_wrong_password");
+
+        let mut source = DbState::new(source_dir.clone());
+        source.setup_master_password("SourcePassword123").unwrap();
+        source.execute("INSERT INTO comercializadoras (nombre) VALUES ('Source');", vec![]).unwrap();
+        let backup_db = fs::read(source.enc_db_path()).unwrap();
+        let backup_vault = fs::read(source.vault_path()).unwrap();
+
+        let mut target = DbState::new(target_dir.clone());
+        target.setup_master_password("TargetPassword123").unwrap();
+        target.execute("INSERT INTO comercializadoras (nombre) VALUES ('Target');", vec![]).unwrap();
+        let original_db = fs::read(target.enc_db_path()).unwrap();
+        let original_vault = fs::read(target.vault_path()).unwrap();
+
+        let result = target.restore_encrypted_backup(&backup_db, &backup_vault, "WrongPassword123");
+        assert!(result.is_err());
+        assert_eq!(fs::read(target.enc_db_path()).unwrap(), original_db);
+        assert_eq!(fs::read(target.vault_path()).unwrap(), original_vault);
+        let rows = target.select("SELECT nombre FROM comercializadoras;", vec![]).unwrap();
+        assert_eq!(rows[0]["nombre"], "Target");
+
+        drop(target);
+        drop(source);
+        fs::remove_dir_all(source_dir).unwrap();
+        fs::remove_dir_all(target_dir).unwrap();
+    }
+
+    #[test]
+    fn test_restore_rejects_corrupted_ciphertext_without_changing_active_data() {
+        let source_dir = setup_test_dir("restore_source_corrupt");
+        let target_dir = setup_test_dir("restore_target_corrupt");
+
+        let mut source = DbState::new(source_dir.clone());
+        source.setup_master_password("SourcePassword123").unwrap();
+        let mut backup_db = fs::read(source.enc_db_path()).unwrap();
+        let backup_vault = fs::read(source.vault_path()).unwrap();
+        let last = backup_db.len() - 1;
+        backup_db[last] ^= 0x01;
+
+        let mut target = DbState::new(target_dir.clone());
+        target.setup_master_password("TargetPassword123").unwrap();
+        let original_db = fs::read(target.enc_db_path()).unwrap();
+        let original_vault = fs::read(target.vault_path()).unwrap();
+
+        let result = target.restore_encrypted_backup(&backup_db, &backup_vault, "SourcePassword123");
+        assert!(result.is_err());
+        assert_eq!(fs::read(target.enc_db_path()).unwrap(), original_db);
+        assert_eq!(fs::read(target.vault_path()).unwrap(), original_vault);
+
+        drop(target);
+        drop(source);
+        fs::remove_dir_all(source_dir).unwrap();
+        fs::remove_dir_all(target_dir).unwrap();
+    }
+
+    #[test]
+    fn test_restore_rejects_invalid_recovery_metadata() {
+        let source_dir = setup_test_dir("restore_source_bad_recovery");
+        let target_dir = setup_test_dir("restore_target_bad_recovery");
+
+        let mut source = DbState::new(source_dir.clone());
+        source.setup_master_password("SourcePassword123").unwrap();
+        let backup_db = fs::read(source.enc_db_path()).unwrap();
+        let mut vault: serde_json::Value = serde_json::from_slice(&fs::read(source.vault_path()).unwrap()).unwrap();
+        vault["salt_recovery"] = serde_json::Value::String("not base64".to_string());
+        let backup_vault = serde_json::to_vec(&vault).unwrap();
+
+        let mut target = DbState::new(target_dir.clone());
+        target.setup_master_password("TargetPassword123").unwrap();
+        let original_db = fs::read(target.enc_db_path()).unwrap();
+        let original_vault = fs::read(target.vault_path()).unwrap();
+
+        assert!(target.restore_encrypted_backup(&backup_db, &backup_vault, "SourcePassword123").is_err());
+        assert_eq!(fs::read(target.enc_db_path()).unwrap(), original_db);
+        assert_eq!(fs::read(target.vault_path()).unwrap(), original_vault);
+
+        drop(target);
+        drop(source);
+        fs::remove_dir_all(source_dir).unwrap();
+        fs::remove_dir_all(target_dir).unwrap();
+    }
+
+    #[test]
+    fn test_restore_valid_backup_replaces_data_and_can_be_unlocked() {
+        let source_dir = setup_test_dir("restore_source_valid");
+        let target_dir = setup_test_dir("restore_target_valid");
+
+        let mut source = DbState::new(source_dir.clone());
+        source.setup_master_password("SourcePassword123").unwrap();
+        source.execute("INSERT INTO comercializadoras (nombre) VALUES ('Source');", vec![]).unwrap();
+        let backup_db = fs::read(source.enc_db_path()).unwrap();
+        let backup_vault = fs::read(source.vault_path()).unwrap();
+
+        let mut target = DbState::new(target_dir.clone());
+        target.setup_master_password("TargetPassword123").unwrap();
+        target.execute("INSERT INTO comercializadoras (nombre) VALUES ('Target');", vec![]).unwrap();
+
+        target.restore_encrypted_backup(&backup_db, &backup_vault, "SourcePassword123").unwrap();
+        assert!(!target.get_status().unwrap().is_unlocked);
+        drop(target);
+
+        let mut reopened = DbState::new(target_dir.clone());
+        assert!(reopened.login("TargetPassword123").is_err());
+        reopened.login("SourcePassword123").unwrap();
+        let rows = reopened.select("SELECT nombre FROM comercializadoras;", vec![]).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["nombre"], "Source");
+
+        drop(reopened);
+        drop(source);
+        fs::remove_dir_all(source_dir).unwrap();
+        fs::remove_dir_all(target_dir).unwrap();
+    }
+
+    #[test]
+    fn test_restore_valid_backup_into_new_installation() {
+        let source_dir = setup_test_dir("restore_source_first_run");
+        let target_dir = setup_test_dir("restore_target_first_run");
+        let mut source = DbState::new(source_dir.clone());
+        source.setup_master_password("SourcePassword123").unwrap();
+        source.execute("INSERT INTO comercializadoras (nombre) VALUES ('Source');", vec![]).unwrap();
+        let backup_db = fs::read(source.enc_db_path()).unwrap();
+        let backup_vault = fs::read(source.vault_path()).unwrap();
+
+        let mut target = DbState::new(target_dir.clone());
+        target.restore_encrypted_backup(&backup_db, &backup_vault, "SourcePassword123").unwrap();
+        assert!(!target_dir.join("restore-in-progress.json").exists());
+        drop(target);
+
+        let mut reopened = DbState::new(target_dir.clone());
+        reopened.login("SourcePassword123").unwrap();
+        let rows = reopened.select("SELECT nombre FROM comercializadoras;", vec![]).unwrap();
+        assert_eq!(rows[0]["nombre"], "Source");
+
+        drop(reopened);
+        drop(source);
+        fs::remove_dir_all(source_dir).unwrap();
+        fs::remove_dir_all(target_dir).unwrap();
+    }
+
+    #[test]
+    fn test_restore_recovers_original_pair_after_interrupted_swap() {
+        let target_dir = setup_test_dir("restore_interrupted");
+        let mut target = DbState::new(target_dir.clone());
+        target.setup_master_password("TargetPassword123").unwrap();
+        target.execute("INSERT INTO comercializadoras (nombre) VALUES ('Target');", vec![]).unwrap();
+        let original_db = fs::read(target.enc_db_path()).unwrap();
+        let original_vault = fs::read(target.vault_path()).unwrap();
+        drop(target);
+
+        fs::write(target_dir.join("comparetica.db.enc.restore-old"), &original_db).unwrap();
+        fs::write(target_dir.join("vault.json.restore-old"), &original_vault).unwrap();
+        fs::write(target_dir.join("restore-in-progress.json"), br#"{"had_db":true,"had_vault":true}"#).unwrap();
+        fs::write(target_dir.join("comparetica.db.enc"), b"partially replaced").unwrap();
+
+        let mut recovered = DbState::new(target_dir.clone());
+        recovered.recover_interrupted_restore().unwrap();
+        assert_eq!(fs::read(recovered.enc_db_path()).unwrap(), original_db);
+        assert_eq!(fs::read(recovered.vault_path()).unwrap(), original_vault);
+        assert!(!target_dir.join("restore-in-progress.json").exists());
+        recovered.login("TargetPassword123").unwrap();
+        let rows = recovered.select("SELECT nombre FROM comercializadoras;", vec![]).unwrap();
+        assert_eq!(rows[0]["nombre"], "Target");
+
+        drop(recovered);
+        fs::remove_dir_all(target_dir).unwrap();
+    }
+
+    #[test]
+    fn test_factory_reset_discards_interrupted_restore_without_resurrecting_data() {
+        let dir = setup_test_dir("restore_factory_reset");
+        let mut state = DbState::new(dir.clone());
+        state.setup_master_password("Password123").unwrap();
+        let original_db = fs::read(state.enc_db_path()).unwrap();
+        let original_vault = fs::read(state.vault_path()).unwrap();
+        drop(state);
+
+        fs::write(dir.join("comparetica.db.enc.restore-old"), original_db).unwrap();
+        fs::write(dir.join("vault.json.restore-old"), original_vault).unwrap();
+        fs::write(dir.join("restore-in-progress.json"), br#"{"had_db":true,"had_vault":true}"#).unwrap();
+
+        let state = DbState::new(dir.clone());
+        state.discard_restore_artifacts().unwrap();
+        fs::remove_file(state.enc_db_path()).unwrap();
+        fs::remove_file(state.vault_path()).unwrap();
+        state.recover_interrupted_restore().unwrap();
+        assert!(!state.enc_db_path().exists());
+        assert!(!state.vault_path().exists());
+
+        drop(state);
+        fs::remove_dir_all(dir).unwrap();
     }
 }

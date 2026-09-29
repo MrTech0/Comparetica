@@ -135,7 +135,7 @@ fn export_backup(app_handle: tauri::AppHandle, _state: tauri::State<'_, db::Shar
 }
 
 #[tauri::command]
-fn import_backup(app_handle: tauri::AppHandle, state: tauri::State<'_, db::SharedDbState>) -> Result<String, String> {
+fn import_backup(app_handle: tauri::AppHandle, state: tauri::State<'_, db::SharedDbState>, password: Option<String>) -> Result<String, String> {
     use tauri::Manager;
     let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
 
@@ -155,16 +155,13 @@ fn import_backup(app_handle: tauri::AppHandle, state: tauri::State<'_, db::Share
             if let Ok(bundle) = serde_json::from_str::<serde_json::Value>(content_str) {
                 if let (Some(db_b64), Some(vault_val)) = (bundle.get("db_enc").and_then(|v| v.as_str()), bundle.get("vault")) {
                     let db_bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, db_b64).map_err(|e| e.to_string())?;
-                    let vault_str = serde_json::to_string_pretty(vault_val).map_err(|e| e.to_string())?;
-
-                    std::fs::write(app_data_dir.join("comparetica.db.enc"), db_bytes).map_err(|e| e.to_string())?;
-                    std::fs::write(app_data_dir.join("vault.json"), vault_str).map_err(|e| e.to_string())?;
-
-                    // Limpiar estado en memoria
-                    if let Ok(mut db_state) = state.lock() {
-                        db_state.conn = None;
-                        db_state.mdk = None;
-                    }
+                    let vault_bytes = serde_json::to_vec(vault_val).map_err(|e| e.to_string())?;
+                    let backup_password = password.as_deref()
+                        .filter(|value| !value.is_empty())
+                        .ok_or_else(|| "La copia cifrada requiere su contraseña maestra".to_string())?;
+                    let mut db_state = state.lock().map_err(|e| e.to_string())?;
+                    db_state.restore_encrypted_backup(&db_bytes, &vault_bytes, backup_password)?;
+                    drop(db_state);
 
                     #[cfg(dev)]
                     {
@@ -200,8 +197,10 @@ pub fn run() {
         .setup(|app| {
             use tauri::Manager;
             if let Ok(app_data_dir) = app.path().app_data_dir() {
+                let db_state = db::DbState::new(app_data_dir.clone());
                 let reset_flag = app_data_dir.join("reset_db.flag");
                 if reset_flag.exists() {
+                    db_state.discard_restore_artifacts().map_err(std::io::Error::other)?;
                     let db_path = app_data_dir.join("comparetica.db");
                     let db_enc = app_data_dir.join("comparetica.db.enc");
                     let vault = app_data_dir.join("vault.json");
@@ -210,9 +209,10 @@ pub fn run() {
                     let _ = std::fs::remove_file(&db_enc);
                     let _ = std::fs::remove_file(&vault);
                     let _ = std::fs::remove_file(&reset_flag);
+                } else {
+                    db_state.recover_interrupted_restore().map_err(std::io::Error::other)?;
                 }
 
-                let db_state = db::DbState::new(app_data_dir);
                 app.manage(std::sync::Arc::new(std::sync::Mutex::new(db_state)));
 
                 // Migrar copias de seguridad de usuarios existentes a Comparetica_backups si es necesario
@@ -744,7 +744,9 @@ fn factory_reset(app_handle: tauri::AppHandle, state: tauri::State<'_, db::Share
     let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
     
     // 1. Cerrar conexión en memoria y limpiar clave MDK en la sesión de Rust
-    if let Ok(mut db_state) = state.lock() {
+    {
+        let mut db_state = state.lock().map_err(|e| e.to_string())?;
+        db_state.discard_restore_artifacts()?;
         db_state.conn = None;
         db_state.mdk = None;
     }

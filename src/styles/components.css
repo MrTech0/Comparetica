@@ -454,6 +454,10 @@ input[type="checkbox"]:checked + .m3-switch::after {
   z-index: var(--z-modal-priority);
 }
 
+#dialog-backup-password {
+  z-index: calc(var(--z-auth) + 1);
+}
+
 .m3-dialog-overlay.active {
   opacity: 1 !important;
   pointer-events: auto !important;

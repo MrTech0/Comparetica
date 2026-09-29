@@ -133,6 +133,53 @@ export function showConfirm(mensaje, titulo = "Confirmación") {
   });
 }
 
+/**
+ * Solicita la contraseña de una copia cifrada. Una cadena vacía permite
+ * seleccionar copias SQLite antiguas sin cifrar; null indica cancelación.
+ * @returns {Promise<string|null>}
+ */
+export function showBackupPasswordPrompt() {
+  return new Promise((resolve) => {
+    if (typeof document === 'undefined') {
+      resolve(null);
+      return;
+    }
+    const overlay = document.getElementById('dialog-backup-password');
+    const input = document.getElementById('dialog-backup-password-input');
+    const cancelButton = document.getElementById('dialog-backup-password-cancel');
+    const acceptButton = document.getElementById('dialog-backup-password-accept');
+    if (!overlay || !input || !cancelButton || !acceptButton) {
+      resolve(null);
+      return;
+    }
+
+    input.value = '';
+    const cancelClone = cancelButton.cloneNode(true);
+    const acceptClone = acceptButton.cloneNode(true);
+    cancelButton.replaceWith(cancelClone);
+    acceptButton.replaceWith(acceptClone);
+
+    const finish = (value) => {
+      overlay.classList.remove('active');
+      input.value = '';
+      input.onkeydown = null;
+      resolve(value);
+    };
+    cancelClone.addEventListener('click', () => finish(null));
+    acceptClone.addEventListener('click', () => finish(input.value));
+    input.onkeydown = (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        finish(input.value);
+      } else if (event.key === 'Escape') {
+        finish(null);
+      }
+    };
+    overlay.classList.add('active');
+    input.focus?.();
+  });
+}
+
 // Puente de retrocompatibilidad global
 if (typeof window !== 'undefined') {
   window.showToast = showToast;

@@ -425,6 +425,24 @@ describe('UI Notifications & Confirmation Module (src/js/ui.js)', () => {
     return { overlay, titleEl, msgEl, btnCancel, btnAccept, elements };
   }
 
+  function setupPasswordDOM() {
+    const elements = new Map();
+    for (const id of [
+      'dialog-backup-password', 'dialog-backup-password-title',
+      'dialog-backup-password-message', 'dialog-backup-password-input',
+      'dialog-backup-password-cancel', 'dialog-backup-password-accept'
+    ]) {
+      const element = createMockElement('div', elements);
+      element.id = id;
+      elements.set(id, element);
+    }
+    globalThis.document = {
+      getElementById: (id) => elements.get(id) || null,
+      createElement: (tag) => createMockElement(tag, elements)
+    };
+    return elements;
+  }
+
   describe('Exportaciones y puente de compatibilidad global (window)', () => {
     test('exporta las funciones canónicas showToast, showActionToast y showConfirm', () => {
       assert.strictEqual(typeof showToast, 'function');
@@ -696,6 +714,43 @@ describe('UI Notifications & Confirmation Module (src/js/ui.js)', () => {
     });
   });
 
+  describe('showBackupPasswordPrompt()', () => {
+    test('devuelve la contraseña introducida y borra el campo al aceptar', async () => {
+      const elements = setupPasswordDOM();
+      const { showBackupPasswordPrompt } = await import('../src/js/ui.js');
+      const promise = showBackupPasswordPrompt();
+      const overlay = elements.get('dialog-backup-password');
+      const input = elements.get('dialog-backup-password-input');
+      input.value = 'SourcePassword123';
+      elements.get('dialog-backup-password-accept').click();
+
+      assert.strictEqual(await promise, 'SourcePassword123');
+      assert.strictEqual(input.value, '');
+      assert.strictEqual(overlay.classList.contains('active'), false);
+    });
+
+    test('al cancelar devuelve null y borra la contraseña', async () => {
+      const elements = setupPasswordDOM();
+      const { showBackupPasswordPrompt } = await import('../src/js/ui.js');
+      const promise = showBackupPasswordPrompt();
+      const input = elements.get('dialog-backup-password-input');
+      input.value = 'SourcePassword123';
+      elements.get('dialog-backup-password-cancel').click();
+
+      assert.strictEqual(await promise, null);
+      assert.strictEqual(input.value, '');
+    });
+
+    test('permite dejar la contraseña vacía para una copia SQLite antigua', async () => {
+      const elements = setupPasswordDOM();
+      const { showBackupPasswordPrompt } = await import('../src/js/ui.js');
+      const promise = showBackupPasswordPrompt();
+      elements.get('dialog-backup-password-input').value = '';
+      elements.get('dialog-backup-password-accept').click();
+      assert.strictEqual(await promise, '');
+    });
+  });
+
   describe('Tipografía y salto de línea en notificaciones y alertas', () => {
     test('.m3-toast no divide palabras a la mitad (word-break: normal y overflow-wrap: break-word)', () => {
       const cssPath = path.resolve('src/styles/components.css');
@@ -787,5 +842,3 @@ describe('UI Notifications & Confirmation Module (src/js/ui.js)', () => {
     });
   });
 });
-
-

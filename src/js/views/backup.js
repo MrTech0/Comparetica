@@ -1,7 +1,7 @@
 /* src/js/views/backup.js */
 
 import { invoke } from '../ipc.js';
-import { showToast, showConfirm } from '../ui.js';
+import { showToast, showConfirm, showBackupPasswordPrompt } from '../ui.js';
 
 // Cargar la configuración de copias de seguridad actual
 export async function loadBackupConfig() {
@@ -149,12 +149,15 @@ export function initBackupView() {
 
       if (!confirmRestore) return;
 
+      const password = await showBackupPasswordPrompt();
+      if (password === null) return;
+
       try {
         importBtn.disabled = true;
         const originalText = importBtn.innerHTML;
         importBtn.innerText = "Restaurando...";
 
-        const msg = await invoke('import_backup');
+        const msg = await invoke('import_backup', { password });
         localStorage.setItem('first_run_completed', 'true');
         
         if (msg === "DEV_MODE") {

@@ -1,7 +1,7 @@
 // src/js/auth.js
 import { checkDbStatus, setupMasterPassword, loginDb, recoverDbAccess, changeMasterPassword } from './db.js';
 import { invoke } from './ipc.js';
-import { showToast } from './ui.js';
+import { showToast, showBackupPasswordPrompt } from './ui.js';
 
 let authOverlayEl = null;
 let authTitleEl = null;
@@ -180,7 +180,9 @@ function setupAuthEventListeners(onUnlockedCallback) {
     btnOnboardingRestoreBackup.addEventListener('click', async () => {
       try {
         btnOnboardingRestoreBackup.disabled = true;
-        const msg = await invoke('import_backup');
+        const password = await showBackupPasswordPrompt();
+        if (password === null) return;
+        const msg = await invoke('import_backup', { password });
         localStorage.setItem('first_run_completed', 'true');
 
         if (msg === "DEV_MODE") {
