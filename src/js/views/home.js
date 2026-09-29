@@ -86,8 +86,7 @@ async function loadMarketData() {
       const avgSpotMwh = spotValues.reduce((sum, item) => sum + item.value, 0) / spotValues.length;
       avgMwhEl.innerText = `${avgSpotMwh.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/MWh`;
     } else {
-      // Estimación fallback si el spot viene vacío
-      avgMwhEl.innerText = `${(avgPvpcMwh * 0.85).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/MWh`;
+      avgMwhEl.innerText = 'No disponible';
     }
 
     // Actualizar etiqueta de fecha
