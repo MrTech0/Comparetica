@@ -152,7 +152,7 @@ fn deserialize_into_conn(conn: &mut Connection, bytes: &[u8]) -> Result<(), Stri
         .ok_or_else(|| "Puntero nulo al deserializar SQLite".to_string())?;
     let owned_data = unsafe { rusqlite::serialize::OwnedData::from_raw_nonnull(non_null, sz) };
 
-    conn.deserialize(rusqlite::DatabaseName::Main, owned_data, false)
+    conn.deserialize("main", owned_data, false)
         .map_err(|e| format!("Error al deserializar base de datos en memoria: {}", e))
 }
 
@@ -267,7 +267,7 @@ impl DbState {
             None => return Ok(()),
         };
 
-        let db_bytes = conn.serialize(rusqlite::DatabaseName::Main)
+        let db_bytes = conn.serialize("main")
             .map_err(|e| format!("Error al serializar base de datos desde memoria: {}", e))?;
 
         let enc_bytes = encrypt_bytes(mdk, &db_bytes)?;
@@ -1033,6 +1033,90 @@ mod tests {
         path
     }
 
+    const SQLITE_032_PASSWORD: &str = "FixturePassword032!";
+    const SQLITE_032_DATABASE: &[u8] = include_bytes!("../tests/fixtures/rusqlite-0.32.1/database.enc");
+    const SQLITE_032_VAULT: &[u8] = include_bytes!("../tests/fixtures/rusqlite-0.32.1/vault.json");
+
+    #[test]
+    fn test_rusqlite_032_database_can_be_opened_updated_and_reopened() {
+        let dir = setup_test_dir("rusqlite_032_open_update");
+        fs::write(dir.join("comparetica.db.enc"), SQLITE_032_DATABASE).unwrap();
+        fs::write(dir.join("vault.json"), SQLITE_032_VAULT).unwrap();
+
+        let mut state = DbState::new(dir.clone());
+        state.login(SQLITE_032_PASSWORD).unwrap();
+        let clients = state.select("SELECT nombre_empresa, cif, email, agente_id, estado FROM clientes;", vec![]).unwrap();
+        assert_eq!(clients, vec![serde_json::json!({
+            "nombre_empresa": "Cliente Compatibilidad SL", "cif": "B12345674",
+            "email": "fixture@example.invalid", "agente_id": null, "estado": "activo"
+        })]);
+        let tariffs = state.select("SELECT nombre, termino_fijo, termino_variable, notas FROM tarifas_gas;", vec![]).unwrap();
+        assert_eq!(tariffs, vec![serde_json::json!({
+            "nombre": "Gas Compatibilidad", "termino_fijo": 12.5,
+            "termino_variable": 0.065125, "notas": "Acentos: energía; prueba"
+        })]);
+
+        let updated = state.execute("UPDATE clientes SET email = ? WHERE cif = ?;", vec![
+            serde_json::json!("updated@example.invalid"), serde_json::json!("B12345674")
+        ]).unwrap();
+        assert_eq!(updated["rowsAffected"], 1);
+        state.execute("UPDATE tarifas_gas SET termino_variable = ? WHERE id = ?;", vec![
+            serde_json::json!(0.075), serde_json::json!(1)
+        ]).unwrap();
+        drop(state);
+
+        let mut reopened = DbState::new(dir.clone());
+        reopened.login(SQLITE_032_PASSWORD).unwrap();
+        assert_eq!(reopened.select("SELECT email FROM clientes;", vec![]).unwrap(),
+            vec![serde_json::json!({"email": "updated@example.invalid"})]);
+        assert_eq!(reopened.select("SELECT termino_variable FROM tarifas_gas;", vec![]).unwrap(),
+            vec![serde_json::json!({"termino_variable": 0.075})]);
+        drop(reopened);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_rusqlite_032_backup_can_replace_existing_data_and_be_reopened() {
+        let dir = setup_test_dir("rusqlite_032_restore");
+        let mut state = DbState::new(dir.clone());
+        state.setup_master_password("TargetPassword032!").unwrap();
+        state.execute("INSERT INTO comercializadoras (nombre) VALUES ('Datos a reemplazar');", vec![]).unwrap();
+
+        state.restore_encrypted_backup(SQLITE_032_DATABASE, SQLITE_032_VAULT, SQLITE_032_PASSWORD).unwrap();
+        assert!(!state.get_status().unwrap().is_unlocked);
+        drop(state);
+
+        let mut reopened = DbState::new(dir.clone());
+        reopened.login(SQLITE_032_PASSWORD).unwrap();
+        assert_eq!(reopened.select("SELECT nombre FROM comercializadoras;", vec![]).unwrap(),
+            vec![serde_json::json!({"nombre": "Energía Compatibilidad"})]);
+        assert_eq!(reopened.select("SELECT nombre_empresa FROM clientes;", vec![]).unwrap(),
+            vec![serde_json::json!({"nombre_empresa": "Cliente Compatibilidad SL"})]);
+        drop(reopened);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_rusqlite_032_plaintext_backup_is_migrated_and_persisted_encrypted() {
+        let dir = setup_test_dir("rusqlite_032_legacy_import");
+        let mut state = DbState::new(dir.clone());
+        state.setup_master_password(SQLITE_032_PASSWORD).unwrap();
+        state.import_legacy_sqlite(include_bytes!("../tests/fixtures/rusqlite-0.32.1/legacy.sqlite")).unwrap();
+        drop(state);
+
+        let mut reopened = DbState::new(dir.clone());
+        reopened.login(SQLITE_032_PASSWORD).unwrap();
+        let clients = reopened.select("SELECT id, nombre_empresa, email, agente_id, estado, bloqueado_en FROM clientes;", vec![]).unwrap();
+        assert_eq!(clients, vec![serde_json::json!({
+            "id": 73, "nombre_empresa": "Cliente Legacy SL", "email": "legacy@example.invalid",
+            "agente_id": null, "estado": "activo", "bloqueado_en": null
+        })]);
+        assert!(dir.join("comparetica.db.enc").exists());
+        assert!(!dir.join("comparetica.db").exists());
+        drop(reopened);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn test_vault_and_login_lifecycle() {
         let dir = setup_test_dir("vault_and_login_lifecycle");
@@ -1286,7 +1370,7 @@ mod tests {
         let legacy_conn = Connection::open_in_memory().unwrap();
         legacy_conn.execute("CREATE TABLE legacy_clientes (id INTEGER PRIMARY KEY, nombre TEXT);", []).unwrap();
         legacy_conn.execute("INSERT INTO legacy_clientes (nombre) VALUES ('Cliente Migrado SL');", []).unwrap();
-        let legacy_bytes = legacy_conn.serialize(rusqlite::DatabaseName::Main).unwrap().to_vec();
+        let legacy_bytes = legacy_conn.serialize("main").unwrap().to_vec();
         drop(legacy_conn);
 
         // Importar usando el método optimizado en memoria

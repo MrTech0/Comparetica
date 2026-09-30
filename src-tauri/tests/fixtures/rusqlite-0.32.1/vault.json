@@ -1,0 +1,7 @@
+{
+  "is_initialized": true,
+  "salt_password": "wAKhHcbmm6D2Vxi+lyT/NHeVJhsCOmkYtMTXI2nF6vg=",
+  "salt_recovery": "qd0pAhcbL1rfPHT+LulvtxC9tnhoDk3Q4nO+LOTchmU=",
+  "encrypted_mdk_password": "kDT0O21xeJTkLd/gsRmUt4YAPGKobSIS0MM7YbH6F4Qj3kWMSYTTpwK4GeZa4MJcJO7Z73am4KW7UvKw",
+  "encrypted_mdk_recovery": "JxDjpJvDGHl3db6QwS954oafE78qeJD+GaWQy0remi4B6BPqDbjSalvz75ZgBIDA4GBFLMGK8Bydaz/H"
+}

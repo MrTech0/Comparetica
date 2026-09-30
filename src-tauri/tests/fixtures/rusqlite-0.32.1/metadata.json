@@ -1,0 +1,9 @@
+{
+  "libsqlite3_sys_version": "0.30.1",
+  "password": "FixturePassword032!",
+  "purpose": "Synthetic compatibility fixtures; no user data or real credentials",
+  "recovery_key": "RC-6ZDP-VDAJ-MAZP-ZNP7",
+  "rusqlite_version": "0.32.1",
+  "source_revision": "343f839a6d4e46e0e534e5d63710f6b10b438334",
+  "sqlite_version": "3.46.0"
+}
