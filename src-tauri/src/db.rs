@@ -96,8 +96,8 @@ fn encrypt_bytes(key: &[u8; 32], plaintext: &[u8]) -> Result<Vec<u8>, String> {
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
     let mut nonce_bytes = [0u8; 12];
     thread_rng().fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
-    let ciphertext = cipher.encrypt(nonce, plaintext).map_err(|e| e.to_string())?;
+    let nonce = Nonce::from(nonce_bytes);
+    let ciphertext = cipher.encrypt(&nonce, plaintext).map_err(|e| e.to_string())?;
     
     let mut combined = Vec::with_capacity(12 + ciphertext.len());
     combined.extend_from_slice(&nonce_bytes);
@@ -111,8 +111,8 @@ fn decrypt_bytes(key: &[u8; 32], combined: &[u8]) -> Result<Vec<u8>, String> {
     }
     let (nonce_bytes, ciphertext) = combined.split_at(12);
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
-    let nonce = Nonce::from_slice(nonce_bytes);
-    cipher.decrypt(nonce, ciphertext).map_err(|_| "Contraseña o clave incorrecta".to_string())
+    let nonce = Nonce::try_from(nonce_bytes).map_err(|_| "Datos cifrados inválidos".to_string())?;
+    cipher.decrypt(&nonce, ciphertext).map_err(|_| "Contraseña o clave incorrecta".to_string())
 }
 
 fn encrypt_aes_gcm(key: &[u8; 32], plaintext: &[u8]) -> Result<String, String> {
@@ -1036,6 +1036,61 @@ mod tests {
     const SQLITE_032_PASSWORD: &str = "FixturePassword032!";
     const SQLITE_032_DATABASE: &[u8] = include_bytes!("../tests/fixtures/rusqlite-0.32.1/database.enc");
     const SQLITE_032_VAULT: &[u8] = include_bytes!("../tests/fixtures/rusqlite-0.32.1/vault.json");
+
+    #[test]
+    fn test_pre_upgrade_vault_password_change_preserves_existing_data() {
+        let dir = setup_test_dir("pre_upgrade_password_change");
+        fs::write(dir.join("comparetica.db.enc"), SQLITE_032_DATABASE).unwrap();
+        fs::write(dir.join("vault.json"), SQLITE_032_VAULT).unwrap();
+        let metadata: Value = serde_json::from_str(include_str!("../tests/fixtures/rusqlite-0.32.1/metadata.json")).unwrap();
+        let old_recovery = metadata["recovery_key"].as_str().unwrap();
+        let mut state = DbState::new(dir.clone());
+        state.login(SQLITE_032_PASSWORD).unwrap();
+        assert!(state.change_password("WrongCurrentPassword!", "MigratedPassword2026!").is_err());
+        assert_eq!(fs::read(state.vault_path()).unwrap(), SQLITE_032_VAULT);
+        let new_recovery = state.change_password(SQLITE_032_PASSWORD, "MigratedPassword2026!").unwrap();
+        assert_ne!(new_recovery, old_recovery);
+        drop(state);
+
+        let mut reopened = DbState::new(dir.clone());
+        assert!(reopened.login(SQLITE_032_PASSWORD).is_err());
+        assert!(reopened.recover_access(old_recovery, "IncorrectRotation2026!").is_err());
+        reopened.login("MigratedPassword2026!").unwrap();
+        assert_eq!(reopened.select("SELECT nombre_empresa FROM clientes;", vec![]).unwrap(),
+            vec![serde_json::json!({"nombre_empresa": "Cliente Compatibilidad SL"})]);
+        drop(reopened);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_pre_upgrade_backup_recovery_preserves_data_in_new_backups() {
+        let dir = setup_test_dir("pre_upgrade_backup_recovery");
+        let metadata: Value = serde_json::from_str(include_str!("../tests/fixtures/rusqlite-0.32.1/metadata.json")).unwrap();
+        let old_recovery = metadata["recovery_key"].as_str().unwrap();
+        let mut state = DbState::new(dir.clone());
+        state.restore_encrypted_backup(SQLITE_032_DATABASE, SQLITE_032_VAULT, SQLITE_032_PASSWORD).unwrap();
+        assert!(state.recover_access("RC-AAAA-AAAA-AAAA-AAAA", "RecoveredPassword2026!").is_err());
+        assert_eq!(fs::read(state.vault_path()).unwrap(), SQLITE_032_VAULT);
+        assert_eq!(fs::read(state.enc_db_path()).unwrap(), SQLITE_032_DATABASE);
+        let new_recovery = state.recover_access(old_recovery, "RecoveredPassword2026!").unwrap();
+        assert_ne!(new_recovery, old_recovery);
+        assert_eq!(state.select("SELECT nombre_empresa FROM clientes;", vec![]).unwrap(),
+            vec![serde_json::json!({"nombre_empresa": "Cliente Compatibilidad SL"})]);
+        state.execute("UPDATE clientes SET email = ?;", vec![serde_json::json!("recovered@example.invalid")]).unwrap();
+        let new_database = fs::read(state.enc_db_path()).unwrap();
+        let new_vault = fs::read(state.vault_path()).unwrap();
+        drop(state);
+
+        let target = setup_test_dir("post_upgrade_backup_restore");
+        let mut restored = DbState::new(target.clone());
+        restored.restore_encrypted_backup(&new_database, &new_vault, "RecoveredPassword2026!").unwrap();
+        restored.login("RecoveredPassword2026!").unwrap();
+        assert_eq!(restored.select("SELECT nombre_empresa, email FROM clientes;", vec![]).unwrap(),
+            vec![serde_json::json!({"nombre_empresa": "Cliente Compatibilidad SL", "email": "recovered@example.invalid"})]);
+        drop(restored);
+        let _ = fs::remove_dir_all(dir);
+        let _ = fs::remove_dir_all(target);
+    }
 
     #[test]
     fn test_rusqlite_032_database_can_be_opened_updated_and_reopened() {

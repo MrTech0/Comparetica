@@ -5,6 +5,11 @@ Estas muestras contienen únicamente datos ficticios. Se generaron con el módul
 rusqlite **0.32.1**, libsqlite3-sys **0.30.1** y SQLite **3.46.0**, antes de
 actualizar las dependencias de la aplicación.
 
+El cifrado original utiliza **aes-gcm 0.10.3** y **argon2 0.5.3**, según el
+`Cargo.lock` de ese commit. Estas mismas muestras permiten comprobar que las
+actualizaciones del cifrado mantienen la lectura de datos y copias anteriores,
+el cambio de contraseña y la recuperación con la clave de emergencia.
+
 - `database.enc` y `vault.json`: base cifrada y bóveda creadas mediante
   `DbState::setup_master_password` y `DbState::execute`. Incluyen un cliente,
   una comercializadora, una tarifa de gas con precios decimales y texto UTF-8.
