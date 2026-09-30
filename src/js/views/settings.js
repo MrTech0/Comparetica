@@ -17,6 +17,7 @@ import {
 import { initCsvImporter } from '../csv_importer.js';
 import { invoke } from '../ipc.js';
 import { setupFileDropzone } from '../utils/file_drop.js';
+import { createLogoSelection } from '../utils/logo.js';
 import { showToast, showConfirm } from '../ui.js';
 
 export async function initSettingsView() {
@@ -354,54 +355,35 @@ async function setupCompanySettings() {
 
   if (!form) return;
 
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const setLogoBusy = busy => {
+    if (logoInput) logoInput.disabled = busy;
+    if (clearLogoBtn) clearLogoBtn.disabled = busy;
+    if (submitBtn) submitBtn.disabled = busy;
+  };
+
   // Cargar datos actuales
   await loadCurrentCompanyData();
 
-  const validateLogoFile = file => {
-    const extension = file?.name.split('.').pop().toLowerCase();
-    if (file && !['svg', 'png', 'jpg', 'jpeg', 'webp', 'avif'].includes(extension)) {
-      showToast("Formato de imagen no soportado. Selecciona un archivo SVG, PNG, JPG, JPEG, WebP o AVIF.", "error");
-      if (logoInput) logoInput.value = '';
-      return false;
-    }
-    return true;
-  };
-  let selectionVersion = 0;
-  logoInput?.addEventListener('change', () => {
-    selectionVersion++;
-    validateLogoFile(logoInput.files?.[0]);
-  });
-  const selectDroppedLogo = file => {
-    if (!logoInput || !validateLogoFile(file)) return;
-    const selection = new DataTransfer();
-    selection.items.add(file);
-    logoInput.files = selection.files;
-  };
+  const logoSelection = createLogoSelection(logoInput, showToast);
+  logoInput?.addEventListener('change', () => !logoInput.disabled && logoSelection.select());
   await setupFileDropzone(logoDropzone, {
-    onFile: file => {
-      selectionVersion++;
-      selectDroppedLogo(file);
-    },
+    onFile: file => !logoInput?.disabled && logoSelection.select(file, true),
     onPaths: async paths => {
-      const version = ++selectionVersion;
+      if (logoInput?.disabled) return;
       const path = paths[0];
       const name = path.split(/[/\\]/).pop();
-      if (!validateLogoFile({ name })) return;
-      try {
-        const bytes = await invoke('read_dropped_logo_file', { path });
-        if (version !== selectionVersion) return;
-        selectDroppedLogo(new File([new Uint8Array(bytes)], name));
-      } catch (error) {
-        if (version !== selectionVersion) return;
-        if (logoInput) logoInput.value = '';
-        showToast("Error al leer el logotipo arrastrado.", "error");
-      }
+      if (!logoSelection.validate({ name })) return;
+      await logoSelection.select(invoke('read_dropped_logo_file', { path })
+        .then(bytes => new File([new Uint8Array(bytes)], name))
+        .catch(() => { throw new Error('Error al leer el logotipo arrastrado. El archivo se ha retirado del campo.'); }), true);
     }
   });
 
   // Escuchar envío del formulario
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (submitBtn?.disabled) return;
 
     const name = document.getElementById('settings-company-name').value.trim();
     const street = document.getElementById('settings-company-street').value.trim();
@@ -430,10 +412,6 @@ async function setupCompanySettings() {
       }
     }
 
-    const logoFile = logoInput?.files?.[0];
-    if (!validateLogoFile(logoFile)) return;
-    const extension = logoFile?.name.split('.').pop().toLowerCase();
-
     const configData = {
       consultora_nombre: name,
       consultora_calle: street,
@@ -447,23 +425,21 @@ async function setupCompanySettings() {
     };
 
     try {
-      const submitBtn = form.querySelector('button[type="submit"]');
-      submitBtn.disabled = true;
+      setLogoBusy(true);
       submitBtn.innerText = "Guardando...";
+
+      const { ok, logo } = await logoSelection.ready();
+      if (!ok) return;
 
       // 1. Guardar Configuración de Texto
       await saveCompanyConfig(configData);
 
       // 2. Guardar Logotipo si se ha seleccionado uno nuevo
-      if (logoFile) {
-        const base64Data = await fileToBase64(logoFile);
-        const dataUri = `data:image/${extension === 'svg' ? 'svg+xml' : extension};base64,${base64Data}`;
-
+      if (logo) {
         if (typeof window !== 'undefined' && window.__TAURI__) {
-          await invoke('save_company_logo', { base64Data, extension });
+          await invoke('save_company_logo', { base64Data: logo.base64Data, extension: logo.extension });
         }
-
-        await saveCompanyLogo(dataUri);
+        await saveCompanyLogo(logo.dataUri);
       }
 
       showToast("Configuración de la consultora guardada correctamente.", "success");
@@ -473,31 +449,33 @@ async function setupCompanySettings() {
       console.error("Error al guardar la configuración de la consultora:", error);
       showToast("Error al guardar los datos de configuración.", "error");
     } finally {
-      const submitBtn = form.querySelector('button[type="submit"]');
       if (submitBtn) {
-        submitBtn.disabled = false;
         submitBtn.innerText = "Guardar Datos de Consultora";
       }
+      setLogoBusy(false);
     }
   });
 
   // Limpiar logotipo personalizado
   if (clearLogoBtn) {
     clearLogoBtn.addEventListener('click', async () => {
+      if (clearLogoBtn.disabled) return;
       if (!await showConfirm("¿Estás seguro de que deseas eliminar tu logotipo personalizado y usar la bombilla por defecto?", "Borrar Logotipo Personalizado")) {
         return;
       }
+      if (clearLogoBtn.disabled) return;
 
+      setLogoBusy(true);
+      logoSelection.clear();
       try {
         await deleteCompanyLogo();
-        
-        selectionVersion++;
-        logoInput.value = ''; // Limpiar input file
         showToast("Logotipo eliminado con éxito. Ahora se usará el icono por defecto.", "success");
         await loadSettings(); // Refrescar vista previa
       } catch (error) {
         console.error("Error al eliminar el logotipo:", error);
         showToast("Error al eliminar el logotipo personalizado.", "error");
+      } finally {
+        setLogoBusy(false);
       }
     });
   }
@@ -599,24 +577,6 @@ export async function loadSettings() {
 // Helper para compatibilidad interna
 async function loadCurrentCompanyData() {
   await loadSettings();
-}
-
-// Convertir archivo a base64
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const result = reader.result;
-      const base64Index = result.indexOf(';base64,') + 8;
-      if (base64Index > 7) {
-        resolve(result.substring(base64Index));
-      } else {
-        reject("Error al parsear base64");
-      }
-    };
-    reader.onerror = error => reject(error);
-  });
 }
 
 // --- Control de Actualizaciones ---

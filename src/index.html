@@ -1553,14 +1553,15 @@
                     <label class="m3-label" for="settings-company-logo">Logotipo de la Empresa (Subir nueva imagen para cambiar)</label>
                     <div id="settings-company-logo-dropzone" class="logo-dropzone">
                       <div style="display: flex; gap: 16px; align-items: center;">
-                        <input type="file" id="settings-company-logo" class="m3-input" accept=".svg, .png, .jpg, .jpeg, .webp, .avif" aria-describedby="settings-company-logo-drop-hint" style="padding-top: 10px; cursor: pointer; flex: 1;" />
+                        <input type="file" id="settings-company-logo" class="m3-input" accept=".svg" aria-describedby="settings-company-logo-drop-hint settings-company-logo-size-hint" style="padding-top: 10px; cursor: pointer; flex: 1;" />
                         <div id="settings-company-logo-preview" style="width: 50px; height: 50px; border: 1px dashed var(--color-outline); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; overflow: hidden; background-color: var(--color-surface-variant);">
                           <span class="text-muted" style="font-size: 9px;">Sin Logo</span>
                         </div>
                       </div>
-                      <p id="settings-company-logo-drop-hint" class="text-muted" style="font-size: 12px; margin: 10px 0 0;">Arrastra una imagen aquí o selecciónala con el botón. Se aplicará al guardar.</p>
+                      <p id="settings-company-logo-drop-hint" class="text-muted" style="font-size: 12px; margin: 10px 0 0;">Arrastra un archivo .svg aquí o selecciónalo con el botón. Se aplicará al guardar.</p>
                     </div>
-                    <span class="text-muted" style="font-size: 11px; margin-top: 4px;">Formatos: SVG, PNG, JPG, WebP, AVIF. Si deseas borrar tu logo y usar la bombilla por defecto, usa el botón de abajo.</span>
+                    <p id="settings-company-logo-size-hint" class="text-muted" style="font-size: 12px; margin: 6px 0 0;">Solo se admiten archivos .svg. Al adjuntarlo, se convierte una sola vez a PNG, con transparencia y un máximo de 512 px en su lado mayor. Al guardar, solo se conserva el PNG optimizado para mantener ligeros los PDF.</p>
+                    <span class="text-muted" style="font-size: 11px; margin-top: 4px;">Formato admitido: SVG (.svg). Si deseas borrar tu logo y usar la bombilla por defecto, usa el botón de abajo.</span>
                   </div>
 
                   <div class="m3-field">
@@ -2322,8 +2323,9 @@
 
               <div class="m3-field">
                 <label class="m3-label" for="wizard-company-logo">Logotipo de la Empresa (Opcional)</label>
-                <input type="file" id="wizard-company-logo" class="m3-input" accept=".svg, .png, .jpg, .jpeg, .webp, .avif" style="padding-top: 10px; cursor: pointer;" />
-                <span class="text-muted" style="font-size: 11px; margin-top: 4px;">Formatos admitidos: SVG, PNG, JPG, WebP, AVIF.</span>
+                <input type="file" id="wizard-company-logo" class="m3-input" accept=".svg" aria-describedby="wizard-company-logo-size-hint" style="padding-top: 10px; cursor: pointer;" />
+                <p id="wizard-company-logo-size-hint" class="text-muted" style="font-size: 12px; margin: 6px 0 0;">Solo se admiten archivos .svg. Al adjuntarlo, se convierte una sola vez a PNG, con transparencia y un máximo de 512 px en su lado mayor. Al guardar, solo se conserva el PNG optimizado para mantener ligeros los PDF.</p>
+                <span class="text-muted" style="font-size: 11px; margin-top: 4px;">Formato admitido: SVG (.svg).</span>
               </div>
 
               <div class="m3-field">

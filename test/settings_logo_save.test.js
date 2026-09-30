@@ -44,9 +44,9 @@ test('the picker clears an invalid logo immediately and accepts a later valid se
   assert.equal(input.value, '');
   assert.equal(settings.get('company_logo'), previousLogo);
   assert.equal(get('settings-company-logo-preview').children[0].src, previousLogo);
-  assert.match(get('toast-container').children.at(-1).innerText, /Formato de imagen no soportado/);
+  assert.match(get('toast-container').children.at(-1).innerText, /solo.*\.svg/i);
 
-  input.files = [{ name: 'nuevo.png' }];
+  input.files = [new File(['svg source'], 'nuevo.svg')];
   input.onchange({ target: input });
   assert.equal(input.files.length, 1);
   await submit();

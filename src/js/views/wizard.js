@@ -1,6 +1,8 @@
 /* src/js/views/wizard.js */
 import { loadBackupConfig } from './backup.js';
 import { saveCompanyConfig, saveCompanyLogo, addAgente, reassignAgenteClientes } from '../db.js';
+import { createLogoSelection } from '../utils/logo.js';
+import { showToast } from '../ui.js';
 
 export async function initWizard() {
   const wizardOverlay = document.getElementById('dialog-welcome-wizard');
@@ -20,6 +22,10 @@ export async function initWizard() {
   const pathInput = document.getElementById('wizard-backup-path-input');
 
   if (!wizardOverlay) return;
+
+  const logoInput = document.getElementById('wizard-company-logo');
+  const logoSelection = createLogoSelection(logoInput, showToast);
+  logoInput?.addEventListener('change', () => !logoInput.disabled && logoSelection.select());
 
   // Cargar ruta por defecto al iniciar
   let defaultBackupPath = '';
@@ -89,7 +95,7 @@ export async function initWizard() {
       }
     }
 
-    return true;
+    return logoSelection.validate(logoInput?.files?.[0]);
   }
 
   // Validación defensiva del Paso 3 (Comercial Principal)
@@ -234,7 +240,6 @@ export async function initWizard() {
       const web = document.getElementById('wizard-company-web').value.trim();
       const email = document.getElementById('wizard-company-email').value.trim();
       const phone = document.getElementById('wizard-company-phone').value.trim();
-      const logoInput = document.getElementById('wizard-company-logo');
 
       const configData = {
         consultora_nombre: name,
@@ -254,6 +259,10 @@ export async function initWizard() {
           submitBtn.disabled = true;
           submitBtn.innerText = "Finalizando...";
         }
+        if (logoInput) logoInput.disabled = true;
+
+        const { ok, logo } = await logoSelection.ready();
+        if (!ok) { showStep1(); return; }
 
         // 1. Guardar Configuración de Texto de la Consultora
         await saveCompanyConfig(configData);
@@ -266,22 +275,11 @@ export async function initWizard() {
         }
 
         // 3. Guardar Logotipo si se ha subido
-        if (logoInput && logoInput.files && logoInput.files[0]) {
-          const file = logoInput.files[0];
-          const extension = file.name.split('.').pop().toLowerCase();
-          
-          const base64Data = await fileToBase64(file);
-          const logoDataUri = `data:image/${extension === 'svg' ? 'svg+xml' : extension};base64,${base64Data}`;
-
-          await saveCompanyLogo(logoDataUri);
-
+        if (logo) {
           if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-            try {
-              await window.__TAURI__.core.invoke('save_company_logo', { base64Data, extension });
-            } catch (errLogo) {
-              console.warn("No se pudo guardar logotipo en backend:", errLogo);
-            }
+            await window.__TAURI__.core.invoke('save_company_logo', { base64Data: logo.base64Data, extension: logo.extension });
           }
+          await saveCompanyLogo(logo.dataUri);
         }
 
         // 4. Crear el Comercial Principal y asignar posibles clientes
@@ -310,25 +308,8 @@ export async function initWizard() {
           submitBtn.disabled = false;
           submitBtn.innerText = "Finalizar";
         }
+        if (logoInput) logoInput.disabled = false;
       }
     });
   }
-}
-
-// Convertir archivo a base64 (removiendo el header data:image/...)
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const result = reader.result;
-      const base64Index = result.indexOf(';base64,') + 8;
-      if (base64Index > 7) {
-        resolve(result.substring(base64Index));
-      } else {
-        reject("Error al parsear base64");
-      }
-    };
-    reader.onerror = error => reject(error);
-  });
 }

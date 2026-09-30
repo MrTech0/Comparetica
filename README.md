@@ -130,6 +130,7 @@ El frontend usa módulos de JavaScript y estilos CSS; Tauri conecta la interfaz 
 │       ├── csv_importer.js            # Importación CSV de clientes y renovaciones
 │       ├── utils/validators.js        # Validación de DNI, CIF, NIE y CUPS
 │       ├── utils/file_drop.js         # Arrastre de archivos en navegador y Tauri
+│       ├── utils/logo.js              # Validación SVG y conversión única a PNG al adjuntar el logo
 │       ├── components/date_range_picker.js
 │       └── views/                     # Controladores de cada pantalla
 │           ├── home.js                # Precios PVPC y mayoristas
@@ -166,16 +167,21 @@ El frontend usa módulos de JavaScript y estilos CSS; Tauri conecta la interfaz 
 │   ├── fixtures/                      # Archivos de ejemplo utilizados por las pruebas
 │   ├── home_market.test.js            # Precios del panel de Inicio
 │   ├── ipc_and_ui.test.js             # IPC, eventos y componentes comunes
+│   ├── pdf_logo.test.js               # Tamaño y compresión del logo en los PDF
 │   ├── renewals_calendar.test.js      # Navegación del calendario
 │   ├── renewals_html.test.js          # Texto seguro en renovaciones
 │   ├── settings_dom.test.js           # Estructura y comportamiento del DOM
 │   ├── settings_logo_html.test.js     # Vista previa segura del logo de empresa
 │   ├── settings_logo_drop.test.js     # Arrastre de logos y separación del importador CSV
+│   ├── settings_logo_optimization.test.js # Conversión única y guardado del PNG optimizado
 │   ├── settings_logo_save.test.js     # Guardado del logo y conservación ante errores
+│   ├── settings_logo_resolution.test.js # Avisos de dimensiones y compatibilidad con CSP
+│   ├── settings_logo_svg.test.js      # Restricción a SVG en selección, arrastre y asistente
 │   └── wizard_steps.test.js           # Asistente inicial
 │
 ├── test-support/                      # Utilidades compartidas de las pruebas
-│   └── company_settings.js            # Entorno de pruebas de los datos y el logo de consultora
+│   ├── company_settings.js            # Entorno de pruebas de los datos y el logo de consultora
+│   └── pdf_logo.js                    # Entorno de pruebas de conversión y generación de PDF
 │
 ├── scripts/                           # Preparación y distribución
 │   ├── build.js                       # Compilación y copia del instalador MSI

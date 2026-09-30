@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 const CSV_EXTENSIONS: &[&str] = &["csv", "txt"];
-const LOGO_EXTENSIONS: &[&str] = &["svg", "png", "jpg", "jpeg", "webp", "avif"];
-const SUPPORTED_EXTENSIONS: &[&str] = &["csv", "txt", "svg", "png", "jpg", "jpeg", "webp", "avif"];
+const LOGO_EXTENSIONS: &[&str] = &["svg"];
+const SUPPORTED_EXTENSIONS: &[&str] = &["csv", "txt", "svg"];
 const ACCESS_DENIED: &str = "Solo se pueden leer archivos del tipo solicitado arrastrados a esta ventana.";
 
 #[derive(Default)]
@@ -168,16 +168,29 @@ mod tests {
     }
 
     #[test]
-    fn dropped_logo_formats_preserve_binary_bytes() {
-        for extension in ["SVG", "PNG", "jpg", "jpeg", "webp", "avif"] {
+    fn dropped_svg_logos_preserve_original_bytes() {
+        for extension in ["SVG", "svg"] {
             let path = std::env::temp_dir().join(format!("comparetica_dropped_logo_{}.{}", rand::random::<u64>(), extension));
-            let bytes = [0xFF, 0x00, 0x80, 0x42];
+            let bytes = b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>";
             std::fs::write(&path, bytes).unwrap();
             let mut files = DroppedFiles::default();
             files.register_drop("main", &[path.clone()]);
             let result = files.read_logo("main", &path);
             std::fs::remove_file(&path).unwrap();
             assert_eq!(result.unwrap(), bytes);
+        }
+    }
+
+    #[test]
+    fn dropped_raster_logos_are_rejected() {
+        for extension in ["png", "jpg", "jpeg", "webp", "avif"] {
+            let path = std::env::temp_dir().join(format!("comparetica_rejected_logo_{}.{}", rand::random::<u64>(), extension));
+            std::fs::write(&path, b"raster logo").unwrap();
+            let mut files = DroppedFiles::default();
+            files.register_drop("main", &[path.clone()]);
+            let result = files.read_logo("main", &path);
+            std::fs::remove_file(&path).unwrap();
+            assert!(result.is_err(), "{} must not be readable as a new logo", extension);
         }
     }
 

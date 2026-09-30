@@ -3,6 +3,7 @@ import { getCompanyConfig, getCompanyLogo } from './db.js';
 import { formatPriceDecimals } from './calculator.js';
 import { invoke } from './ipc.js';
 import { showToast } from './ui.js';
+import { PDF_LOGO_MAX_SIDE, isOptimizedPngLogo } from './utils/logo.js';
 
 /**
  * Solicita una contraseña para proteger el PDF exportado mediante un diálogo modal.
@@ -119,15 +120,16 @@ export async function generatePDFReport(data, previewMode = false, returnBase64 
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.rect(0, 0, 210, 15, 'F');
 
-  // Cargar logotipo (SVG/AVIF/Bombilla) convertida a PNG
+  // El PNG optimizado se incorpora directamente; también admitimos logos antiguos.
   const logoPng = await loadAndConvertLogo(logoDataUri);
 
   // Pintar logotipo en la cabecera
   if (logoPng) {
     try {
-      doc.addImage(logoPng, 'PNG', 15, 18, 20, 20);
+      doc.addImage(logoPng, 'PNG', 15, 18, 20, 20, undefined, 'FAST');
     } catch (e) {
       console.error("Error al insertar logotipo en el PDF:", e);
+      doc.addImage(getDefaultLogoAsPng(), 'PNG', 15, 18, 20, 20, undefined, 'FAST');
     }
   }
 
@@ -590,8 +592,20 @@ export async function generatePDFReport(data, previewMode = false, returnBase64 
   }
 }
 
-// Convertir logotipo a canvas/PNG
+let cachedLogoSource;
+let cachedLogoPng;
 function loadAndConvertLogo(logoDataUri) {
+  if (isOptimizedPngLogo(logoDataUri)) return Promise.resolve(logoDataUri);
+  // Compatibility for existing installations: decode an old logo only once
+  // per session, without keeping an additional persistent copy of its source.
+  if (!cachedLogoPng || cachedLogoSource !== logoDataUri) {
+    cachedLogoSource = logoDataUri;
+    cachedLogoPng = rasterizeLegacyLogo(logoDataUri);
+  }
+  return cachedLogoPng;
+}
+
+function rasterizeLegacyLogo(logoDataUri) {
   return new Promise((resolve) => {
     if (!logoDataUri) {
       resolve(getDefaultLogoAsPng());
@@ -599,18 +613,24 @@ function loadAndConvertLogo(logoDataUri) {
     }
     
     const img = new Image();
-    img.src = logoDataUri;
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth || 200;
-      canvas.height = img.naturalHeight || 200;
+      const width = img.naturalWidth || 200;
+      const height = img.naturalHeight || 200;
+      // The header logo is at most 24 mm: 512 px keeps it sharp without
+      // passing millions of unnecessary pixels to jsPDF on every export.
+      const scale = Math.min(1, PDF_LOGO_MAX_SIDE / width, PDF_LOGO_MAX_SIDE / height);
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL('image/png'));
     };
     img.onerror = () => {
       resolve(getDefaultLogoAsPng());
     };
+    img.src = logoDataUri;
   });
 }
 
@@ -712,10 +732,11 @@ export async function generateLopdCertificatePdf(cliente, companyConfig = null) 
     try {
       const logoPng = await loadAndConvertLogo(logoDataUri);
       if (logoPng) {
-        doc.addImage(logoPng, 'PNG', 20, startHeaderY, 24, 20);
+        doc.addImage(logoPng, 'PNG', 20, startHeaderY, 24, 20, undefined, 'FAST');
       }
     } catch (eLogo) {
       console.warn("No se pudo cargar el logo:", eLogo);
+      doc.addImage(getDefaultLogoAsPng(), 'PNG', 20, startHeaderY, 24, 20, undefined, 'FAST');
     }
   }
 

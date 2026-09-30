@@ -656,13 +656,22 @@ fn save_company_logo_file(app_data_dir: &std::path::Path, base64_data: &str, ext
 
     let ext = extension.to_lowercase();
     let supported = ["svg", "png", "jpg", "jpeg", "webp", "avif"];
-    if !supported.contains(&ext.as_str()) {
-        return Err("Formato de imagen no soportado".to_string());
+    // Input SVG is optimized by the frontend before persisting it.
+    if ext != "png" {
+        return Err("El logotipo debe guardarse como PNG optimizado.".to_string());
     }
 
     let bytes = general_purpose::STANDARD
         .decode(base64_data)
         .map_err(|e| e.to_string())?;
+    if bytes.len() < 33 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" || &bytes[8..16] != b"\x00\x00\x00\x0dIHDR" {
+        return Err("El logotipo optimizado no es un PNG válido.".to_string());
+    }
+    let width = u32::from_be_bytes(bytes[16..20].try_into().unwrap());
+    let height = u32::from_be_bytes(bytes[20..24].try_into().unwrap());
+    if width == 0 || height == 0 || width.max(height) > 512 {
+        return Err("El PNG optimizado debe tener un máximo de 512 px en su lado mayor.".to_string());
+    }
     fs::create_dir_all(app_data_dir).map_err(|e| e.to_string())?;
 
     let file_name = format!("logo.{}", ext);
@@ -984,6 +993,8 @@ mod company_logo_tests {
     use base64::{engine::general_purpose, Engine as _};
     use std::{fs, path::PathBuf};
 
+    const PNG_DATA: &str = "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFUlEQVR4nGN85WzawIAHMOGTHD4KAPZYAfKVaiJXAAAAAElFTkSuQmCC";
+
     struct TestDirectory(PathBuf);
 
     impl TestDirectory {
@@ -1020,13 +1031,25 @@ mod company_logo_tests {
     }
 
     #[test]
+    fn only_optimized_png_storage_is_accepted_without_touching_existing_logos() {
+        let dir = TestDirectory::new();
+        let previous = dir.0.join("logo.webp");
+        fs::write(&previous, b"previous logo").unwrap();
+        let data = general_purpose::STANDARD.encode(b"new raster logo");
+        for extension in ["svg", "jpg", "jpeg", "webp", "avif"] {
+            assert!(save_company_logo_file(&dir.0, &data, extension).is_err(), "{} must be rejected", extension);
+            assert_eq!(fs::read(&previous).unwrap(), b"previous logo");
+            assert_eq!(fs::read_dir(&dir.0).unwrap().count(), 1);
+        }
+    }
+
+    #[test]
     fn a_failed_replacement_preserves_the_previous_logo_and_removes_temporary_files() {
         let dir = TestDirectory::new();
-        let previous = dir.0.join("logo.png");
+        let previous = dir.0.join("logo.svg");
         fs::write(&previous, b"previous logo").unwrap();
-        fs::create_dir(dir.0.join("logo.webp")).unwrap();
-        let data = general_purpose::STANDARD.encode(b"new logo");
-        assert!(save_company_logo_file(&dir.0, &data, "webp").is_err());
+        fs::create_dir(dir.0.join("logo.png")).unwrap();
+        assert!(save_company_logo_file(&dir.0, PNG_DATA, "png").is_err());
         assert_eq!(fs::read(&previous).unwrap(), b"previous logo");
         assert_eq!(fs::read_dir(&dir.0).unwrap().count(), 2);
     }
@@ -1034,12 +1057,12 @@ mod company_logo_tests {
     #[test]
     fn a_successful_format_change_removes_only_previous_logos() {
         let dir = TestDirectory::new();
-        fs::write(dir.0.join("logo.svg"), b"previous svg").unwrap();
+        fs::write(dir.0.join("logo.webp"), b"previous webp").unwrap();
         fs::write(dir.0.join("logo.png"), b"previous png").unwrap();
+        fs::write(dir.0.join("logo.svg"), b"previous svg source").unwrap();
         fs::write(dir.0.join("keep.txt"), b"unrelated file").unwrap();
-        let data = general_purpose::STANDARD.encode(b"new logo");
-        assert_eq!(save_company_logo_file(&dir.0, &data, "WEBP").unwrap(), "logo.webp");
-        assert_eq!(fs::read(dir.0.join("logo.webp")).unwrap(), b"new logo");
+        assert_eq!(save_company_logo_file(&dir.0, PNG_DATA, "PNG").unwrap(), "logo.png");
+        assert_eq!(fs::read(dir.0.join("logo.png")).unwrap(), general_purpose::STANDARD.decode(PNG_DATA).unwrap());
         assert_eq!(fs::read(dir.0.join("keep.txt")).unwrap(), b"unrelated file");
         assert_eq!(fs::read_dir(&dir.0).unwrap().count(), 2);
     }
@@ -1048,9 +1071,21 @@ mod company_logo_tests {
     fn an_existing_logo_can_be_replaced_with_the_same_format() {
         let dir = TestDirectory::new();
         fs::write(dir.0.join("logo.png"), b"previous logo").unwrap();
-        let data = general_purpose::STANDARD.encode(b"new logo");
-        assert_eq!(save_company_logo_file(&dir.0, &data, "png").unwrap(), "logo.png");
-        assert_eq!(fs::read(dir.0.join("logo.png")).unwrap(), b"new logo");
+        assert_eq!(save_company_logo_file(&dir.0, PNG_DATA, "png").unwrap(), "logo.png");
+        assert_eq!(fs::read(dir.0.join("logo.png")).unwrap(), general_purpose::STANDARD.decode(PNG_DATA).unwrap());
+        assert_eq!(fs::read_dir(&dir.0).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn invalid_or_oversized_png_preserves_the_previous_logo() {
+        let dir = TestDirectory::new();
+        fs::write(dir.0.join("logo.svg"), b"previous source").unwrap();
+        let invalid = general_purpose::STANDARD.encode(b"not a PNG");
+        assert!(save_company_logo_file(&dir.0, &invalid, "png").is_err());
+        let mut oversized = general_purpose::STANDARD.decode(PNG_DATA).unwrap();
+        oversized[16..20].copy_from_slice(&513_u32.to_be_bytes());
+        assert!(save_company_logo_file(&dir.0, &general_purpose::STANDARD.encode(oversized), "png").is_err());
+        assert_eq!(fs::read(dir.0.join("logo.svg")).unwrap(), b"previous source");
         assert_eq!(fs::read_dir(&dir.0).unwrap().count(), 1);
     }
 }
