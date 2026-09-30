@@ -1038,6 +1038,17 @@ mod tests {
     const SQLITE_032_VAULT: &[u8] = include_bytes!("../tests/fixtures/rusqlite-0.32.1/vault.json");
 
     #[test]
+    fn test_key_derivation_matches_argon2_053_vectors() {
+        let fixture: Value = serde_json::from_str(include_str!("../tests/fixtures/argon2-0.5.3/derived-keys.json")).unwrap();
+        for vector in fixture["vectors"].as_array().unwrap() {
+            let salt = general_purpose::STANDARD.decode(vector["salt_base64"].as_str().unwrap()).unwrap();
+            let key = derive_key(vector["secret"].as_str().unwrap(), &salt).unwrap();
+            assert_eq!(general_purpose::STANDARD.encode(key), vector["derived_key_base64"].as_str().unwrap(),
+                "La derivación debe conservar la clave de {}", vector["name"].as_str().unwrap());
+        }
+    }
+
+    #[test]
     fn test_pre_upgrade_vault_password_change_preserves_existing_data() {
         let dir = setup_test_dir("pre_upgrade_password_change");
         fs::write(dir.join("comparetica.db.enc"), SQLITE_032_DATABASE).unwrap();

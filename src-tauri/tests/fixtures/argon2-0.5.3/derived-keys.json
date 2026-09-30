@@ -1,0 +1,26 @@
+{
+  "purpose": "Synthetic fixed compatibility vectors; no user data or real credentials",
+  "source_argon2_version": "0.5.3",
+  "source_function": "src-tauri/src/db.rs::derive_key",
+  "source_revision": "6f4e0085e1afc7a643969943f43467fa2fd13fa7",
+  "vectors": [
+    {
+      "derived_key_base64": "d+CeQfV+NyC8d8JJ4VE1Fcr/j8fSn0uOjM0Z77Ikzz8=",
+      "name": "old_vault_password",
+      "salt_base64": "wAKhHcbmm6D2Vxi+lyT/NHeVJhsCOmkYtMTXI2nF6vg=",
+      "secret": "FixturePassword032!"
+    },
+    {
+      "derived_key_base64": "9GevxKV+oxBASpUdcgEbUDVSXfiWv3SfFeA7eZQL90Q=",
+      "name": "old_vault_recovery",
+      "salt_base64": "qd0pAhcbL1rfPHT+LulvtxC9tnhoDk3Q4nO+LOTchmU=",
+      "secret": "RC-6ZDP-VDAJ-MAZP-ZNP7"
+    },
+    {
+      "derived_key_base64": "5PriaibaoH//WuWcWM0fnkatJfpZqq182AYusOiZCFs=",
+      "name": "utf8_password",
+      "salt_base64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "secret": "Contraseña áéíóú ñ 🔐 2026!"
+    }
+  ]
+}
