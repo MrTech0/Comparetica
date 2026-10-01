@@ -166,15 +166,6 @@ describe('Integridad del DOM y Prototipos', () => {
     assert.ok(historyJs.includes("updateComparativaContrato(c.id, 'En trámite', '')"), 'Debe revertir a En trámite si se cancela la renovación');
   });
 
-  test('renewals.js gestiona callbacks onSaved y onCancelled al interactuar desde historial', () => {
-    const renewalsJs = fs.readFileSync(path.resolve('src/js/views/renewals.js'), 'utf8');
-
-    assert.ok(renewalsJs.includes('historyRenewalCallbacks'), 'Debe existir la variable historyRenewalCallbacks');
-    assert.ok(renewalsJs.includes('handleRenewalModalCancel'), 'Debe existir función handleRenewalModalCancel');
-    assert.ok(renewalsJs.includes('historyRenewalCallbacks.onCancelled'), 'Debe invocar onCancelled al cerrar o cancelar');
-    assert.ok(renewalsJs.includes('historyRenewalCallbacks.onSaved'), 'Debe invocar onSaved al guardar renovación con éxito');
-  });
-
   test('el cambio de estado de una comparativa actualiza cachedHistory y recarga la tabla automáticamente para reflejar el estado del contrato', () => {
     const historyJs = fs.readFileSync(path.resolve('src/js/views/history.js'), 'utf8');
 

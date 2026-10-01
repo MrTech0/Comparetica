@@ -7,6 +7,7 @@ import {
   getComercializadoras,
   getTarifasLuz,
   getTarifasGas,
+  getPuntosSuministroByCliente,
   getRenewalThresholds
 } from '../db.js';
 import { showToast, showConfirm } from '../ui.js';
@@ -656,10 +657,119 @@ function setupRenewalEventListeners() {
 }
 
 let historyRenewalCallbacks = null;
+let renewalSupplyContext = null;
+
+function renewalEnergy(value) {
+  const energy = String(value || '').trim().toUpperCase();
+  return energy === 'GAS' ? 'Gas' : energy === 'LUZ' ? 'Luz' : null;
+}
+
+function setRenewalSelectDisabled(select, disabled) {
+  if (!select) return;
+  select.disabled = disabled;
+  const wrapper = document.getElementById(`custom-select-for-${select.id}`);
+  if (wrapper) {
+    wrapper.classList.remove('open');
+    wrapper.style.pointerEvents = disabled ? 'none' : '';
+    wrapper.setAttribute('aria-disabled', String(disabled));
+    wrapper.style.opacity = disabled ? '0.75' : '';
+  }
+}
+
+function setRenewalOptions(select, options, placeholder = '') {
+  if (!select) return;
+  select.innerHTML = '';
+  for (const [value, text] of [...(placeholder ? [['', placeholder]] : []), ...options]) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = text;
+    select.appendChild(option);
+  }
+  select.value = '';
+}
+
+function renderRenewalSupplyOptions() {
+  const context = renewalSupplyContext;
+  const energySelect = document.getElementById('manual-ren-tipo');
+  const cupsSelect = document.getElementById('manual-ren-cups');
+  const help = document.getElementById('manual-ren-supply-help');
+  if (!context || !energySelect || !cupsSelect) return;
+  const compatible = context.points.filter(point => renewalEnergy(point.tipo_energia) === energySelect.value
+    && (!context.locked || point.cups === context.fixedCups));
+  setRenewalOptions(cupsSelect, compatible.map(point => [point.cups, `${point.direccion_alias || 'Principal'} — ${point.cups}`]),
+    context.ready ? (compatible.length ? 'Selecciona un punto de suministro' : 'Sin puntos de suministro compatibles') : 'Selecciona primero un cliente');
+  if (compatible.length === 1) cupsSelect.value = compatible[0].cups;
+  cupsSelect.title = compatible.find(point => point.cups === cupsSelect.value)?.cups || '';
+  cupsSelect.onchange = () => { cupsSelect.title = cupsSelect.value; };
+  setRenewalSelectDisabled(cupsSelect, context.locked || !context.ready || compatible.length === 0);
+  if (help) {
+    help.textContent = !context.ready ? 'Selecciona un cliente para ver sus puntos de suministro registrados.'
+      : compatible.length === 0 ? 'No hay puntos de suministro compatibles. Añádelos o actualízalos en la ficha de Clientes.'
+      : context.locked ? 'Cliente, tipo y CUPS fijados según el suministro de la comparativa.'
+      : 'Elige un punto registrado de este cliente. Para añadir otro CUPS, actualiza su ficha en Clientes.';
+  }
+}
+
+function resetRenewalSupplySelection() {
+  renewalSupplyContext = { clientId: null, points: [], ready: false, locked: false };
+  const searchInput = document.getElementById('manual-ren-client-search');
+  if (searchInput) searchInput.readOnly = false;
+  const energySelect = document.getElementById('manual-ren-tipo');
+  setRenewalOptions(energySelect, [['Luz', 'Luz'], ['Gas', 'Gas']]);
+  if (energySelect) {
+    energySelect.value = 'Luz';
+    energySelect.onchange = () => {
+      if (renewalSupplyContext?.locked) energySelect.value = renewalSupplyContext.fixedEnergy;
+      renderRenewalSupplyOptions();
+    };
+  }
+  setRenewalSelectDisabled(energySelect, true);
+  renderRenewalSupplyOptions();
+}
+
+async function selectRenewalClient(client, fixedSupply = null) {
+  const context = { clientId: Number(client.id), points: [], ready: false, locked: Boolean(fixedSupply), fixedCups: normalizeCups(fixedSupply?.cups) };
+  renewalSupplyContext = context;
+  const searchInput = document.getElementById('manual-ren-client-search');
+  const energySelect = document.getElementById('manual-ren-tipo');
+  document.getElementById('manual-ren-client-id').value = String(client.id);
+  searchInput.value = client.nombre_empresa;
+  searchInput.readOnly = context.locked;
+  setRenewalSelectDisabled(energySelect, true);
+  renderRenewalSupplyOptions();
+  const help = document.getElementById('manual-ren-supply-help');
+  if (help) help.textContent = 'Cargando puntos de suministro…';
+  try {
+    const points = await getPuntosSuministroByCliente(client.id);
+    if (renewalSupplyContext !== context) return;
+    context.points = (Array.isArray(points) ? points : []).map(point => ({ ...point, cups: normalizeCups(point.cups) }))
+      .filter(point => point.cups && renewalEnergy(point.tipo_energia));
+    context.ready = true;
+    const energies = ['Luz', 'Gas'].filter(energy => context.points.some(point => renewalEnergy(point.tipo_energia) === energy));
+    const previousEnergy = energySelect.value;
+    setRenewalOptions(energySelect, energies.map(energy => [energy, energy]));
+    if (context.locked) {
+      const point = context.points.find(point => point.cups === context.fixedCups);
+      context.fixedEnergy = renewalEnergy(fixedSupply.energy) || renewalEnergy(point?.tipo_energia);
+      energySelect.value = context.fixedEnergy || '';
+    } else {
+      energySelect.value = energies.includes(previousEnergy) ? previousEnergy : (energies[0] || '');
+    }
+    setRenewalSelectDisabled(energySelect, context.locked || energies.length === 0);
+    renderRenewalSupplyOptions();
+  } catch (err) {
+    if (renewalSupplyContext !== context) return;
+    if (help) help.textContent = 'No se pudieron cargar los puntos de suministro. Vuelve a seleccionar el cliente.';
+    showToast('No se pudieron cargar los puntos de suministro del cliente.', 'error');
+    console.error('Error al cargar los puntos de suministro para la renovación:', err);
+  }
+  return context;
+}
 
 export function handleRenewalModalCancel() {
   const dialogManual = document.getElementById('dialog-renewal-form');
   if (dialogManual) dialogManual.classList.remove('active');
+  renewalSupplyContext = null;
 
   if (historyRenewalCallbacks && typeof historyRenewalCallbacks.onCancelled === 'function') {
     const cb = historyRenewalCallbacks.onCancelled;
@@ -680,34 +790,36 @@ if (typeof document !== 'undefined') {
 }
 
 export async function openNewRenewalDialogFromHistory(comp, callbacks = null) {
-  historyRenewalCallbacks = callbacks;
-
   // Abrir modal manual directamente sobre la vista actual
   await openManualAddModal();
+  historyRenewalCallbacks = callbacks;
+  const context = renewalSupplyContext;
 
   if (!comp) return;
+  const searchInput = document.getElementById('manual-ren-client-search');
+  if (searchInput) {
+    searchInput.value = comp.cliente_nombre || '';
+    searchInput.readOnly = true;
+  }
+  context.locked = true;
 
-  // 3. Buscar ID de cliente por nombre o NIF
+  // Localizar el cliente activo de la comparativa.
   try {
     const clients = await getClientes({ soloActivos: true });
+    if (renewalSupplyContext !== context) return;
     const matchedClient = Array.isArray(clients) ? clients.find(c => (c.nombre_empresa || '').trim().toLowerCase() === (comp.cliente_nombre || '').trim().toLowerCase()) : null;
 
-    const searchInput = document.getElementById('manual-ren-client-search');
-    const idInput = document.getElementById('manual-ren-client-id');
-    const cupsInput = document.getElementById('manual-ren-cups');
-    const energySelect = document.getElementById('manual-ren-tipo') || document.getElementById('manual-ren-energy');
     const retailerInput = document.getElementById('manual-ren-comercializadora') || document.getElementById('manual-ren-retailer');
     const tariffInput = document.getElementById('manual-ren-tarifa') || document.getElementById('manual-ren-tariff');
     const durationInput = document.getElementById('manual-ren-duration');
 
-    if (matchedClient && idInput) idInput.value = matchedClient.id;
-    if (searchInput) searchInput.value = comp.cliente_nombre || '';
-    if (cupsInput) cupsInput.value = normalizeCups(comp.cliente_cups || '');
-    if (energySelect) {
-      const compEnergy = (comp.tipo_energia || '').toUpperCase();
-      energySelect.value = compEnergy.includes('GAS') ? 'Gas' : 'Luz';
-      energySelect.dispatchEvent(new Event('change'));
+    if (!matchedClient) {
+      if (searchInput) { searchInput.value = comp.cliente_nombre || ''; searchInput.readOnly = true; }
+      showToast('No se encontró un cliente activo para esta comparativa. Revisa su ficha en Clientes.', 'error');
+      return;
     }
+    const selectedContext = await selectRenewalClient(matchedClient, { cups: comp.cliente_cups, energy: comp.tipo_energia });
+    if (!selectedContext || renewalSupplyContext !== selectedContext) return;
 
     const retailerName = comp.comercializadora_luz_nombre || comp.comercializadora_gas_nombre || '';
     const tariffName = comp.tarifa_luz_nombre || comp.tarifa_gas_nombre || '';
@@ -741,6 +853,8 @@ export async function openManualAddModal() {
   const form = document.getElementById('form-renewal-manual');
 
   if (form) form.reset();
+  historyRenewalCallbacks = null;
+  resetRenewalSupplySelection();
   if (idInput) idInput.value = '';
   if (durationInput) durationInput.value = '12';
   if (suggestionsBox) {
@@ -798,7 +912,10 @@ export async function openManualAddModal() {
   if (searchInput && suggestionsBox) {
     let debounceTimer = null;
     searchInput.oninput = () => {
+      if (searchInput.readOnly) return;
       idInput.value = ''; // Resetear ID si el usuario escribe libremente
+      resetRenewalSupplySelection();
+      const searchContext = renewalSupplyContext;
       const term = searchInput.value.trim();
       clearTimeout(debounceTimer);
 
@@ -811,6 +928,7 @@ export async function openManualAddModal() {
       debounceTimer = setTimeout(async () => {
         try {
           const results = await searchClientes(term, 10);
+          if (renewalSupplyContext !== searchContext || searchInput.value.trim() !== term) return;
           suggestionsBox.innerHTML = '';
 
           if (!Array.isArray(results) || results.length === 0) {
@@ -835,34 +953,8 @@ export async function openManualAddModal() {
               item.onmouseleave = () => { item.style.backgroundColor = 'transparent'; };
 
               item.onclick = async () => {
-                searchInput.value = c.nombre_empresa;
-                idInput.value = c.id.toString();
-
-                const cupsInput = document.getElementById('manual-ren-cups');
-                const tipoSelect = document.getElementById('manual-ren-tipo');
-
-                if (cupsInput && c.cups) {
-                  cupsInput.value = normalizeCups(c.cups);
-                }
-
-                try {
-                  const { getPuntosSuministroByCliente } = await import('../db.js');
-                  const puntos = await getPuntosSuministroByCliente(c.id);
-                  if (Array.isArray(puntos) && puntos.length > 0) {
-                    const primerPunto = puntos[0];
-                    if (cupsInput && primerPunto.cups) {
-                      cupsInput.value = normalizeCups(primerPunto.cups);
-                    }
-                    if (tipoSelect && primerPunto.tipo_energia) {
-                      tipoSelect.value = primerPunto.tipo_energia.toUpperCase() === 'GAS' ? 'Gas' : 'Luz';
-                      tipoSelect.dispatchEvent(new Event('change'));
-                    }
-                  }
-                } catch (errPuntos) {
-                  console.warn("No se pudieron cargar los puntos de suministro del cliente:", errPuntos);
-                }
-
                 suggestionsBox.style.display = 'none';
+                await selectRenewalClient(c);
               };
 
               suggestionsBox.appendChild(item);
@@ -1035,10 +1127,13 @@ export async function openManualAddModal() {
 }
 
 async function saveManualRenewal() {
+  const context = renewalSupplyContext;
+  const callbacks = historyRenewalCallbacks;
+  if (context?.saving) return;
+  if (context) context.saving = true;
   try {
     const db = await getDb();
     const clientIdVal = document.getElementById('manual-ren-client-id')?.value;
-    const clientSearchVal = document.getElementById('manual-ren-client-search')?.value.trim();
 
     if (!clientIdVal) {
       showToast("Por favor, selecciona un cliente existente haciendo clic en las sugerencias desplegadas.", "error");
@@ -1049,6 +1144,11 @@ async function saveManualRenewal() {
     const tipo_energia = document.getElementById('manual-ren-tipo').value;
     const cupsRaw = document.getElementById('manual-ren-cups')?.value || '';
     const cups = normalizeCups(cupsRaw);
+
+    if (!context?.ready || context.clientId !== cliente_id || !cups) {
+      showToast('Selecciona un punto de suministro registrado del cliente. Si falta, añádelo primero en su ficha de Clientes.', 'error');
+      return;
+    }
 
     if (cups && !isValidSpanishCups(cups)) {
       showToast("El CUPS introducido no tiene un formato oficial español válido (debe comenzar por ES y tener 20 o 22 caracteres).", "error");
@@ -1068,8 +1168,18 @@ async function saveManualRenewal() {
     const fecha_vencimiento = document.getElementById('manual-ren-date-end').value;
     const notas = document.getElementById('manual-ren-notes').value.trim();
 
+    // Capturar todos los campos antes de consultar datos evita mezclar dos selecciones.
+    const registeredPoints = await getPuntosSuministroByCliente(cliente_id);
+    if (renewalSupplyContext !== context) return;
+    if (!registeredPoints.some(point => normalizeCups(point.cups) === cups && renewalEnergy(point.tipo_energia) === tipo_energia)
+      || (context.locked && (cups !== context.fixedCups || tipo_energia !== context.fixedEnergy))) {
+      showToast('El CUPS seleccionado no corresponde a este cliente y tipo de suministro. Revisa sus puntos registrados.', 'error');
+      return;
+    }
+
     // Obtener parámetros globales de días de aviso desde Configuración -> Parámetros
     const thresholds = await getRenewalThresholds();
+    if (renewalSupplyContext !== context) return;
     const warningDays = thresholds.warning;
 
     let fecha_aviso_personalizada = null;
@@ -1090,20 +1200,17 @@ async function saveManualRenewal() {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `, [cliente_id, tipo_energia, cups, comercializadora_actual, tarifa_actual, fecha_firma, duracion_meses, fecha_vencimiento, fecha_aviso_personalizada, notas]);
 
-    document.getElementById('dialog-renewal-form')?.classList.remove('active');
+    if (renewalSupplyContext === context) document.getElementById('dialog-renewal-form')?.classList.remove('active');
     showToast("Renovación de contrato registrada con éxito.", "success");
     await refreshRenewals();
 
-    if (historyRenewalCallbacks && typeof historyRenewalCallbacks.onSaved === 'function') {
-      const cb = historyRenewalCallbacks.onSaved;
-      historyRenewalCallbacks = null;
-      await cb();
-    } else {
-      historyRenewalCallbacks = null;
-    }
+    if (historyRenewalCallbacks === callbacks) historyRenewalCallbacks = null;
+    if (typeof callbacks?.onSaved === 'function') await callbacks.onSaved();
   } catch (err) {
     console.error("Error al guardar renovación manual:", err);
     showToast("Error al guardar la renovación de contrato.", "error");
+  } finally {
+    if (context) context.saving = false;
   }
 }
 

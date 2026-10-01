@@ -2842,19 +2842,23 @@
               <div id="manual-ren-client-suggestions" class="m3-autocomplete-suggestions" style="display:none; position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); max-height: 180px; overflow-y: auto; z-index: var(--z-dropdown); box-shadow: var(--shadow-2);"></div>
             </div>
 
-            <div class="m3-field-row">
+            <div>
               <div class="m3-field">
                 <label class="m3-label" for="manual-ren-tipo">Tipo Suministro</label>
-                <select id="manual-ren-tipo" class="m3-input m3-select">
+                <select id="manual-ren-tipo" class="m3-input m3-select" aria-describedby="manual-ren-supply-help" disabled>
                   <option value="Luz">Luz</option>
                   <option value="Gas">Gas</option>
                 </select>
               </div>
               <div class="m3-field">
-                <label class="m3-label" for="manual-ren-cups">CUPS (Opcional)</label>
-                <input type="text" id="manual-ren-cups" class="m3-input" placeholder="Ej. ES00..." />
+                <label class="m3-label" for="manual-ren-cups">Punto de suministro / CUPS *</label>
+                <select id="manual-ren-cups" class="m3-input m3-native-select" aria-describedby="manual-ren-supply-help" required disabled>
+                  <option value="">Selecciona primero un cliente</option>
+                </select>
               </div>
             </div>
+
+            <p id="manual-ren-supply-help" class="text-muted" style="font-size: 12px; margin-bottom: 16px;" aria-live="polite">Selecciona un cliente para ver sus puntos de suministro registrados.</p>
 
             <div class="m3-field-row">
               <div class="m3-field" style="position: relative;">

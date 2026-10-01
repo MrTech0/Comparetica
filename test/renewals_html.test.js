@@ -9,6 +9,7 @@ function element() {
     children: [],
     style: {},
     classList: { add() {}, remove() {}, contains() { return false; } },
+    setAttribute(name, value) { this[name] = String(value); },
     addEventListener(type, callback) { this[`on${type}`] = callback; },
     appendChild(child) { this.children.push(child); return child; },
     querySelectorAll() { return []; },
