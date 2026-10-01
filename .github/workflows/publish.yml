@@ -14,33 +14,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v7.0.0
-        with:
-          node-version: lts/*
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6.1.0
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-          echo "PNPM_VERSION=$(pnpm --version)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v6.1.0
+      - name: Setup Node.js, pnpm and dependencies
+        uses: pnpm/setup@v3.0.0
         with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-${{ env.PNPM_VERSION }}-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-${{ env.PNPM_VERSION }}-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          runtime: node@lts
+          cache: true
+          require-lockfile: true
 
       - name: Prepare Release Notes
         shell: bash
