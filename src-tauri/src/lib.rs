@@ -63,6 +63,12 @@ fn db_login(state: tauri::State<'_, db::SharedDbState>, password: String) -> Res
 }
 
 #[tauri::command]
+fn db_logout(state: tauri::State<'_, db::SharedDbState>) -> Result<(), String> {
+    let mut db_state = state.lock().map_err(|e| e.to_string())?;
+    db_state.logout()
+}
+
+#[tauri::command]
 fn db_recover_access(state: tauri::State<'_, db::SharedDbState>, recovery_key: String, new_password: String) -> Result<String, String> {
     let mut db_state = state.lock().map_err(|e| e.to_string())?;
     db_state.recover_access(&recovery_key, &new_password)
@@ -279,6 +285,7 @@ pub fn run() {
             db_check_status,
             db_setup_master_password,
             db_login,
+            db_logout,
             db_recover_access,
             db_change_password,
             db_select,

@@ -510,6 +510,14 @@ impl DbState {
         Ok(())
     }
 
+    pub fn logout(&mut self) -> Result<(), String> {
+        // Conservar la sesión si falla el guardado para permitir reintentarlo sin perder datos.
+        self.persist_db()?;
+        self.conn = None;
+        self.mdk = None;
+        Ok(())
+    }
+
     pub fn recover_access(&mut self, recovery_key: &str, new_password: &str) -> Result<String, String> {
         if new_password.trim().len() < 6 {
             return Err("La nueva contraseña debe tener al menos 6 caracteres".to_string());
@@ -1036,6 +1044,71 @@ mod tests {
     const SQLITE_032_PASSWORD: &str = "FixturePassword032!";
     const SQLITE_032_DATABASE: &[u8] = include_bytes!("../tests/fixtures/rusqlite-0.32.1/database.enc");
     const SQLITE_032_VAULT: &[u8] = include_bytes!("../tests/fixtures/rusqlite-0.32.1/vault.json");
+
+    #[test]
+    fn test_logout_blocks_access_and_preserves_data_for_next_login() {
+        let dir = setup_test_dir("logout_relogin");
+        let mut state = DbState::new(dir.clone());
+        state.setup_master_password("LogoutPassword2026!").unwrap();
+        let vault_before = fs::read(state.vault_path()).unwrap();
+        state.conn.as_ref().unwrap().execute_batch(
+            "CREATE TABLE logout_probe (value TEXT); INSERT INTO logout_probe VALUES ('saved before logout');"
+        ).unwrap();
+
+        for _ in 0..2 {
+            state.logout().unwrap();
+            assert!(state.conn.is_none());
+            assert!(state.mdk.is_none());
+            let status = state.get_status().unwrap();
+            assert!(status.is_initialized);
+            assert!(!status.is_unlocked);
+            assert!(state.select("SELECT * FROM logout_probe", vec![]).unwrap_err().contains("bloqueada"));
+            assert!(state.execute("DELETE FROM logout_probe", vec![]).unwrap_err().contains("bloqueada"));
+            assert!(state.login("WrongPassword2026!").is_err());
+            assert!(!state.get_status().unwrap().is_unlocked);
+            state.login("LogoutPassword2026!").unwrap();
+            let rows = state.select("SELECT value FROM logout_probe", vec![]).unwrap();
+            assert_eq!(rows[0]["value"], "saved before logout");
+            assert_eq!(fs::read(state.vault_path()).unwrap(), vault_before);
+        }
+        drop(state);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn test_logout_keeps_session_available_if_persistence_fails() {
+        let dir = setup_test_dir("logout_persistence_failure");
+        let mut state = DbState::new(dir.clone());
+        state.open_db([8; 32]).unwrap();
+        state.conn.as_ref().unwrap().execute_batch(
+            "CREATE TABLE logout_probe (value TEXT); INSERT INTO logout_probe VALUES ('not yet saved');"
+        ).unwrap();
+        let blocked_dir = dir.join("not-a-directory");
+        fs::write(&blocked_dir, b"blocked").unwrap();
+        state.app_data_dir = blocked_dir;
+
+        assert!(state.logout().is_err());
+        assert!(state.conn.is_some());
+        assert!(state.mdk.is_some());
+        assert_eq!(state.select("SELECT value FROM logout_probe", vec![]).unwrap()[0]["value"], "not yet saved");
+
+        state.app_data_dir = dir.clone();
+        state.logout().unwrap();
+        drop(state);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn test_logout_already_locked_is_safe() {
+        let dir = setup_test_dir("logout_locked");
+        let mut state = DbState::new(dir.clone());
+        state.logout().unwrap();
+        state.logout().unwrap();
+        assert!(state.conn.is_none());
+        assert!(state.mdk.is_none());
+        assert!(!state.enc_db_path().exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn test_recovery_keys_keep_unambiguous_format_and_are_fresh() {

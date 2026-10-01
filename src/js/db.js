@@ -25,6 +25,13 @@ export async function loginDb(password) {
 }
 
 /**
+ * Guarda los datos cifrados y bloquea la bóveda al cerrar la sesión.
+ */
+export async function logoutDb() {
+  return await invoke('db_logout');
+}
+
+/**
  * Recupera el acceso a la base de datos con la Clave de Recuperación y establece una nueva contraseña.
  */
 export async function recoverDbAccess(recoveryKey, newPassword) {

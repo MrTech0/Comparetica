@@ -1,7 +1,7 @@
 // src/js/auth.js
-import { checkDbStatus, setupMasterPassword, loginDb, recoverDbAccess, changeMasterPassword } from './db.js';
+import { checkDbStatus, setupMasterPassword, loginDb, logoutDb, recoverDbAccess, changeMasterPassword } from './db.js';
 import { invoke } from './ipc.js';
-import { showToast, showBackupPasswordPrompt } from './ui.js';
+import { showToast, showConfirm, showBackupPasswordPrompt } from './ui.js';
 
 let authOverlayEl = null;
 let authTitleEl = null;
@@ -54,15 +54,20 @@ export async function initAuthGuard(onUnlockedCallback) {
     }
   } catch (err) {
     console.error("Error al comprobar el estado de autenticación:", err);
+    showAuthOverlay();
     showLoginMode();
   }
 }
 
 function showAuthOverlay() {
+  const appContainer = document.getElementById('app-container');
+  if (appContainer) appContainer.inert = true;
   if (authOverlayEl) authOverlayEl.classList.remove('hidden');
 }
 
 function hideAuthOverlay() {
+  const appContainer = document.getElementById('app-container');
+  if (appContainer) appContainer.inert = false;
   if (authOverlayEl) authOverlayEl.classList.add('hidden');
 }
 
@@ -154,6 +159,29 @@ function showRecoverMode() {
 }
 
 function setupAuthEventListeners(onUnlockedCallback) {
+  const logoutButton = document.getElementById('nav-logout');
+  if (logoutButton) {
+    logoutButton.addEventListener('click', async () => {
+      if (logoutButton.disabled) return;
+      logoutButton.disabled = true;
+      try {
+        const confirmed = await showConfirm(
+          '¿Quieres cerrar la sesión? Los cambios que no hayas guardado en los formularios se perderán.',
+          'Cerrar sesión'
+        );
+        if (!confirmed) return;
+        await logoutDb();
+        // Recargar elimina los datos de las vistas y evita duplicar sus listeners al volver a entrar.
+        window.location.reload();
+      } catch (error) {
+        console.error('Error al cerrar la sesión:', error);
+        showToast('No se ha podido cerrar la sesión. Vuelve a intentarlo.', 'error');
+      } finally {
+        logoutButton.disabled = false;
+      }
+    });
+  }
+
   const acceptEula = document.getElementById('auth-accept-eula');
   if (acceptEula && btnOnboardingNewSetup) {
     btnOnboardingNewSetup.disabled = !acceptEula.checked;
