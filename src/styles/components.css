@@ -814,7 +814,7 @@ body.private-mode-active .private-value::after {
   opacity: 0;
   border-left: 4px solid var(--color-outline);
   word-break: normal;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   hyphens: none;
   line-height: 1.45;
   box-sizing: border-box;

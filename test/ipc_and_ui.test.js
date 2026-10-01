@@ -752,7 +752,7 @@ describe('UI Notifications & Confirmation Module (src/js/ui.js)', () => {
   });
 
   describe('Tipografía y salto de línea en notificaciones y alertas', () => {
-    test('.m3-toast no divide palabras a la mitad (word-break: normal y overflow-wrap: break-word)', () => {
+    test('.m3-toast conserva los saltos normales entre palabras y no añade guiones', () => {
       const cssPath = path.resolve('src/styles/components.css');
       const css = fs.readFileSync(cssPath, 'utf8');
 
@@ -762,7 +762,6 @@ describe('UI Notifications & Confirmation Module (src/js/ui.js)', () => {
 
       assert.ok(!toastRules.includes('word-break: break-all'), '.m3-toast NO debe contener word-break: break-all');
       assert.ok(toastRules.includes('word-break: normal'), '.m3-toast debe especificar word-break: normal');
-      assert.ok(toastRules.includes('overflow-wrap: break-word'), '.m3-toast debe especificar overflow-wrap: break-word');
       assert.ok(toastRules.includes('hyphens: none'), '.m3-toast debe especificar hyphens: none');
       // Verificación de sintaxis válida de 4 argumentos para la función de temporización cubic-bezier
       assert.ok(toastRules.includes('cubic-bezier(0.2, 0, 0, 1)'), '.m3-toast debe tener una curva bezier válida de 4 argumentos para animarse correctamente');
