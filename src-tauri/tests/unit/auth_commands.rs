@@ -45,7 +45,10 @@ impl LoginFixture {
     fn app(&self) -> tauri::App<MockRuntime> {
         mock_builder()
             .manage(Arc::clone(&self.state))
-            .invoke_handler(tauri::generate_handler![crate::db_login])
+            .invoke_handler(tauri::generate_handler![
+                crate::db_login,
+                crate::db_change_password
+            ])
             .build(mock_context(noop_assets()))
             .unwrap()
     }
@@ -160,4 +163,119 @@ fn login_command_rejects_wrong_password_and_allows_retry_and_relogin() {
         state.logout().unwrap();
         assert!(!state.get_status().unwrap().is_unlocked);
     }
+}
+
+#[test]
+fn vault_save_preserves_previous_file_on_failure_and_replaces_an_interrupted_write() {
+    let fixture = LoginFixture::new();
+    let state = DbState::new(fixture.dir.clone());
+    let previous_bytes = fs::read(state.vault_path()).unwrap();
+    let previous_config = state.load_vault().unwrap().unwrap();
+    let mut replacement = previous_config.clone();
+    replacement.is_initialized = false;
+    let temporary_path = fixture.dir.join("vault.json.tmp");
+
+    // Un destino temporal no escribible debe conservar intacta la bóveda anterior.
+    fs::create_dir(&temporary_path).unwrap();
+    let failed_save = state.save_vault(&replacement);
+    let bytes_after_failure = fs::read(state.vault_path()).unwrap();
+    fs::remove_dir(&temporary_path).unwrap();
+    assert!(
+        failed_save.is_err(),
+        "El guardado debe comunicar el fallo de escritura"
+    );
+    assert_eq!(bytes_after_failure, previous_bytes);
+
+    // Una escritura temporal interrumpida no debe impedir leer o volver a guardar.
+    fs::write(&temporary_path, b"{\"is_initialized\":").unwrap();
+    assert_eq!(
+        serde_json::to_value(state.load_vault().unwrap().unwrap()).unwrap(),
+        serde_json::to_value(previous_config).unwrap()
+    );
+    state.save_vault(&replacement).unwrap();
+    assert_eq!(
+        serde_json::to_value(state.load_vault().unwrap().unwrap()).unwrap(),
+        serde_json::to_value(replacement).unwrap()
+    );
+    assert!(!temporary_path.exists());
+}
+
+#[test]
+fn password_change_releases_the_ui_thread_and_preserves_access_with_the_new_password() {
+    let fixture = LoginFixture::new();
+    fixture.state.lock().unwrap().login(PASSWORD).unwrap();
+    let app = fixture.app();
+    let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+    let new_password = "UpdatedPassword2026!";
+    let request = |current_password: &str| {
+        let mut request = login_request("");
+        request.cmd = "db_change_password".into();
+        request.body = InvokeBody::Json(serde_json::json!({
+            "currentPassword": current_password,
+            "newPassword": new_password,
+        }));
+        request
+    };
+    let vault_before = fs::read(fixture.dir.join("vault.json")).unwrap();
+    let wrong = tauri::test::get_ipc_response(&webview, request("WrongCurrentPassword!"));
+    assert!(wrong.is_err());
+    assert_eq!(
+        fs::read(fixture.dir.join("vault.json")).unwrap(),
+        vault_before
+    );
+
+    let state = Arc::clone(&fixture.state);
+    let (ready_tx, ready_rx) = mpsc::channel();
+    let (ui_free_tx, ui_free_rx) = mpsc::channel();
+    let database_thread = std::thread::spawn(move || {
+        let guard = state.lock().unwrap();
+        ready_tx.send(()).unwrap();
+        let ui_was_free = ui_free_rx.recv_timeout(Duration::from_secs(5)).is_ok();
+        drop(guard);
+        ui_was_free
+    });
+    ready_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+
+    let (response_tx, response_rx) = mpsc::channel();
+    webview.as_ref().clone().on_message(
+        request(PASSWORD),
+        Box::new(move |_, _, response, _, _| {
+            response_tx.send(response).unwrap();
+        }),
+    );
+    let _ = ui_free_tx.send(());
+    let ui_was_free = database_thread.join().unwrap();
+    let response = response_rx.recv_timeout(Duration::from_secs(30)).unwrap();
+    assert!(
+        ui_was_free,
+        "El cambio de contraseña bloqueó el hilo que atiende la ventana"
+    );
+    let new_recovery_key = match response {
+        InvokeResponse::Ok(body) => body.deserialize::<String>().unwrap(),
+        InvokeResponse::Err(error) => {
+            panic!("El cambio de contraseña válido debe funcionar: {error:?}")
+        }
+    };
+    assert!(new_recovery_key.starts_with("RC-"));
+    let metadata: serde_json::Value =
+        serde_json::from_str(include_str!("../fixtures/rusqlite-0.32.1/metadata.json")).unwrap();
+    assert_ne!(new_recovery_key, metadata["recovery_key"].as_str().unwrap());
+    {
+        let mut state = fixture.state.lock().unwrap();
+        assert!(state.get_status().unwrap().is_unlocked);
+        state.logout().unwrap();
+    }
+    assert!(tauri::test::get_ipc_response(&webview, login_request(PASSWORD)).is_err());
+    assert!(tauri::test::get_ipc_response(&webview, login_request(new_password)).is_ok());
+    assert_eq!(
+        fixture
+            .state
+            .lock()
+            .unwrap()
+            .select("SELECT nombre_empresa FROM clientes", vec![])
+            .unwrap(),
+        vec![serde_json::json!({ "nombre_empresa": "Cliente Compatibilidad SL" })]
+    );
 }

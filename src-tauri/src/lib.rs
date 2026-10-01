@@ -85,9 +85,15 @@ fn db_recover_access(state: tauri::State<'_, db::SharedDbState>, recovery_key: S
 }
 
 #[tauri::command]
-fn db_change_password(state: tauri::State<'_, db::SharedDbState>, current_password: String, new_password: String) -> Result<String, String> {
-    let mut db_state = state.lock().map_err(|e| e.to_string())?;
-    db_state.change_password(&current_password, &new_password)
+async fn db_change_password(state: tauri::State<'_, db::SharedDbState>, current_password: String, new_password: String) -> Result<String, String> {
+    let state = state.inner().clone();
+    // La derivación de las nuevas claves no debe bloquear los eventos de la ventana.
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut db_state = state.lock().map_err(|e| e.to_string())?;
+        db_state.change_password(&current_password, &new_password)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

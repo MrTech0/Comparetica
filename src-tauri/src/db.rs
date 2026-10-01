@@ -197,8 +197,15 @@ impl DbState {
             fs::create_dir_all(&self.app_data_dir).map_err(|e| e.to_string())?;
         }
         let content = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
-        fs::write(self.vault_path(), content).map_err(|e| e.to_string())?;
-        Ok(())
+        let temporary_path = self.app_data_dir.join("vault.json.tmp");
+        // Un cierre o una copia concurrente deben ver una bóveda completa.
+        let result = write_synced(&temporary_path, content.as_bytes()).and_then(|_| {
+            fs::rename(&temporary_path, self.vault_path()).map_err(|e| e.to_string())
+        });
+        if result.is_err() {
+            let _ = fs::remove_file(&temporary_path);
+        }
+        result
     }
 
     pub fn get_status(&self) -> Result<DbStatus, String> {
