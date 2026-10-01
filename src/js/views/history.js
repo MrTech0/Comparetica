@@ -9,6 +9,7 @@ import { onAppEvent, APP_EVENTS } from '../events.js';
 let activeLockTimers = [];
 let isCobroDialogInitialized = false;
 let unsubComparisonSaved = null;
+const HISTORY_SEARCH_COLUMNS = ['client', 'cups'];
 
 function clearActiveLockTimers() {
   activeLockTimers.forEach(timer => clearTimeout(timer));
@@ -36,9 +37,11 @@ function showLegalRetentionCompWarning() {
 }
 
 export async function initHistoryView() {
-  const searchInput = document.getElementById('search-history-input');
-  if (searchInput) {
-    searchInput.value = '';
+  for (const column of HISTORY_SEARCH_COLUMNS) {
+    const input = document.getElementById(`search-history-${column}`);
+    const details = document.getElementById(`history-${column}-search`);
+    if (input) input.value = '';
+    if (details) details.open = false;
   }
 
   setupCobroDialog();
@@ -61,6 +64,32 @@ let currentHistorySavingsSort = null; // 'desc' (mayor a menor) | 'asc' (menor a
 let currentHistoryEstadoFilter = 'ALL';
 let currentHistoryContractFilter = 'ALL';
 let currentHistoryCobroFilter = 'ALL';
+
+function setupHistoryColumnSearches() {
+  for (const column of HISTORY_SEARCH_COLUMNS) {
+    const input = document.getElementById(`search-history-${column}`);
+    const details = document.getElementById(`history-${column}-search`);
+    const clearButton = document.getElementById(`btn-clear-history-${column}`);
+    if (!input || !details || input.dataset.listenerAdded) continue;
+    input.dataset.listenerAdded = 'true';
+    input.addEventListener('input', applyHistoryFilter);
+    details.addEventListener('toggle', () => {
+      if (details.open) input.focus();
+    });
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        details.open = false;
+        details.querySelector('summary')?.focus();
+      }
+    });
+    clearButton?.addEventListener('click', () => {
+      input.value = '';
+      applyHistoryFilter();
+      input.focus();
+    });
+  }
+}
 
 function closeAllHistoryHeaderDropdowns() {
   const tableContainer = document.querySelector('#section-history .table-container');
@@ -356,14 +385,7 @@ async function loadHistoryTable() {
   try {
     cachedHistory = await getComparativas();
     
-    // Configurar búsqueda
-    const searchInput = document.getElementById('search-history-input');
-    if (searchInput && !searchInput.dataset.listenerAdded) {
-      searchInput.addEventListener('input', () => {
-        applyHistoryFilter();
-      });
-      searchInput.dataset.listenerAdded = 'true';
-    }
+    setupHistoryColumnSearches();
 
     // Configurar desplegables de filtrado en cabeceras
     setupHistoryEstadoFilterDropdown();
@@ -437,22 +459,28 @@ function applyHistoryFilter() {
 
   updateHistoryKpis(cachedHistory);
 
-  const searchInput = document.getElementById('search-history-input');
-  const query = searchInput ? searchInput.value.trim() : '';
+  const clientQuery = document.getElementById('search-history-client')?.value.trim() || '';
+  const cupsQuery = document.getElementById('search-history-cups')?.value.trim() || '';
+  for (const [column, query] of [['client', clientQuery], ['cups', cupsQuery]]) {
+    const details = document.getElementById(`history-${column}-search`);
+    const clearButton = document.getElementById(`btn-clear-history-${column}`);
+    details?.classList.toggle('is-filtered', Boolean(query));
+    const label = column === 'client' ? 'Cliente' : 'CUPS';
+    details?.querySelector('summary')?.setAttribute('aria-label', query ? `${label}, búsqueda activa: ${query}` : `${label}, abrir búsqueda`);
+    if (clearButton) clearButton.disabled = !query;
+  }
 
   const cleanString = (str) => {
     if (!str) return '';
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   };
 
-  const cleanQuery = cleanString(query);
+  const cleanClientQuery = cleanString(clientQuery);
+  const cleanCupsQuery = cleanString(cupsQuery);
 
   const filtered = cachedHistory.filter(c => {
-    if (query) {
-      const name = cleanString(c.cliente_nombre);
-      const cups = cleanString(c.cliente_cups);
-      if (!name.includes(cleanQuery) && !cups.includes(cleanQuery)) return false;
-    }
+    if (clientQuery && !cleanString(c.cliente_nombre).includes(cleanClientQuery)) return false;
+    if (cupsQuery && !cleanString(c.cliente_cups).includes(cleanCupsQuery)) return false;
 
     if (currentHistoryEstadoFilter !== 'ALL') {
       if ((c.estado || 'Pendiente de aceptación') !== currentHistoryEstadoFilter) return false;
@@ -487,7 +515,7 @@ function applyHistoryFilter() {
   tbody.innerHTML = '';
 
   if (filtered.length === 0) {
-    const hasActiveFilters = query || currentHistoryEstadoFilter !== 'ALL' || currentHistoryContractFilter !== 'ALL' || currentHistoryCobroFilter !== 'ALL';
+    const hasActiveFilters = clientQuery || cupsQuery || currentHistoryEstadoFilter !== 'ALL' || currentHistoryContractFilter !== 'ALL' || currentHistoryCobroFilter !== 'ALL';
     tbody.innerHTML = `
       <tr>
         <td colspan="10" class="text-muted" style="text-align: center; padding: 32px 16px;">
