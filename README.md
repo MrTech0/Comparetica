@@ -57,7 +57,7 @@ Si prefieres configurar tu entorno manualmente o trabajas en otro sistema operat
 
 #### Requisitos del Sistema
 Para compilar y ejecutar el proyecto desde el código fuente, necesitas:
-- **Node.js** (versiones LTS actualmente soportadas) y **pnpm** (versión 11 o superior).
+- **Node.js** (una versión LTS soportada, 22.13 o posterior) y **pnpm**. El proyecto fija **pnpm 12.8.1** mediante `packageManager` en `package.json`, para usar la misma versión en desarrollo y en GitHub Actions.
 - **Rust 1.90 o superior** (entorno de compilación cargo) y herramientas de compilación de C++ (requerido por Tauri).
 - **Microsoft Edge WebView2 Runtime** (en Windows).
 
