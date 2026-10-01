@@ -8,7 +8,7 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce
 };
-use rand::{RngCore, thread_rng};
+use rand::{Rng, rng};
 use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, Map};
@@ -69,7 +69,7 @@ pub type SharedDbState = Arc<Mutex<DbState>>;
 const UNAMBIGUOUS_ALPHABET: &[u8] = b"2345679ACDEFGHJKMNPQRSTVWXYZ";
 
 pub fn generate_unambiguous_recovery_key() -> String {
-    let mut rng = thread_rng();
+    let mut rng = rng();
     let mut raw = String::new();
     for _ in 0..16 {
         let idx = (rng.next_u32() as usize) % UNAMBIGUOUS_ALPHABET.len();
@@ -95,7 +95,7 @@ fn derive_key(secret: &str, salt: &[u8]) -> Result<[u8; 32], String> {
 fn encrypt_bytes(key: &[u8; 32], plaintext: &[u8]) -> Result<Vec<u8>, String> {
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
     let mut nonce_bytes = [0u8; 12];
-    thread_rng().fill_bytes(&mut nonce_bytes);
+    rng().fill_bytes(&mut nonce_bytes);
     let nonce = Nonce::from(nonce_bytes);
     let ciphertext = cipher.encrypt(&nonce, plaintext).map_err(|e| e.to_string())?;
     
@@ -468,9 +468,9 @@ impl DbState {
         let mut salt_p = [0u8; 32];
         let mut salt_r = [0u8; 32];
         let mut mdk = [0u8; 32];
-        thread_rng().fill_bytes(&mut salt_p);
-        thread_rng().fill_bytes(&mut salt_r);
-        thread_rng().fill_bytes(&mut mdk);
+        rng().fill_bytes(&mut salt_p);
+        rng().fill_bytes(&mut salt_r);
+        rng().fill_bytes(&mut mdk);
 
         let key_p = derive_key(password, &salt_p)?;
         let recovery_key = generate_unambiguous_recovery_key();
@@ -531,8 +531,8 @@ impl DbState {
         // Generar nuevos salts y NUEVA clave de recuperación (invalidando la anterior)
         let mut new_salt_p = [0u8; 32];
         let mut new_salt_r = [0u8; 32];
-        thread_rng().fill_bytes(&mut new_salt_p);
-        thread_rng().fill_bytes(&mut new_salt_r);
+        rng().fill_bytes(&mut new_salt_p);
+        rng().fill_bytes(&mut new_salt_r);
 
         let new_recovery_key = generate_unambiguous_recovery_key();
         let new_key_p = derive_key(new_password, &new_salt_p)?;
@@ -574,8 +574,8 @@ impl DbState {
         // Generar nuevos salts y NUEVA clave de recuperación (invalidando la anterior)
         let mut new_salt_p = [0u8; 32];
         let mut new_salt_r = [0u8; 32];
-        thread_rng().fill_bytes(&mut new_salt_p);
-        thread_rng().fill_bytes(&mut new_salt_r);
+        rng().fill_bytes(&mut new_salt_p);
+        rng().fill_bytes(&mut new_salt_r);
 
         let new_recovery_key = generate_unambiguous_recovery_key();
         let new_key_p = derive_key(new_password, &new_salt_p)?;
@@ -1038,6 +1038,35 @@ mod tests {
     const SQLITE_032_VAULT: &[u8] = include_bytes!("../tests/fixtures/rusqlite-0.32.1/vault.json");
 
     #[test]
+    fn test_recovery_keys_keep_unambiguous_format_and_are_fresh() {
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..32 {
+            let key = generate_unambiguous_recovery_key();
+            let groups: Vec<&str> = key.split('-').collect();
+            assert_eq!(groups.len(), 5);
+            assert_eq!(groups[0], "RC");
+            for group in &groups[1..] {
+                assert_eq!(group.len(), 4);
+                assert!(group.bytes().all(|byte| UNAMBIGUOUS_ALPHABET.contains(&byte)));
+            }
+            assert!(seen.insert(key), "Cada clave de recuperación debe ser nueva");
+        }
+    }
+
+    #[test]
+    fn test_repeated_encryption_uses_fresh_nonces_and_preserves_payload() {
+        let key = [7u8; 32];
+        let payload = b"Synthetic nonce compatibility payload";
+        let first = encrypt_bytes(&key, payload).unwrap();
+        let second = encrypt_bytes(&key, payload).unwrap();
+        assert_eq!(first.len(), 12 + payload.len() + 16);
+        assert_eq!(second.len(), 12 + payload.len() + 16);
+        assert_ne!(&first[..12], &second[..12], "Cada cifrado debe usar un nonce nuevo");
+        assert_eq!(decrypt_bytes(&key, &first).unwrap(), payload);
+        assert_eq!(decrypt_bytes(&key, &second).unwrap(), payload);
+    }
+
+    #[test]
     fn test_key_derivation_matches_argon2_053_vectors() {
         let fixture: Value = serde_json::from_str(include_str!("../tests/fixtures/argon2-0.5.3/derived-keys.json")).unwrap();
         for vector in fixture["vectors"].as_array().unwrap() {
@@ -1408,7 +1437,7 @@ mod tests {
     fn test_direct_bytes_encryption_and_in_memory_legacy_import() {
         // 1. Verificar primitivas de cifrado/descifrado directo en bytes
         let mut test_key = [0u8; 32];
-        thread_rng().fill_bytes(&mut test_key);
+        rng().fill_bytes(&mut test_key);
         let sample_payload = b"Prueba de cifrado directo en bytes sin Base64";
 
         let encrypted_bytes = encrypt_bytes(&test_key, sample_payload).expect("encrypt_bytes debe tener éxito");
