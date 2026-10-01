@@ -3,6 +3,10 @@
 mod db;
 mod dropped_files;
 
+#[cfg(test)]
+#[path = "../tests/unit/auth_commands.rs"]
+mod auth_command_tests;
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -57,9 +61,15 @@ fn db_setup_master_password(state: tauri::State<'_, db::SharedDbState>, password
 }
 
 #[tauri::command]
-fn db_login(state: tauri::State<'_, db::SharedDbState>, password: String) -> Result<(), String> {
-    let mut db_state = state.lock().map_err(|e| e.to_string())?;
-    db_state.login(&password)
+async fn db_login(state: tauri::State<'_, db::SharedDbState>, password: String) -> Result<(), String> {
+    let state = state.inner().clone();
+    // Argon2 y la apertura de la base no deben bloquear los eventos de la ventana.
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut db_state = state.lock().map_err(|e| e.to_string())?;
+        db_state.login(&password)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
