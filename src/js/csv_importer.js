@@ -101,6 +101,7 @@ function setupEncodingModals() {
 
 function resetImporter() {
   parsedCsvData = { headers: [], rows: [] };
+  crmColumns = [];
   columnMappings = {};
   
   const fileInput = document.getElementById('csv-file-input');
@@ -108,6 +109,20 @@ function resetImporter() {
 
   const progressContainer = document.getElementById('csv-progress-container');
   if (progressContainer) progressContainer.classList.add('hidden');
+
+  const fileInfo = document.getElementById('csv-file-info');
+  if (fileInfo) fileInfo.textContent = '';
+  for (const id of ['csv-mapping-rows', 'csv-preview-thead', 'csv-preview-tbody']) {
+    const element = document.getElementById(id);
+    if (element) element.innerHTML = '';
+  }
+
+  const statusEl = document.getElementById('csv-progress-status');
+  const percentEl = document.getElementById('csv-progress-percent');
+  const progressBar = document.getElementById('csv-progress-bar');
+  if (statusEl) statusEl.textContent = 'Procesando importación...';
+  if (percentEl) percentEl.textContent = '0%';
+  if (progressBar) progressBar.style.width = '0%';
 
   document.getElementById('csv-step-1').classList.remove('hidden');
   document.getElementById('csv-step-2').classList.add('hidden');
@@ -594,6 +609,7 @@ async function executeImport() {
     }
 
     showToast(`Importación completada: ${totalAdded.toLocaleString('es-ES')} creados, ${totalUpdated.toLocaleString('es-ES')} actualizados.`, "success");
+    resetImporter();
   } catch (err) {
     console.error("Error durante la importación CSV:", err);
     showToast(`Error durante la importación: ${err.message || err}`, "error");
