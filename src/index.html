@@ -1261,13 +1261,6 @@
                   <div style="flex: 1; min-width: 220px; position: relative;">
                     <input type="text" id="search-renewals-input" class="m3-input" placeholder="Buscar por cliente, CIF o CUPS..." style="width: 100%; box-sizing: border-box;" />
                   </div>
-                  <select id="filter-renewals-status" class="m3-input m3-select" style="width: 160px;">
-                    <option value="ALL">Todos los Estados</option>
-                    <option value="CRITICAL">🔴 Críticos</option>
-                    <option value="WARNING">🟡 Próximos</option>
-                    <option value="RADAR">🔵 En Radar</option>
-                    <option value="DONE">✅ Renovados</option>
-                  </select>
                   <button type="button" id="btn-open-add-renewal" class="m3-btn">
                     <span>+ Añadir Renovación</span>
                   </button>
@@ -1284,7 +1277,15 @@
                       <th>Fecha Firma</th>
                       <th>Vencimiento</th>
                       <th>Días Restantes</th>
-                      <th>Estado</th>
+                      <th scope="col" aria-label="Estado">
+                        <select id="filter-renewals-status" class="m3-input m3-native-select m3-table-column-filter" aria-label="Filtrar renovaciones por estado">
+                          <option value="ALL">Estado: Todos</option>
+                          <option value="CRITICAL">🔴 Estado: Críticos</option>
+                          <option value="WARNING">🟡 Estado: Próximos</option>
+                          <option value="RADAR">🔵 Estado: En Radar</option>
+                          <option value="DONE">✅ Estado: Renovados</option>
+                        </select>
+                      </th>
                       <th style="text-align: right;">Acciones</th>
                     </tr>
                   </thead>

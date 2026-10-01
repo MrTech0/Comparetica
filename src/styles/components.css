@@ -421,6 +421,44 @@
   color: var(--color-on-surface);
 }
 
+.m3-native-select.m3-table-column-filter {
+  height: 28px;
+  width: auto;
+  padding: 0 24px 0 0;
+  border-color: transparent;
+  background-color: transparent;
+  background-position: right center;
+  background-size: 18px;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.m3-native-select.m3-table-column-filter:focus {
+  border-color: transparent;
+  border-width: 1px;
+  background-color: transparent;
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+@supports (appearance: base-select) {
+  .m3-native-select.m3-table-column-filter,
+  .m3-native-select.m3-table-column-filter:focus,
+  .m3-native-select.m3-table-column-filter:open {
+    padding: 0;
+    border-color: transparent;
+    border-width: 1px;
+    background-color: transparent;
+  }
+
+  .m3-table-column-filter::picker-icon {
+    width: 18px;
+    height: 18px;
+    mask-size: 18px;
+  }
+}
+
 .m3-table tbody tr:hover {
   background-color: rgba(0, 0, 0, 0.02);
 }
