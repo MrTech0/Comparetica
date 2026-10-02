@@ -39,7 +39,7 @@ function element(tag = 'div') {
   };
 }
 
-async function mount(t, getPoints = id => points[id] || [], getClients = () => clients) {
+async function mount(t, getPoints = id => points[id] || [], getClients = () => clients, offers = {}) {
   const original = { document: globalThis.document, window: globalThis.window, localStorage: globalThis.localStorage };
   const nodes = new Map();
   const get = id => { if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); };
@@ -53,7 +53,10 @@ async function mount(t, getPoints = id => points[id] || [], getClients = () => c
     if (args.query.includes('FROM puntos_suministro')) return await getPoints(args.params[0]);
     if (args.query.includes('FROM clientes')) return await getClients();
     if (args.query.includes('FROM ajustes')) return [];
-    if (/FROM (renovaciones|comercializadoras|tarifas_luz|tarifas_gas)/.test(args.query)) return [];
+    for (const table of ['comercializadoras', 'tarifas_luz', 'tarifas_gas']) {
+      if (args.query.includes(`FROM ${table}`)) return await offers[table] || [];
+    }
+    if (args.query.includes('FROM renovaciones')) return [];
     throw new Error(`Consulta inesperada: ${args.query}`);
   } } } };
   t.after(() => { for (const [key, value] of Object.entries(original)) { if (value === undefined) delete globalThis[key]; else globalThis[key] = value; } });
@@ -193,6 +196,80 @@ test('history locks the customer while the client lookup is still pending', asyn
   resolveClients(clients);
   await opening;
   assert.equal(lockedDuringLookup, true);
+});
+
+for (const [energy, cups, suffix] of [['LUZ', luzCentral, 'luz'], ['GAS', gasCentral, 'gas']]) {
+  test(`history ${energy} renewal fixes the selected retailer and tariff and saves their original values`, async t => {
+    const retailer = `Comercializadora ${energy}`;
+    const tariff = `Tarifa ${energy}`;
+    const f = await mount(t, undefined, undefined, {
+      comercializadoras: [{ nombre: retailer }],
+      [`tarifas_${suffix}`]: [{ nombre: tariff, comercializadora_nombre: retailer }]
+    });
+    await f.view.openNewRenewalDialogFromHistory({ cliente_nombre: 'Veeam', cliente_cups: cups, tipo_energia: energy,
+      [`comercializadora_${suffix}_nombre`]: retailer, [`tarifa_${suffix}_nombre`]: tariff });
+    assert.equal(f.get('manual-ren-comercializadora').value, retailer);
+    assert.equal(f.get('manual-ren-tarifa').value, tariff);
+    assert.equal(f.get('manual-ren-comercializadora').readOnly, true);
+    assert.equal(f.get('manual-ren-tarifa').readOnly, true);
+    assert.equal(f.get('manual-ren-comercializadora').disabled, true, 'no debe recibir foco al pulsarlo');
+    assert.equal(f.get('manual-ren-tarifa').disabled, true, 'no debe recibir foco al pulsarlo');
+    assert.equal(f.get('manual-ren-duration').readOnly, false);
+    assert.equal(f.get('manual-ren-duration').disabled, false);
+    await f.get('manual-ren-comercializadora').oninput();
+    await f.get('manual-ren-tarifa').oninput();
+    assert.equal(f.get('manual-ren-comercializadora-suggestions').style.display, 'none');
+    assert.equal(f.get('manual-ren-tarifa-suggestions').style.display, 'none');
+    await f.save();
+    assert.deepEqual(f.inserts[0]?.slice(3, 5), [retailer, tariff]);
+    await f.view.openManualAddModal();
+    assert.equal(f.get('manual-ren-comercializadora').readOnly, false);
+    assert.equal(f.get('manual-ren-tarifa').readOnly, false);
+    assert.equal(f.get('manual-ren-comercializadora').disabled, false);
+    assert.equal(f.get('manual-ren-tarifa').disabled, false);
+    await f.selectClient(clients[0]);
+    f.changeEnergy(energy === 'LUZ' ? 'Luz' : 'Gas');
+    f.get('manual-ren-comercializadora').value = retailer;
+    await f.get('manual-ren-comercializadora').oninput();
+    assert.equal(f.get('manual-ren-comercializadora-suggestions').style.display, 'block');
+    f.get('manual-ren-tarifa').value = tariff;
+    await f.get('manual-ren-tarifa').oninput();
+    assert.equal(f.get('manual-ren-tarifa-suggestions').style.display, 'block');
+  });
+}
+
+test('history locks the offer immediately while the client lookup is pending', async t => {
+  let resolveClients, notifyWaiting;
+  const pending = new Promise(resolve => { resolveClients = resolve; });
+  const waiting = new Promise(resolve => { notifyWaiting = resolve; });
+  const f = await mount(t, undefined, () => { notifyWaiting(); return pending; });
+  const opening = f.view.openNewRenewalDialogFromHistory({ cliente_nombre: 'Veeam', cliente_cups: gasCentral,
+    tipo_energia: 'GAS', comercializadora_gas_nombre: 'Gas Demo', tarifa_gas_nombre: 'Plan Gas' });
+  await waiting;
+  const retailerLocked = f.get('manual-ren-comercializadora').readOnly;
+  const tariffLocked = f.get('manual-ren-tarifa').readOnly;
+  const retailerDisabled = f.get('manual-ren-comercializadora').disabled;
+  const tariffDisabled = f.get('manual-ren-tarifa').disabled;
+  resolveClients(clients); await opening;
+  assert.equal(retailerLocked, true);
+  assert.equal(tariffLocked, true);
+  assert.equal(retailerDisabled, true);
+  assert.equal(tariffDisabled, true);
+});
+
+test('a pending manual suggestion cannot appear or change the offer after opening a history renewal', async t => {
+  let resolveRetailers, notifyWaiting;
+  const pending = new Promise(resolve => { resolveRetailers = resolve; });
+  const waiting = new Promise(resolve => { notifyWaiting = resolve; });
+  const f = await mount(t, undefined, undefined, { get comercializadoras() { notifyWaiting(); return pending; } });
+  const input = f.get('manual-ren-comercializadora');
+  input.value = 'Manual'; const searching = input.oninput(); await waiting;
+  await f.view.openNewRenewalDialogFromHistory({ cliente_nombre: 'Veeam', cliente_cups: gasCentral,
+    tipo_energia: 'GAS', comercializadora_gas_nombre: 'Gas Demo', tarifa_gas_nombre: 'Plan Gas' });
+  resolveRetailers([{ nombre: 'Manual Offer' }]); await searching;
+  assert.equal(input.value, 'Gas Demo');
+  assert.equal(f.get('manual-ren-comercializadora-suggestions').style.display, 'none');
+  assert.equal(f.get('manual-ren-comercializadora-suggestions').children.length, 0);
 });
 
 test('saving captures the supply and offer together before asynchronous validation', async t => {

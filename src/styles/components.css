@@ -292,6 +292,25 @@
   opacity: 0.75;
 }
 
+/* Show fixed renewal data consistently, without dropdown affordances. */
+#dialog-renewal-form .m3-input:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+#dialog-renewal-form select.m3-input:disabled {
+  background-image: none;
+  padding-right: 16px;
+}
+
+#dialog-renewal-form select:disabled + .m3-custom-select .m3-custom-select-trigger {
+  cursor: default;
+}
+
+#dialog-renewal-form select:disabled + .m3-custom-select .m3-custom-select-arrow {
+  display: none;
+}
+
 /* Older WebViews retain the styled native control above. */
 @supports (appearance: base-select) {
   .m3-native-select,
@@ -326,6 +345,10 @@
     background-color: var(--color-on-surface-variant);
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") center / 24px no-repeat;
     transition: transform var(--transition-fast);
+  }
+
+  #dialog-renewal-form .m3-native-select:disabled::picker-icon {
+    display: none;
   }
 
   .m3-native-select:open::picker-icon {

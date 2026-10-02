@@ -727,6 +727,22 @@ function resetRenewalSupplySelection() {
   renderRenewalSupplyOptions();
 }
 
+function setRenewalOfferLocked(locked) {
+  for (const field of ['comercializadora', 'tarifa']) {
+    const input = document.getElementById(`manual-ren-${field}`);
+    if (input) {
+      input.readOnly = locked;
+      input.disabled = locked;
+      input.title = locked ? 'Dato fijado según la comparativa firmada y activada.' : '';
+    }
+    const suggestions = document.getElementById(`manual-ren-${field}-suggestions`);
+    if (suggestions) {
+      suggestions.style.display = 'none';
+      suggestions.innerHTML = '';
+    }
+  }
+}
+
 async function selectRenewalClient(client, fixedSupply = null) {
   const context = { clientId: Number(client.id), points: [], ready: false, locked: Boolean(fixedSupply), fixedCups: normalizeCups(fixedSupply?.cups) };
   renewalSupplyContext = context;
@@ -802,6 +818,7 @@ export async function openNewRenewalDialogFromHistory(comp, callbacks = null) {
     searchInput.readOnly = true;
   }
   context.locked = true;
+  setRenewalOfferLocked(true);
 
   // Localizar el cliente activo de la comparativa.
   try {
@@ -855,6 +872,7 @@ export async function openManualAddModal() {
   if (form) form.reset();
   historyRenewalCallbacks = null;
   resetRenewalSupplySelection();
+  setRenewalOfferLocked(false);
   if (idInput) idInput.value = '';
   if (durationInput) durationInput.value = '12';
   if (suggestionsBox) {
@@ -981,6 +999,8 @@ export async function openManualAddModal() {
 
   if (comInput && comSuggestionsBox) {
     const showComSuggestions = async () => {
+      if (comInput.readOnly) return;
+      const suggestionContext = renewalSupplyContext;
       try {
         const term = comInput.value.trim().toLowerCase();
         if (term.length === 0) {
@@ -990,6 +1010,7 @@ export async function openManualAddModal() {
         }
 
         const coms = await getComercializadoras();
+        if (comInput.readOnly || renewalSupplyContext !== suggestionContext || comInput.value.trim().toLowerCase() !== term) return;
         const filtered = coms.filter(c => c.nombre.toLowerCase().includes(term));
         comSuggestionsBox.innerHTML = '';
 
@@ -1012,6 +1033,7 @@ export async function openManualAddModal() {
           item.onmouseleave = () => { item.style.backgroundColor = 'transparent'; };
 
           item.onclick = () => {
+            if (comInput.readOnly || renewalSupplyContext !== suggestionContext) return;
             comInput.value = c.nombre;
             comSuggestionsBox.style.display = 'none';
           };
@@ -1040,6 +1062,8 @@ export async function openManualAddModal() {
 
   if (tarifaInput && tarifaSuggestionsBox) {
     const showTarifaSuggestions = async () => {
+      if (tarifaInput.readOnly) return;
+      const suggestionContext = renewalSupplyContext;
       try {
         const term = tarifaInput.value.trim().toLowerCase();
         if (term.length === 0) {
@@ -1060,6 +1084,7 @@ export async function openManualAddModal() {
           const gas = await getTarifasGas();
           allTariffs.push(...gas.map(t => ({ ...t, tipo_enum: 'Gas' })));
         }
+        if (tarifaInput.readOnly || renewalSupplyContext !== suggestionContext || tarifaInput.value.trim().toLowerCase() !== term) return;
 
         let filtered = allTariffs;
         if (selectedComName) {
@@ -1100,6 +1125,7 @@ export async function openManualAddModal() {
           item.onmouseleave = () => { item.style.backgroundColor = 'transparent'; };
 
           item.onclick = () => {
+            if (tarifaInput.readOnly || comInput?.readOnly || renewalSupplyContext !== suggestionContext) return;
             tarifaInput.value = t.nombre;
             if (comInput && t.comercializadora_nombre) {
               comInput.value = t.comercializadora_nombre;
