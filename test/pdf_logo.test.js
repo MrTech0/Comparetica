@@ -6,6 +6,48 @@ import { jsPDF } from 'jspdf';
 // Real 8x8 RGBA PNG with a translucent red pixel; only canvas encoding is doubled.
 const translucentLogo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFUlEQVR4nGN85WzawIAHMOGTHD4KAPZYAfKVaiJXAAAAAElFTkSuQmCC';
 
+for (const mode of ['preview', 'download', 'email']) {
+  for (const logo of [translucentLogo, null]) {
+    test(`${mode} PDF keeps the captured ${logo ? 'custom' : 'default'} logo and company after settings change`, async () => {
+      const { browser, canvases } = setupLogoConverter({ width: 8, height: 8, pngData: translucentLogo });
+      const images = [];
+      let output;
+      let settingsReads = 0;
+      class ReportPdf {
+        constructor(options) {
+          const doc = new jsPDF(options);
+          const addImage = doc.addImage;
+          doc.addImage = function(image, ...args) { images.push(image); return addImage.call(this, image, ...args); };
+          const originalOutput = doc.output;
+          doc.output = function(...args) { output = originalOutput.call(this); return originalOutput.apply(this, args); };
+          return doc;
+        }
+      }
+      Object.assign(browser, {
+        window: { jspdf: { jsPDF: ReportPdf }, __TAURI__: {}, open() {} },
+        URL: { createObjectURL: () => 'blob:test-preview' },
+        getCompanyConfig: async () => { settingsReads++; return { consultora_nombre: 'Consultora modificada' }; },
+        getCompanyLogo: async () => { settingsReads++; return logo ? null : translucentLogo; },
+        formatPriceDecimals: value => String(value), showToast() {},
+        invoke: async command => { assert.equal(command, 'save_pdf'); return 'synthetic.pdf'; },
+      });
+      await browser.generatePDFReport({
+        companySnapshot: { config: { consultora_nombre: 'Consultora original', consultora_email: 'original@example.invalid' }, logo },
+        energyType: 'GAS', clientName: 'Cliente de prueba', currentCost: 600, proposedCost: 500, ahorro: 100,
+        tariffDetails: { comercializadora_nombre: 'Demo', nombre: 'Tarifa Demo', termino_fijo: 10, termino_variable: .05 },
+        inputDetails: { dias: 30 }, costDetail: { annual: { fijo: 100, variable: 300, hidrocarburos: 10, alquiler: 5, impuestos: 85 } }
+      }, mode === 'preview', mode === 'email');
+      assert.equal(settingsReads, 0, 'historical reports must not consult mutable branding settings');
+      assert.equal(canvases.length, logo ? 0 : 1, 'a captured null logo means the default bulb');
+      assert.equal(images.length, 1);
+      if (logo) assert.equal(images[0], translucentLogo);
+      assert.match(output, /Consultora original/);
+      assert.match(output, /original@example\.invalid/);
+      assert.doesNotMatch(output, /Consultora modificada/);
+    });
+  }
+}
+
 test('stored optimized PNG is passed directly to the PDF without a canvas conversion', async () => {
   const { convert, canvases } = setupLogoConverter();
   assert.equal(await convert(translucentLogo), translucentLogo);

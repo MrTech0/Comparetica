@@ -1,7 +1,7 @@
 /* src/js/views/calculator_view.js */
 
 import { calculateLightBill, calculateGasBill, formatPriceDecimals } from '../calculator.js';
-import { getTarifasLuz, getTarifasGas, addComparativa, getClientes, getComparativas, getPuntosSuministroByCliente } from '../db.js';
+import { getTarifasLuz, getTarifasGas, addComparativa, getClientes, getComparativas, getPuntosSuministroByCliente, getCompanySnapshot } from '../db.js';
 import { generatePDFReport } from '../pdf.js';
 import { showToast } from '../ui.js';
 import { emitAppEvent, APP_EVENTS } from '../events.js';
@@ -497,6 +497,15 @@ function setupCalcFormSubmit() {
       return;
     }
 
+    let companySnapshot;
+    try {
+      companySnapshot = await getCompanySnapshot();
+    } catch (error) {
+      if (selectionIsCurrent()) showToast('No se pudieron guardar los datos de la consultora para esta comparativa. Vuelve a intentarlo.', 'error');
+      return;
+    }
+    if (!selectionIsCurrent()) return;
+
     // Resetear contenedores de resultados
     document.getElementById('results-light-list').innerHTML = '';
     document.getElementById('results-gas-list').innerHTML = '';
@@ -642,6 +651,7 @@ function setupCalcFormSubmit() {
 
     // Inicializar temporales globales
     lastComparisonData = {
+      companySnapshot,
       clientName,
       clientCups,
       energyType,
@@ -947,6 +957,7 @@ async function saveComparisonToDb(item, type, buttonEl) {
 
     // Datos del formulario estructurados
     const datosClienteJson = {
+      companySnapshot: lastComparisonData.companySnapshot,
       lightInput: lastComparisonData.lightInput,
       gasInput: lastComparisonData.gasInput,
       currentLightCost: lastComparisonData.currentLightCost,
@@ -1013,6 +1024,7 @@ async function saveComparisonToDb(item, type, buttonEl) {
 // --- Exportación a PDF ---
 async function exportPDF(item, type, previewMode = false) {
   const reportData = {
+    companySnapshot: lastComparisonData.companySnapshot,
     clientName: lastComparisonData.clientName,
     clientCups: lastComparisonData.clientCups,
     energyType: type,

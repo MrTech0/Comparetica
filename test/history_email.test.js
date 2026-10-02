@@ -25,7 +25,7 @@ function element() {
   };
 }
 
-async function mount({ email = 'cliente@example.invalid', cancel = false, failOpening = false } = {}) {
+async function mount({ email = 'cliente@example.invalid', cancel = false, failOpening = false, companySnapshot } = {}) {
   const tbody = element();
   const calls = [];
   const toasts = [];
@@ -33,7 +33,7 @@ async function mount({ email = 'cliente@example.invalid', cancel = false, failOp
   const record = {
     id: 1, cliente_nombre: 'Cliente de prueba', cliente_email: email, cliente_cups: 'ES003100001AB',
     tipo_energia: 'GAS', fecha: '2026-10-02', ahorro_luz_anual: 0, ahorro_gas_anual: 100,
-    comision_total: 10, datos_cliente_json: JSON.stringify({ currentGasCost: 600 })
+    comision_total: 10, datos_cliente_json: JSON.stringify({ currentGasCost: 600, companySnapshot })
   };
   const browser = vm.createContext({
     document: {
@@ -62,8 +62,21 @@ async function mount({ email = 'cliente@example.invalid', cancel = false, failOp
   new vm.Script(source, { filename: 'history.js' }).runInContext(browser);
   await browser.initHistoryView();
   assert.equal(tbody.children.length, 1);
-  return { calls, reports, toasts, click: () => tbody.children[0].querySelector('.btn-email-history').onclick() };
+  return { calls, reports, toasts, click: () => tbody.children[0].querySelector('.btn-email-history').onclick(),
+    preview: () => tbody.children[0].querySelector('.btn-preview-history').onclick(),
+    print: () => tbody.children[0].querySelector('.btn-print-history').onclick() };
 }
+
+test('all historical PDF actions pass the saved branding including a default logo', async () => {
+  const snapshot = { config: { consultora_nombre: 'Consultora original' }, logo: null };
+  const f = await mount({ companySnapshot: snapshot });
+  f.preview(); f.print(); await f.click();
+  assert.equal(f.reports.length, 3);
+  for (const report of f.reports) {
+    assert.ok(report.data.companySnapshot, 'history must pass the saved branding to PDF generation');
+    assert.deepEqual(JSON.parse(JSON.stringify(report.data.companySnapshot)), snapshot);
+  }
+});
 
 test('history email opens the registered native command with the recipient and generated PDF', async () => {
   const f = await mount();

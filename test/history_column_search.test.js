@@ -55,6 +55,7 @@ async function mount(t) {
     addEventListener() {}, removeEventListener() {},
     __TAURI__: { core: { invoke: async (command, args) => {
       assert.equal(command, 'db_select');
+      if (/^SELECT id FROM comparativas/.test(args.query)) return [];
       assert.match(args.query, /FROM comparativas c/);
       return comparisons;
     } } }

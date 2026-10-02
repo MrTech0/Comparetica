@@ -79,15 +79,20 @@ export async function generatePDFReport(data, previewMode = false, returnBase64 
     return;
   }
 
-  // Cargar configuración de consultora y logotipo
+  // Las comparativas guardadas conservan su identidad aunque cambie Configuración.
   let config = {};
   let logoDataUri = null;
 
-  try {
-    config = await getCompanyConfig();
-    logoDataUri = await getCompanyLogo();
-  } catch (e) {
-    console.error("Error al obtener la configuración de la consultora:", e);
+  if (data.companySnapshot) {
+    config = data.companySnapshot.config || {};
+    logoDataUri = data.companySnapshot.logo ?? null;
+  } else {
+    try {
+      config = await getCompanyConfig();
+      logoDataUri = await getCompanyLogo();
+    } catch (e) {
+      console.error("Error al obtener la configuración de la consultora:", e);
+    }
   }
 
   const options = {

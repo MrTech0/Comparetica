@@ -309,6 +309,10 @@ export async function deleteTarifaGas(id) {
  */
 export async function addComparativa(clienteNombre, clienteCups, tipoEnergia, datosClienteJson, tarifaLuzPropuestaId, ahorroLuzAnual, tarifaGasPropuestaId, ahorroGasAnual, comisionTotal) {
   const db = await getDb();
+  const savedData = {
+    ...datosClienteJson,
+    companySnapshot: datosClienteJson.companySnapshot || await getCompanySnapshot()
+  };
   return await db.execute(
     `INSERT INTO comparativas (
       cliente_nombre, cliente_cups, tipo_energia, datos_cliente_json, 
@@ -317,7 +321,7 @@ export async function addComparativa(clienteNombre, clienteCups, tipoEnergia, da
       comision_total
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`,
     [
-      clienteNombre, clienteCups, tipoEnergia, JSON.stringify(datosClienteJson), 
+      clienteNombre, clienteCups, tipoEnergia, JSON.stringify(savedData),
       tarifaLuzPropuestaId, ahorroLuzAnual, 
       tarifaGasPropuestaId, ahorroGasAnual, 
       comisionTotal
@@ -331,6 +335,7 @@ export async function addComparativa(clienteNombre, clienteCups, tipoEnergia, da
  */
 export async function getComparativas() {
   const db = await getDb();
+  await preserveComparisonCompanySnapshots();
   return await db.select(`
     SELECT c.*, 
            tl.nombre as tarifa_luz_nombre, cl.nombre as comercializadora_luz_nombre,
@@ -1168,6 +1173,7 @@ export async function getCompanyConfig() {
  * Guarda la configuración de empresa en SQLite cifrada y sincroniza con Rust.
  */
 export async function saveCompanyConfig(configData) {
+  await preserveComparisonCompanySnapshots();
   await setAjuste('company_config', configData);
   try {
     await invoke('save_company_config', { config: configData });
@@ -1206,6 +1212,7 @@ export async function getCompanyLogo() {
  * Guarda el logotipo de empresa en SQLite cifrada.
  */
 export async function saveCompanyLogo(logoDataUri) {
+  await preserveComparisonCompanySnapshots();
   await setAjuste('company_logo', logoDataUri);
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem('company_logo', logoDataUri);
@@ -1217,6 +1224,7 @@ export async function saveCompanyLogo(logoDataUri) {
  */
 export async function deleteCompanyLogo() {
   const db = await getDb();
+  await preserveComparisonCompanySnapshots();
   await db.execute("DELETE FROM ajustes WHERE clave = 'company_logo';");
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem('company_logo');
@@ -1226,6 +1234,32 @@ export async function deleteCompanyLogo() {
   } catch (err) {
     console.warn("Error al borrar logo en backend:", err);
   }
+}
+
+/** Conserva la identidad de la consultora, incluido el uso del logo por defecto. */
+export async function getCompanySnapshot() {
+  const config = await getCompanyConfig();
+  const logo = await getCompanyLogo();
+  return { config, logo };
+}
+
+/**
+ * Las comparativas antiguas no guardaban la identidad de la consultora.
+ * Fija la disponible una sola vez antes de leer el historial o cambiarla.
+ */
+async function preserveComparisonCompanySnapshots() {
+  const db = await getDb();
+  const missingSnapshot = `CASE WHEN json_valid(datos_cliente_json)
+    THEN json_type(datos_cliente_json) = 'object'
+      AND json_type(datos_cliente_json, '$.companySnapshot') IS NULL
+    ELSE 0 END`;
+  const pending = await db.select(`SELECT id FROM comparativas WHERE ${missingSnapshot} LIMIT 1;`);
+  if (!pending.length) return;
+  const snapshot = await getCompanySnapshot();
+  // Una única escritura conserva los cálculos y nunca reemplaza una identidad ya fijada.
+  await db.execute(`UPDATE comparativas
+    SET datos_cliente_json = json_set(datos_cliente_json, '$.companySnapshot', json($1))
+    WHERE ${missingSnapshot};`, [JSON.stringify(snapshot)]);
 }
 
 /**

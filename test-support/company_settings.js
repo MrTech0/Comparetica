@@ -95,6 +95,7 @@ export async function setup(t, { failNative = false, extension = 'svg', includeC
         return Array.from(new TextEncoder().encode('Nombre;CIF;Representante;Email\nConsultoría Muñoz;B12345674;José Núñez;prueba@example.com'));
       }
       if (command === 'db_select') {
+        if (/^SELECT id FROM comparativas/.test(args.query)) return [];
         assert.match(args.query, /SELECT valor FROM ajustes/);
         if (args.params[0] === 'company_logo' && !settings.has('company_logo')) return [];
         assert.ok(settings.has(args.params[0]));

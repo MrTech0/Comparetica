@@ -1021,6 +1021,7 @@ function getReportDataForRecord(record) {
   }
 
   return {
+    companySnapshot: datosCliente.companySnapshot,
     clientName: record.cliente_nombre,
     clientCups: record.cliente_cups,
     energyType: isLuzReport ? 'LUZ' : 'GAS',

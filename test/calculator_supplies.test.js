@@ -69,6 +69,7 @@ function mount(overrides = {}) {
     getPuntosSuministroAll: async () => points,
     getPuntosSuministroByCliente: async id => points.filter(point => point.cliente_id === id),
     getComparativas: async () => [], getTarifasLuz: async () => [light], getTarifasGas: async () => [gas],
+    getCompanySnapshot: async () => ({ config: {}, logo: null }),
     calculateLightBill, calculateGasBill, formatPriceDecimals, normalizeCups, isValidSpanishCups,
     showToast: (message, type) => toasts.push({ message, type }), emitAppEvent() {}, APP_EVENTS: {}, ...overrides
   });
@@ -276,3 +277,22 @@ for (const [name, energy, index] of [['Solo Luz', 'LUZ', 4], ['Solo Gas', 'GAS',
     assert.equal(f.get('calc-results-wrapper').style.display, 'block');
   });
 }
+
+test('previewing and saving a calculated comparison keeps the branding captured when calculating', async () => {
+  const captured = { config: { consultora_nombre: 'Consultora original' }, logo: 'data:image/png;base64,bG9nbyBB' };
+  let current = captured;
+  const saved = [], reports = [];
+  const f = mount({
+    getCompanySnapshot: async () => JSON.parse(JSON.stringify(current)),
+    addComparativa: async (...args) => { saved.push(JSON.parse(JSON.stringify(args[3]))); },
+    generatePDFReport: async data => { reports.push(JSON.parse(JSON.stringify(data))); }
+  });
+  await f.choose('Solo Gas'); f.fillBill(); await f.submit();
+  current = { config: { consultora_nombre: 'Consultora cambiada' }, logo: null };
+  const card = f.get('results-gas-list').children[0];
+  assert.ok(card, 'calculation must produce a proposal');
+  await card.querySelector('.btn-preview-report').click(); await settle();
+  await card.querySelector('.btn-save-comparison').click();
+  assert.deepEqual(reports[0]?.companySnapshot, captured);
+  assert.deepEqual(saved[0]?.companySnapshot, captured);
+});
