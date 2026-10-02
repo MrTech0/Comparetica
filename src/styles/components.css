@@ -1024,6 +1024,11 @@ body.private-mode-active .private-value::after {
 /* ==========================================================================
    CUSTOM AUTOCOMPLETE DROPDOWN (Material 3)
    ========================================================================== */
+.m3-autocomplete-container {
+  position: relative;
+  display: grid;
+}
+
 .m3-autocomplete-list {
   display: none;
   position: absolute;

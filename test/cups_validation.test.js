@@ -124,23 +124,6 @@ describe('Validación y Normalización de CUPS (src/js/utils/validators.js)', ()
       ]).valid, true);
     });
 
-    test('autoselección y bloqueo de tipo de suministro en comparador al elegir punto', () => {
-      const puntos = [
-        { id: 1, cliente_id: 10, cups: 'ES0021000000000000AB', direccion_alias: 'Sede Central', tipo_energia: 'LUZ' },
-        { id: 2, cliente_id: 10, cups: 'ES0031000000000000CD', direccion_alias: 'Almacén Gas', tipo_energia: 'GAS' }
-      ];
-
-      const selectPunto = (p) => {
-        const cups = normalizeCups(p.cups);
-        const energyType = (p.tipo_energia || 'LUZ').toUpperCase();
-        const isLocked = Boolean(cups && energyType);
-        return { cups, energyType, isLocked };
-      };
-
-      assert.deepStrictEqual(selectPunto(puntos[0]), { cups: 'ES0021000000000000AB', energyType: 'LUZ', isLocked: true });
-      assert.deepStrictEqual(selectPunto(puntos[1]), { cups: 'ES0031000000000000CD', energyType: 'GAS', isLocked: true });
-    });
-
     test('un punto de suministro físico solo puede pertenecer a LUZ o GAS (no DUAL en un solo CUPS)', () => {
       const allowedEnergyTypes = ['LUZ', 'GAS'];
       assert.strictEqual(allowedEnergyTypes.includes('LUZ'), true);
@@ -188,73 +171,5 @@ describe('Validación y Normalización de CUPS (src/js/utils/validators.js)', ()
       assert.strictEqual(mapRenewalEnergy(null), 'Luz');
     });
 
-    test('búsqueda inversa: detectar cliente y suministro a partir del CUPS', () => {
-      const clients = [
-        { id: 10, nombre_empresa: 'Empresa Demo S.L.' },
-        { id: 20, nombre_empresa: 'Comercial Norte S.A.' }
-      ];
-      const puntos = [
-        { id: 1, cliente_id: 10, cups: 'ES0021000000000000AB', tipo_energia: 'LUZ' },
-        { id: 2, cliente_id: 20, cups: 'ES0031000000000000CD0F', tipo_energia: 'GAS' }
-      ];
-
-      const reverseLookup = (enteredCups) => {
-        const norm = normalizeCups(enteredCups);
-        const matchedPunto = puntos.find(p => normalizeCups(p.cups) === norm);
-        if (!matchedPunto) return null;
-        const matchedClient = clients.find(c => c.id === matchedPunto.cliente_id);
-        return {
-          clientName: matchedClient?.nombre_empresa || null,
-          cups: matchedPunto.cups,
-          tipoEnergia: matchedPunto.tipo_energia,
-          isLocked: true
-        };
-      };
-
-      assert.deepStrictEqual(reverseLookup('ES0021000000000000AB'), {
-        clientName: 'Empresa Demo S.L.',
-        cups: 'ES0021000000000000AB',
-        tipoEnergia: 'LUZ',
-        isLocked: true
-      });
-
-      assert.deepStrictEqual(reverseLookup('es 0031 0000 0000 0000 cd 0f'), {
-        clientName: 'Comercial Norte S.A.',
-        cups: 'ES0031000000000000CD0F',
-        tipoEnergia: 'GAS',
-        isLocked: true
-      });
-
-      assert.strictEqual(reverseLookup('ES9999999999999999ZZ'), null);
-    });
-
-    test('retrocompatibilidad: cliente legacy sin CUPS requiere que el usuario lo informe para comparar y permite seleccionar tipo', () => {
-      const legacyClient = { id: 99, nombre_empresa: 'Cliente Antiguo', cups: '' };
-      
-      const validateComparatorSubmit = (client, enteredCups) => {
-        const cups = normalizeCups(enteredCups || client.cups || '');
-        if (!cups) {
-          return { canProceed: false, reason: 'CUPS_MISSING', isLocked: false };
-        }
-        if (!isValidSpanishCups(cups)) {
-          return { canProceed: false, reason: 'CUPS_INVALID', isLocked: false };
-        }
-        return { canProceed: true, cups, isLocked: true };
-      };
-
-      // Si el cliente legacy no tiene CUPS y el input está vacío -> Bloqueado con aviso, selector no bloqueado
-      assert.deepStrictEqual(validateComparatorSubmit(legacyClient, ''), {
-        canProceed: false,
-        reason: 'CUPS_MISSING',
-        isLocked: false
-      });
-
-      // Si el usuario introduce el CUPS en el comparador para ese cliente -> Permitido
-      assert.deepStrictEqual(validateComparatorSubmit(legacyClient, 'ES0021000000000000AB'), {
-        canProceed: true,
-        cups: 'ES0021000000000000AB',
-        isLocked: true
-      });
-    });
   });
 });

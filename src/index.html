@@ -502,19 +502,25 @@
                 <div class="m3-field-row">
                   <div class="m3-field">
                     <label class="m3-label" for="calc-client-name">Nombre del Cliente *</label>
-                    <input type="text" id="calc-client-name" class="m3-input" placeholder="Buscar o escribir cliente..." autocomplete="off" required />
-                    <div id="clients-autocomplete-list" class="m3-autocomplete-list"></div>
-                  </div>
-                  <div class="m3-field">
-                    <label class="m3-label" for="calc-client-cups">CUPS *</label>
-                    <input type="text" id="calc-client-cups" class="m3-input" placeholder="Ej. ES0021..." style="text-transform: uppercase;" maxlength="22" required />
+                    <div class="m3-autocomplete-container">
+                      <input type="text" id="calc-client-name" class="m3-input" placeholder="Buscar cliente por nombre o CIF/DNI..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="clients-autocomplete-list" aria-expanded="false" required />
+                      <div id="clients-autocomplete-list" class="m3-autocomplete-list" role="listbox" aria-label="Clientes"></div>
+                    </div>
                   </div>
                   <div class="m3-field">
                     <label class="m3-label" for="calc-energy-type">Tipo de Suministro *</label>
-                    <select id="calc-energy-type" class="m3-input m3-select" required>
+                    <select id="calc-energy-type" name="tipo_energia" class="m3-input m3-native-select" required disabled>
+                      <option value="">Selecciona primero un cliente</option>
                       <option value="LUZ">Luz</option>
                       <option value="GAS">Gas</option>
                     </select>
+                  </div>
+                  <div class="m3-field">
+                    <label class="m3-label" for="calc-client-cups">CUPS *</label>
+                    <select id="calc-client-cups" name="cups" class="m3-input m3-native-select" aria-describedby="calc-supply-help" required disabled>
+                      <option value="">Selecciona primero un cliente</option>
+                    </select>
+                    <small id="calc-supply-help" class="text-muted">Selecciona un cliente para cargar sus suministros registrados.</small>
                   </div>
                 </div>
 

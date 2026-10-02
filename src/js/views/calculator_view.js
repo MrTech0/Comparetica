@@ -1,7 +1,7 @@
 /* src/js/views/calculator_view.js */
 
 import { calculateLightBill, calculateGasBill, formatPriceDecimals } from '../calculator.js';
-import { getTarifasLuz, getTarifasGas, addComparativa, getClientes, getComparativas, getPuntosSuministroAll } from '../db.js';
+import { getTarifasLuz, getTarifasGas, addComparativa, getClientes, getComparativas, getPuntosSuministroByCliente } from '../db.js';
 import { generatePDFReport } from '../pdf.js';
 import { showToast } from '../ui.js';
 import { emitAppEvent, APP_EVENTS } from '../events.js';
@@ -59,236 +59,205 @@ export function initCalculatorView() {
     });
   }
 
-  // Autocompletado y auto-inyección de CUPS personalizado (Material 3 con soporte Multipunto)
-  const calcClientNameInput = document.getElementById('calc-client-name');
-  const calcClientCupsInput = document.getElementById('calc-client-cups');
-  const autocompleteList = document.getElementById('clients-autocomplete-list');
+  setupCalculatorClientSelection();
+}
 
-  if (calcClientNameInput && autocompleteList) {
-    let activeIndex = -1;
+// El cliente se elige primero; sus puntos registrados determinan los selectores.
+let calculatorSupplyContext = null;
+let calculatorSelectionVersion = 0;
+let calculatorSuggestionRequest = 0;
 
-    const closeAutocomplete = () => {
-      autocompleteList.classList.remove('open');
-      autocompleteList.innerHTML = '';
-      activeIndex = -1;
-    };
-
-    const renderSuggestions = async () => {
-      const val = calcClientNameInput.value.trim().toLowerCase();
-      if (val.length === 0) {
-        closeAutocomplete();
-        return;
-      }
-
-      try {
-        const [allClients, allPuntos] = await Promise.all([
-          getClientes({ soloActivos: true }),
-          getPuntosSuministroAll().catch(() => [])
-        ]);
-
-        const suggestions = [];
-
-        allClients.forEach(client => {
-          const nameMatch = client.nombre_empresa.toLowerCase().includes(val);
-          const cifMatch = client.cif.toLowerCase().includes(val);
-          const clientPuntos = allPuntos.filter(p => p.cliente_id === client.id);
-
-          if (clientPuntos.length > 0) {
-            clientPuntos.forEach(p => {
-              const cupsMatch = p.cups.toLowerCase().includes(val);
-              const aliasMatch = (p.direccion_alias || '').toLowerCase().includes(val);
-
-              if (nameMatch || cifMatch || cupsMatch || aliasMatch) {
-                suggestions.push({
-                  client,
-                  cups: p.cups,
-                  alias: p.direccion_alias || 'Principal',
-                  tipoEnergia: p.tipo_energia || 'LUZ'
-                });
-              }
-            });
-          } else {
-            const cupsMatch = client.cups && client.cups.toLowerCase().includes(val);
-            if (nameMatch || cifMatch || cupsMatch) {
-              suggestions.push({
-                client,
-                cups: client.cups || '',
-                alias: 'Principal',
-                tipoEnergia: 'LUZ'
-              });
-            }
-          }
-        });
-
-        if (suggestions.length === 0) {
-          closeAutocomplete();
-          return;
-        }
-
-        autocompleteList.innerHTML = '';
-        activeIndex = -1;
-
-        suggestions.forEach((sug, idx) => {
-          const item = document.createElement('div');
-          item.className = 'm3-autocomplete-item';
-          item.setAttribute('data-index', idx);
-
-          const cupsDisplay = sug.cups
-            ? escapeHtml(sug.cups)
-            : '<span style="color: var(--color-warning); font-weight: 600;">⚠️ Sin CUPS</span>';
-
-          item.innerHTML = `
-            <div class="m3-autocomplete-item-content">
-              <strong>${escapeHtml(sug.client.nombre_empresa)}</strong>
-              <small class="text-muted">${cupsDisplay} ${sug.alias ? `(${escapeHtml(sug.alias)})` : ''}</small>
-            </div>
-            <span class="m3-chip m3-autocomplete-item-badge" style="font-size: 10px; height: 22px; padding: 0 8px; font-weight: 600;">${escapeHtml(sug.tipoEnergia)}</span>
-          `;
-
-          item.addEventListener('click', () => {
-            selectClient(sug.client, sug.cups, sug.tipoEnergia);
-          });
-
-          autocompleteList.appendChild(item);
-        });
-
-        autocompleteList.classList.add('open');
-      } catch (err) {
-        console.error("Error al obtener sugerencias de clientes:", err);
-      }
-    };
-
-    const selectClient = (client, cups = '', tipoEnergia = 'LUZ') => {
-      calcClientNameInput.value = client.nombre_empresa;
-      const finalCups = normalizeCups(cups || client.cups || '');
-      if (calcClientCupsInput) {
-        calcClientCupsInput.value = finalCups;
-      }
-      const energySelect = document.getElementById('calc-energy-type');
-      if (energySelect && tipoEnergia) {
-        energySelect.value = tipoEnergia.toUpperCase();
-        energySelect.dispatchEvent(new Event('change'));
-      }
-      if (finalCups && tipoEnergia) {
-        setEnergySelectLocked(true, `Tipo de suministro bloqueado a ${tipoEnergia} conforme al código CUPS`);
-      } else {
-        setEnergySelectLocked(false);
-        showToast("Aviso: Este cliente no tiene ningún CUPS registrado. Por favor, indícalo o actualiza su ficha en Clientes.", "warning");
-        if (calcClientCupsInput) {
-          calcClientCupsInput.focus();
-        }
-      }
-      closeAutocomplete();
-    };
-
-    calcClientNameInput.addEventListener('input', () => {
-      if (calcClientNameInput.value.trim().length === 0 && (!calcClientCupsInput || calcClientCupsInput.value.trim().length === 0)) {
-        setEnergySelectLocked(false);
-      }
-      renderSuggestions();
-    });
-
-    calcClientNameInput.addEventListener('focus', () => {
-      if (calcClientNameInput.value.trim().length > 0) {
-        renderSuggestions();
-      }
-    });
-
-    // Cerrar al hacer click fuera
-    document.addEventListener('click', (e) => {
-      if (!calcClientNameInput.contains(e.target) && !autocompleteList.contains(e.target)) {
-        closeAutocomplete();
-      }
-    });
-
-    // Teclado: Navegación por flechas y Enter
-    calcClientNameInput.addEventListener('keydown', (e) => {
-      const items = autocompleteList.querySelectorAll('.m3-autocomplete-item');
-      if (items.length === 0 || !autocompleteList.classList.contains('open')) {
-        return;
-      }
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        activeIndex++;
-        if (activeIndex >= items.length) {
-          activeIndex = 0;
-        }
-        updateSelection(items);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        activeIndex--;
-        if (activeIndex < 0) {
-          activeIndex = items.length - 1;
-        }
-        updateSelection(items);
-      } else if (e.key === 'Enter') {
-        if (activeIndex !== -1 && items[activeIndex]) {
-          e.preventDefault();
-          items[activeIndex].click();
-        }
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        closeAutocomplete();
-      }
-    });
-
-    const updateSelection = (items) => {
-      items.forEach((item, idx) => {
-        if (idx === activeIndex) {
-          item.classList.add('selected');
-          item.scrollIntoView({ block: 'nearest' });
-        } else {
-          item.classList.remove('selected');
-        }
-      });
-    };
-
-    // Búsqueda inversa al escribir o pegar directamente en el campo CUPS
-    if (calcClientCupsInput) {
-      calcClientCupsInput.addEventListener('input', async () => {
-        calcClientCupsInput.value = normalizeCups(calcClientCupsInput.value);
-        const enteredCups = calcClientCupsInput.value;
-
-        if (enteredCups.length === 0 && (!calcClientNameInput || calcClientNameInput.value.trim().length === 0)) {
-          setEnergySelectLocked(false);
-        }
-
-        if (enteredCups.length >= 20) {
-          try {
-            const [allClients, allPuntos] = await Promise.all([
-              getClientes({ soloActivos: true }),
-              getPuntosSuministroAll().catch(() => [])
-            ]);
-
-            // 1. Coincidencia en puntos_suministro
-            const matchedPunto = allPuntos.find(p => normalizeCups(p.cups) === enteredCups);
-            if (matchedPunto) {
-              const matchedClient = allClients.find(c => c.id === matchedPunto.cliente_id);
-              if (matchedClient) {
-                calcClientNameInput.value = matchedClient.nombre_empresa;
-                const energySelect = document.getElementById('calc-energy-type');
-                if (energySelect && matchedPunto.tipo_energia) {
-                  energySelect.value = matchedPunto.tipo_energia.toUpperCase();
-                  energySelect.dispatchEvent(new Event('change'));
-                  setEnergySelectLocked(true, `Tipo de suministro bloqueado a ${matchedPunto.tipo_energia} conforme al código CUPS`);
-                }
-                return;
-              }
-            }
-
-            // 2. Coincidencia en campo cups de clientes legacy
-            const matchedClientLegacy = allClients.find(c => normalizeCups(c.cups) === enteredCups);
-            if (matchedClientLegacy) {
-              calcClientNameInput.value = matchedClientLegacy.nombre_empresa;
-            }
-          } catch (err) {
-            console.error("Error en búsqueda inversa por CUPS:", err);
-          }
-        }
-      });
-    }
+function closeCalculatorSuggestions() {
+  calculatorSuggestionRequest++;
+  const list = document.getElementById('clients-autocomplete-list');
+  if (list) {
+    list.classList.remove('open');
+    list.innerHTML = '';
   }
+  document.getElementById('calc-client-name')?.setAttribute('aria-expanded', 'false');
+  document.getElementById('calc-client-name')?.removeAttribute('aria-activedescendant');
+}
+
+function setCalculatorOptions(select, entries, placeholder, selected = '') {
+  select.innerHTML = '';
+  if (placeholder) entries = [{ value: '', label: placeholder }, ...entries];
+  entries.forEach(({ value, label }) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  });
+  select.value = selected;
+}
+
+function setCalculatorSupplyHelp(message) {
+  const help = document.getElementById('calc-supply-help');
+  if (help) help.textContent = message;
+}
+
+function resetCalculatorSupplySelection(message = 'Selecciona un cliente para cargar sus suministros registrados.') {
+  calculatorSupplyContext = null;
+  calculatorSelectionVersion++;
+  bypassTariffCheck = false;
+  closeCalculatorSuggestions();
+  const energy = document.getElementById('calc-energy-type');
+  const cups = document.getElementById('calc-client-cups');
+  setCalculatorOptions(energy, [], 'Selecciona primero un cliente');
+  setEnergySelectLocked(true, message);
+  setCalculatorOptions(cups, [], 'Selecciona primero un cliente');
+  cups.disabled = true;
+  cups.title = '';
+  energy.dispatchEvent(new Event('change'));
+  setCalculatorSupplyHelp(message);
+}
+
+function renderCalculatorSupplyOptions(preferredCups = '', allowAutomaticSelection = true) {
+  const context = calculatorSupplyContext;
+  if (!context?.ready) return;
+  const energy = document.getElementById('calc-energy-type').value;
+  const cups = document.getElementById('calc-client-cups');
+  const points = context.points.filter(point => point.tipo_energia === energy);
+  const selected = points.find(point => point.cups === preferredCups)?.cups
+    || (allowAutomaticSelection && points.length === 1 ? points[0].cups : '');
+  setCalculatorOptions(cups, points.map(point => ({
+    value: point.cups,
+    label: point.direccion_alias ? `${point.cups} — ${point.direccion_alias}` : point.cups
+  })), points.length === 1 && selected ? '' : 'Selecciona un CUPS', selected);
+  cups.disabled = points.length === 0 || (points.length === 1 && Boolean(selected));
+  cups.title = selected;
+  setCalculatorSupplyHelp(points.length === 1
+    ? 'CUPS del único punto de suministro registrado de este tipo.'
+    : 'Selecciona el punto de suministro que quieres comparar.');
+}
+
+async function selectCalculatorClient(client, preferredSupply = null) {
+  resetCalculatorSupplySelection('Cargando los suministros del cliente…');
+  const name = document.getElementById('calc-client-name');
+  name.value = client.nombre_empresa;
+  const context = { client, points: [], ready: false };
+  calculatorSupplyContext = context;
+  try {
+    const points = await getPuntosSuministroByCliente(client.id);
+    if (calculatorSupplyContext !== context) return false;
+    context.points = points.map(point => ({
+      ...point, cups: normalizeCups(point.cups), tipo_energia: String(point.tipo_energia || '').trim().toUpperCase()
+    })).filter(point => point.cups && ['LUZ', 'GAS'].includes(point.tipo_energia));
+    context.ready = true;
+    const types = ['LUZ', 'GAS'].filter(type => context.points.some(point => point.tipo_energia === type));
+    if (types.length === 0) {
+      setCalculatorSupplyHelp('Este cliente no tiene puntos de suministro registrados. Añádelos en su ficha de Clientes.');
+      showToast('Añade los puntos de suministro en la ficha del cliente antes de comparar.', 'warning');
+      return false;
+    }
+    const preferredCups = normalizeCups(preferredSupply?.cups);
+    const preferredPoint = preferredCups ? context.points.find(point => point.cups === preferredCups
+      && point.tipo_energia === String(preferredSupply.tipo_energia || '').toUpperCase()) : null;
+    const energy = document.getElementById('calc-energy-type');
+    setCalculatorOptions(energy, types.map(type => ({ value: type, label: type === 'LUZ' ? 'Luz' : 'Gas' })), '',
+      preferredPoint?.tipo_energia || types[0]);
+    setEnergySelectLocked(types.length === 1, types.length === 1 ? 'El cliente solo tiene suministros de este tipo.' : '');
+    energy.dispatchEvent(new Event('change'));
+    renderCalculatorSupplyOptions(preferredPoint?.cups || '', !preferredCups || Boolean(preferredPoint));
+    if (preferredCups && !preferredPoint) {
+      setCalculatorSupplyHelp('El CUPS de origen ya no está registrado para este cliente y tipo. Revisa su ficha o elige otro punto.');
+      showToast('El CUPS de origen no está registrado para este cliente y tipo de suministro. Revisa su ficha.', 'warning');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    if (calculatorSupplyContext !== context) return false;
+    console.error('Error al cargar los suministros del cliente:', error);
+    setCalculatorSupplyHelp('No se pudieron cargar los suministros. Vuelve a seleccionar el cliente.');
+    showToast('No se pudieron cargar los suministros del cliente.', 'error');
+    return false;
+  }
+}
+
+function setupCalculatorClientSelection() {
+  const name = document.getElementById('calc-client-name');
+  const list = document.getElementById('clients-autocomplete-list');
+  if (!name || !list || name.dataset.supplySelectionInitialized) return;
+  name.dataset.supplySelectionInitialized = 'true';
+  let activeIndex = -1;
+  const renderSuggestions = async () => {
+    const query = name.value.trim().toLocaleLowerCase('es');
+    const request = ++calculatorSuggestionRequest;
+    if (!query) { closeCalculatorSuggestions(); return; }
+    try {
+      const clients = await getClientes({ soloActivos: true });
+      if (request !== calculatorSuggestionRequest) return;
+      const matches = clients.filter(client => [client.nombre_empresa, client.cif]
+        .some(value => String(value || '').toLocaleLowerCase('es').includes(query)));
+      list.innerHTML = '';
+      activeIndex = -1;
+      name.removeAttribute('aria-activedescendant');
+      matches.forEach((client, index) => {
+        const item = document.createElement('div');
+        item.id = `calc-client-option-${index}`;
+        item.className = 'm3-autocomplete-item';
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', 'false');
+        item.setAttribute('data-index', index);
+        const content = document.createElement('div');
+        content.className = 'm3-autocomplete-item-content';
+        const title = document.createElement('strong');
+        title.textContent = client.nombre_empresa;
+        const detail = document.createElement('small');
+        detail.className = 'text-muted';
+        detail.textContent = client.cif || 'Sin CIF/DNI';
+        content.appendChild(title);
+        content.appendChild(detail);
+        item.appendChild(content);
+        item.addEventListener('click', () => selectCalculatorClient(client));
+        list.appendChild(item);
+      });
+      list.classList.toggle('open', matches.length > 0);
+      name.setAttribute('aria-expanded', String(matches.length > 0));
+    } catch (error) {
+      if (request !== calculatorSuggestionRequest) return;
+      closeCalculatorSuggestions();
+      console.error('Error al obtener sugerencias de clientes:', error);
+    }
+  };
+  name.addEventListener('input', () => {
+    resetCalculatorSupplySelection();
+    return renderSuggestions();
+  });
+  name.addEventListener('focus', renderSuggestions);
+  document.addEventListener('click', event => {
+    if (!name.contains(event.target) && !list.contains(event.target)) closeCalculatorSuggestions();
+  });
+  name.addEventListener('keydown', event => {
+    const items = list.querySelectorAll('.m3-autocomplete-item');
+    if (!items.length || !list.classList.contains('open')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeCalculatorSuggestions();
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      activeIndex = event.key === 'ArrowDown' ? (activeIndex + 1) % items.length
+        : (activeIndex <= 0 ? items.length - 1 : activeIndex - 1);
+      items.forEach((item, index) => {
+        item.classList.toggle('selected', index === activeIndex);
+        item.setAttribute('aria-selected', String(index === activeIndex));
+      });
+      name.setAttribute('aria-activedescendant', items[activeIndex].id);
+      items[activeIndex].scrollIntoView({ block: 'nearest' });
+    } else if (event.key === 'Enter' && activeIndex >= 0) {
+      event.preventDefault();
+      items[activeIndex].click();
+    }
+  });
+  document.getElementById('calc-energy-type').addEventListener('change', () => {
+    calculatorSelectionVersion++;
+    bypassTariffCheck = false;
+    renderCalculatorSupplyOptions();
+  });
+  document.getElementById('calc-client-cups').addEventListener('change', event => {
+    calculatorSelectionVersion++;
+    event.target.title = event.target.value;
+  });
+  resetCalculatorSupplySelection();
 }
 
 /**
@@ -300,23 +269,8 @@ export function setEnergySelectLocked(locked, reason = '') {
   const energySelect = document.getElementById('calc-energy-type');
   if (!energySelect) return;
   energySelect.disabled = locked;
+  energySelect.title = locked ? reason : '';
 
-  const customSelectWrapper = document.getElementById('custom-select-for-calc-energy-type');
-  if (customSelectWrapper) {
-    if (locked) {
-      customSelectWrapper.classList.add('disabled');
-      customSelectWrapper.style.pointerEvents = 'none';
-      customSelectWrapper.style.opacity = '0.75';
-      customSelectWrapper.style.cursor = 'not-allowed';
-      customSelectWrapper.title = reason || 'Tipo de suministro bloqueado por el código CUPS';
-    } else {
-      customSelectWrapper.classList.remove('disabled');
-      customSelectWrapper.style.pointerEvents = '';
-      customSelectWrapper.style.opacity = '';
-      customSelectWrapper.style.cursor = '';
-      customSelectWrapper.removeAttribute('title');
-    }
-  }
 }
 
 // --- Control del Tipo de Suministro ---
@@ -353,6 +307,11 @@ function setupEnergyTypeToggle() {
       if (lightTariffTypeSelect) {
         lightTariffTypeSelect.dispatchEvent(new Event('change'));
       }
+    } else {
+      lightBlock.style.display = 'none';
+      gasBlock.style.display = 'none';
+      setInputsRequired(lightBlock, false);
+      setInputsRequired(gasBlock, false);
     }
   });
 }
@@ -393,8 +352,10 @@ function setupLightTariffTypeToggle() {
 }
 
 function setInputsRequired(container, isRequired) {
-  const inputs = container.querySelectorAll('input[required], select[required], input[data-req]');
+  const inputs = container.querySelectorAll('input[required], select[required], input[data-req], select[data-req]');
   inputs.forEach(input => {
+    // Conservar la obligatoriedad aunque el bloque se oculte temporalmente.
+    input.setAttribute('data-req', '');
     if (isRequired) {
       // Si el elemento es un campo condicional de 3.0TD, solo hacerlo requerido si el tipo es 3.0TD
       if (input.id.includes('30td') || ['calc-light-p3-pot', 'calc-light-p4-pot', 'calc-light-p5-pot', 'calc-light-p6-pot', 'calc-light-p4-cons', 'calc-light-p5-cons', 'calc-light-p6-cons'].includes(input.id)) {
@@ -428,10 +389,20 @@ function setupCalcFormSubmit() {
 
     const clientNameInput = document.getElementById('calc-client-name');
     const clientName = clientNameInput ? clientNameInput.value.trim() : "";
+    const context = calculatorSupplyContext;
+    const selectionVersion = calculatorSelectionVersion;
+    const energyType = document.getElementById('calc-energy-type').value;
+    const clientCups = normalizeCups(document.getElementById('calc-client-cups')?.value);
+    const selectionIsCurrent = () => context === calculatorSupplyContext && selectionVersion === calculatorSelectionVersion
+      && clientName === clientNameInput.value.trim()
+      && energyType === document.getElementById('calc-energy-type').value
+      && clientCups === normalizeCups(document.getElementById('calc-client-cups').value);
     
     // Verificar si el cliente existe en base de datos y su estado
     const clients = await getClientes();
-    const matchedClient = clients.find(c => c.nombre_empresa.toLowerCase() === clientName.toLowerCase());
+    if (!selectionIsCurrent()) return;
+    const matchedClient = context ? clients.find(c => c.id === context.client.id)
+      : clients.find(c => c.nombre_empresa.toLowerCase() === clientName.toLowerCase());
 
     if (!matchedClient) {
       const choice = await showNoClientAlert();
@@ -452,11 +423,31 @@ function setupCalcFormSubmit() {
       return;
     }
 
-    const energyType = document.getElementById('calc-energy-type').value;
+    if (!context?.ready || context.client.nombre_empresa !== clientName || !['LUZ', 'GAS'].includes(energyType)) {
+      showToast('Selecciona un cliente de la lista y uno de sus suministros registrados.', 'warning');
+      clientNameInput.focus();
+      return;
+    }
+    let registeredPoints;
+    try {
+      registeredPoints = await getPuntosSuministroByCliente(matchedClient.id);
+    } catch (error) {
+      if (!selectionIsCurrent()) return;
+      showToast('No se pudieron verificar los suministros del cliente. Vuelve a intentarlo.', 'error');
+      return;
+    }
+    if (!selectionIsCurrent()) return;
+    if (!registeredPoints.some(point => normalizeCups(point.cups) === clientCups
+      && String(point.tipo_energia || '').trim().toUpperCase() === energyType)) {
+      showToast('Selecciona un CUPS registrado para este cliente y tipo de suministro. Si su ficha ha cambiado, vuelve a seleccionar el cliente.', 'warning');
+      document.getElementById('calc-client-cups').focus();
+      return;
+    }
 
     if (!bypassTariffCheck) {
       const lightTariffs = (energyType === 'LUZ' || energyType === 'DUAL') ? await getTarifasLuz() : [];
       const gasTariffs = (energyType === 'GAS' || energyType === 'DUAL') ? await getTarifasGas() : [];
+      if (!selectionIsCurrent()) return;
 
       const missingLuz = (energyType === 'LUZ' || energyType === 'DUAL') && lightTariffs.length === 0;
       const missingGas = (energyType === 'GAS' || energyType === 'DUAL') && gasTariffs.length === 0;
@@ -473,6 +464,7 @@ function setupCalcFormSubmit() {
         msg += "\n\n¿Desea omitir esta alerta y continuar para calcular únicamente el gasto actual del cliente, o ir a registrarlas en la pestaña de 'Tarifas Luz'?";
 
         const choice = await showNoTariffsAlert(msg);
+        if (!selectionIsCurrent()) return;
         if (choice === 'redirect') {
           const navTariffs = document.getElementById('nav-tariffs');
           const tabBtnLuz = document.getElementById('tab-btn-luz');
@@ -490,8 +482,6 @@ function setupCalcFormSubmit() {
     }
 
     bypassTariffCheck = false;
-
-    const clientCups = normalizeCups(document.getElementById('calc-client-cups')?.value);
 
     if (!clientCups) {
       showToast("Debes indicar el código CUPS del suministro para poder realizar la comparativa.", "error");
@@ -671,6 +661,7 @@ function setupCalcFormSubmit() {
       document.getElementById('results-light-container').style.display = 'block';
       const is30td = document.getElementById('calc-light-tariff-type').value === '3.0TD';
       const allLightTariffs = await getTarifasLuz();
+      if (!selectionIsCurrent()) return;
       
       // Filtrar propuestas
       const lightTariffs = allLightTariffs.filter(t => (t.tipo_tarifa || '2.0TD') === (is30td ? '3.0TD' : '2.0TD'));
@@ -712,6 +703,7 @@ function setupCalcFormSubmit() {
       document.getElementById('results-gas-container').style.display = 'block';
       const gasTariffType = document.getElementById('calc-gas-tariff-type').value;
       const allGasTariffs = await getTarifasGas();
+      if (!selectionIsCurrent()) return;
       const gasTariffs = allGasTariffs.filter(t => (t.tipo_tarifa || 'RL.1') === gasTariffType);
       const gasResults = [];
 
@@ -808,7 +800,7 @@ function setupCalcFormReset() {
     };
 
     bypassTariffCheck = false;
-    setEnergySelectLocked(false);
+    resetCalculatorSupplySelection();
 
     // 5. Mostrar el formulario y ocultar el botón de modificar
     const formContainer = document.getElementById('calc-form-container');
@@ -1204,39 +1196,43 @@ function setInputValue(id, val) {
  * @param {Object} ren Objeto de la renovación.
  */
 export async function prefillCalculatorForRenewal(ren) {
-  if (!ren) return;
+  if (!ren) return false;
 
   const nameInput = document.getElementById('calc-client-name');
-  const cupsInput = document.getElementById('calc-client-cups');
-  const energySelect = document.getElementById('calc-energy-type');
   const formContainer = document.getElementById('calc-form-container');
   const modifyBtn = document.getElementById('calc-modify-btn');
 
-  if (nameInput) nameInput.value = ren.cliente_nombre || '';
-  if (cupsInput) cupsInput.value = ren.cups || '';
-
-  if (energySelect) {
-    const rawType = (ren.tipo_energia || '').toUpperCase();
-    let targetType = 'LUZ';
-    if (rawType.includes('GAS')) targetType = 'GAS';
-    else targetType = 'LUZ';
-    
-    energySelect.value = targetType;
-    energySelect.dispatchEvent(new Event('change'));
-    if (ren.cups) {
-      setEnergySelectLocked(true, `Tipo de suministro bloqueado a ${targetType} conforme al CUPS de renovación`);
-    } else {
-      setEnergySelectLocked(false);
+  if (formContainer) formContainer.style.display = 'block';
+  if (modifyBtn) modifyBtn.style.display = 'none';
+  resetCalculatorSupplySelection();
+  nameInput.value = ren.cliente_nombre || '';
+  const loadingVersion = calculatorSelectionVersion;
+  try {
+    const clients = await getClientes();
+    if (loadingVersion !== calculatorSelectionVersion) return false;
+    const client = ren.cliente_id != null ? clients.find(client => client.id === ren.cliente_id)
+      : clients.find(client => client.nombre_empresa.toLowerCase() === nameInput.value.toLowerCase());
+    if (!client) {
+      showToast('El cliente de origen ya no está registrado. Selecciona un cliente de la lista.', 'warning');
+      return false;
     }
+    const selected = await selectCalculatorClient(client, {
+      cups: ren.cups, tipo_energia: String(ren.tipo_energia || '').toUpperCase().includes('GAS') ? 'GAS' : 'LUZ'
+    });
+    if (!selected) return false;
+  } catch (error) {
+    showToast('No se pudieron cargar los datos del cliente en el comparador.', 'error');
+    return false;
   }
+  const prefillVersion = calculatorSelectionVersion;
 
   // Intentar recuperar los consumos anteriores de este cliente desde el historial
   try {
     const history = await getComparativas();
-    const match = history.find(c => 
-      (ren.cups && c.cliente_cups === ren.cups) || 
-      (c.cliente_nombre && ren.cliente_nombre && c.cliente_nombre.toLowerCase() === ren.cliente_nombre.toLowerCase())
-    );
+    if (prefillVersion !== calculatorSelectionVersion) return false;
+    const match = history.find(c => ren.cups
+      ? normalizeCups(c.cliente_cups) === normalizeCups(ren.cups)
+      : c.cliente_nombre?.toLowerCase() === ren.cliente_nombre?.toLowerCase());
 
     if (match && match.datos_cliente_json) {
       const parsed = typeof match.datos_cliente_json === 'string' ? JSON.parse(match.datos_cliente_json) : match.datos_cliente_json;
@@ -1293,20 +1289,16 @@ export async function prefillCalculatorForRenewal(ren) {
   } catch (eHistory) {
     console.warn("No se pudieron restaurar consumos anteriores del historial:", eHistory);
   }
-
-  if (formContainer) {
-    formContainer.style.display = 'block';
-  }
-  if (modifyBtn) {
-    modifyBtn.style.display = 'none';
-  }
+  if (prefillVersion !== calculatorSelectionVersion) return false;
 
   setTimeout(() => {
+    if (prefillVersion !== calculatorSelectionVersion) return;
     nameInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     nameInput?.focus();
   }, 100);
 
   showToast(`⚡ Datos de ${ren.cliente_nombre} autocompletados en el comparador.`, "success");
+  return true;
 }
 
 /**
@@ -1328,10 +1320,12 @@ export async function relaunchComparisonForScoring(comp) {
     tipo_energia: comp.tipo_energia
   };
 
-  await prefillCalculatorForRenewal(mockRen);
+  if (!await prefillCalculatorForRenewal(mockRen)) return;
+  const relaunchVersion = calculatorSelectionVersion;
 
   // 3. Ejecutar cálculo para mostrar el listado completo de tarifas alternativas
   setTimeout(() => {
+    if (relaunchVersion !== calculatorSelectionVersion) return;
     const calcBtn = document.getElementById('calc-submit-btn');
     if (calcBtn) {
       calcBtn.click();
