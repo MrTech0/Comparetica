@@ -687,7 +687,7 @@ function applyHistoryFilter() {
       reprintPDF(c, false);
     });
 
-    // Evento de envío de email
+    // Abrir borrador de correo con el reporte adjunto
     tr.querySelector('.btn-email-history').addEventListener('click', async () => {
       if (!c.cliente_email) {
         showToast("El cliente no tiene un correo de contacto configurado en su ficha.", "error");
@@ -710,14 +710,12 @@ function applyHistoryFilter() {
         const pdfFilename = `comparativa_${safeClientName}.pdf`;
 
         if (typeof window !== 'undefined' && window.__TAURI__) {
-          await invoke('send_email', {
-            to: c.cliente_email,
-            subject: `Estudio Comparativo de Energía - ${c.cliente_nombre}`,
-            body: `Estimado/a cliente de ${c.cliente_nombre},\n\nAdjunto a este correo electrónico encontrará el informe detallado de su estudio comparativo de energía realizado con Comparetica.\n\nAtentamente,\nEquipo de Asesoría Energética`,
+          await invoke('open_email_with_attachment', {
+            recipient: c.cliente_email,
             pdfBase64: pdfBase64,
-            filename: pdfFilename
+            pdfFilename: pdfFilename
           });
-          showToast("✅ Correo electrónico enviado correctamente con el PDF adjunto.", "success");
+          showToast("✅ Se ha abierto un borrador de correo con el PDF adjunto.", "success");
         } else {
           // Fallback para pruebas en navegador sin Tauri (abre mailto simple sin adjunto)
           const mailtoUrl = `mailto:${encodeURIComponent(c.cliente_email)}?subject=${encodeURIComponent(`Estudio Comparativo - ${c.cliente_nombre}`)}&body=${encodeURIComponent(`Estimado cliente,\n\nAdjuntamos el informe comparativo.`)}`;
