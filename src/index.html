@@ -1088,22 +1088,18 @@
               </p>
 
               <!-- Summary KPI Cards de Historial & Cobros -->
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px;">
+              <div class="history-summary">
                 <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid var(--color-primary);">
-                  <div style="font-size: 11px; color: var(--color-on-surface-variant); font-weight: 600;">TOTAL ESTUDIOS</div>
-                  <div id="history-kpi-total" style="font-size: 18px; font-weight: 700; color: var(--color-on-surface);">0</div>
+                  <div style="font-size: 11px; color: var(--color-on-surface-variant); font-weight: 600;">COMPARATIVAS PENDIENTES DE ACEPTAR</div>
+                  <div id="history-kpi-acceptance-pending" style="font-size: 18px; font-weight: 700; color: var(--color-on-surface);">0</div>
                 </div>
                 <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #3b82f6;">
-                  <div style="font-size: 11px; color: #3b82f6; font-weight: 600;">ACEPTADAS</div>
-                  <div id="history-kpi-aceptadas" style="font-size: 18px; font-weight: 700; color: #3b82f6;">0</div>
+                  <div style="font-size: 11px; color: #3b82f6; font-weight: 600;">CONTRATOS PENDIENTES DE FIRMA</div>
+                  <div id="history-kpi-signature-pending" style="font-size: 18px; font-weight: 700; color: #3b82f6;">0</div>
                 </div>
                 <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #f59e0b;">
-                  <div style="font-size: 11px; color: #f59e0b; font-weight: 600;">CONSULTORÍA · PENDIENTE DE COBRO</div>
+                  <div style="font-size: 11px; color: #f59e0b; font-weight: 600;">COMISIONES CONSULTORÍA · PENDIENTE DE COBRO</div>
                   <div id="history-kpi-pendientes" style="font-size: 18px; font-weight: 700; color: #f59e0b;" class="private-value">0,00 €</div>
-                </div>
-                <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #10b981;">
-                  <div style="font-size: 11px; color: #10b981; font-weight: 600;">CONSULTORÍA · COBRADO</div>
-                  <div id="history-kpi-cobradas" style="font-size: 18px; font-weight: 700; color: #10b981;" class="private-value">0,00 €</div>
                 </div>
               </div>
 
@@ -1272,6 +1268,14 @@
                 </tbody>
               </table>
             </div>
+            <nav id="history-pagination" class="flex-row-center-between" aria-label="Páginas del historial de comparativas" style="margin-top: 16px; flex-wrap: wrap; gap: 12px; align-items: center;">
+              <div id="history-pagination-info" class="text-muted" style="font-size: 13px;">Mostrando 0 - 0 de 0 comparativas</div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <button type="button" id="btn-prev-page-history" class="m3-btn m3-btn-outlined" aria-controls="table-history" style="height: 36px; padding: 0 14px; font-size: 13px;" disabled>‹ Anterior</button>
+                <span id="history-page-indicator" role="status" aria-atomic="true" style="font-size: 13px; font-weight: 600; min-width: 100px; text-align: center; color: var(--color-on-surface);">Página 1 de 1</span>
+                <button type="button" id="btn-next-page-history" class="m3-btn m3-btn-outlined" aria-controls="table-history" style="height: 36px; padding: 0 14px; font-size: 13px;" disabled>Siguiente ›</button>
+              </div>
+            </nav>
           </section>
 
           <!-- ==========================================

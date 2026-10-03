@@ -91,6 +91,7 @@ function showLegalRetentionCompWarning() {
 }
 
 export async function initHistoryView() {
+  currentHistoryPage = 1;
   for (const column of HISTORY_SEARCH_COLUMNS) {
     const input = document.getElementById(`search-history-${column}`);
     const details = document.getElementById(`history-${column}-search`);
@@ -120,6 +121,37 @@ let currentHistoryTypeFilter = 'ALL';
 let currentHistoryEstadoFilter = 'ALL';
 let currentHistoryContractFilter = 'ALL';
 let currentHistoryCobroFilter = 'ALL';
+const HISTORY_PAGE_SIZE = 25;
+let currentHistoryPage = 1;
+let currentHistoryTotalPages = 1;
+
+function setupHistoryPagination() {
+  for (const [id, direction] of [['btn-prev-page-history', -1], ['btn-next-page-history', 1]]) {
+    const button = document.getElementById(id);
+    if (!button || button.dataset.listenerAdded) continue;
+    button.dataset.listenerAdded = 'true';
+    button.addEventListener('click', () => {
+      const page = currentHistoryPage + direction;
+      if (page < 1 || page > currentHistoryTotalPages) return;
+      currentHistoryPage = page;
+      closeAllHistoryHeaderDropdowns();
+      applyHistoryFilter();
+    });
+  }
+}
+
+function updateHistoryPagination(totalCount) {
+  const start = totalCount === 0 ? 0 : (currentHistoryPage - 1) * HISTORY_PAGE_SIZE + 1;
+  const end = Math.min(currentHistoryPage * HISTORY_PAGE_SIZE, totalCount);
+  const info = document.getElementById('history-pagination-info');
+  const indicator = document.getElementById('history-page-indicator');
+  const previous = document.getElementById('btn-prev-page-history');
+  const next = document.getElementById('btn-next-page-history');
+  if (info) info.textContent = `Mostrando ${start} - ${end} de ${totalCount.toLocaleString('es-ES')} comparativas`;
+  if (indicator) indicator.textContent = `Página ${currentHistoryPage} de ${currentHistoryTotalPages}`;
+  if (previous) previous.disabled = currentHistoryPage <= 1;
+  if (next) next.disabled = currentHistoryPage >= currentHistoryTotalPages;
+}
 
 function setupHistoryColumnSearches() {
   for (const column of HISTORY_SEARCH_COLUMNS) {
@@ -128,7 +160,7 @@ function setupHistoryColumnSearches() {
     const clearButton = document.getElementById(`btn-clear-history-${column}`);
     if (!input || !details || input.dataset.listenerAdded) continue;
     input.dataset.listenerAdded = 'true';
-    input.addEventListener('input', applyHistoryFilter);
+    input.addEventListener('input', () => applyHistoryFilter(true));
     details.addEventListener('toggle', () => {
       if (details.open) input.focus();
     });
@@ -141,7 +173,7 @@ function setupHistoryColumnSearches() {
     });
     clearButton?.addEventListener('click', () => {
       input.value = '';
-      applyHistoryFilter();
+      applyHistoryFilter(true);
       input.focus();
     });
   }
@@ -155,7 +187,7 @@ function setupHistoryTypeFilter() {
   select.dataset.listenerAdded = 'true';
   select.addEventListener('change', () => {
     currentHistoryTypeFilter = select.value;
-    applyHistoryFilter();
+    applyHistoryFilter(true);
   });
 }
 
@@ -234,7 +266,7 @@ function setupHistoryEstadoFilterDropdown() {
       }
 
       closeAllHistoryHeaderDropdowns();
-      applyHistoryFilter();
+      applyHistoryFilter(true);
     });
   });
 
@@ -297,7 +329,7 @@ function setupHistoryContractFilterDropdown() {
       }
 
       closeAllHistoryHeaderDropdowns();
-      applyHistoryFilter();
+      applyHistoryFilter(true);
     });
   });
 
@@ -361,7 +393,7 @@ function setupHistoryCobroFilterDropdown() {
       }
 
       closeAllHistoryHeaderDropdowns();
-      applyHistoryFilter();
+      applyHistoryFilter(true);
     });
   });
 
@@ -391,7 +423,7 @@ function setupHistoryDateSort() {
       currentHistoryDateSort = currentHistoryDateSort === 'desc' ? 'asc' : 'desc';
     }
     updateHistorySortIndicators();
-    applyHistoryFilter();
+    applyHistoryFilter(true);
   });
 }
 
@@ -408,7 +440,7 @@ function setupHistorySavingsSort() {
       currentHistorySavingsSort = 'asc';
     }
     updateHistorySortIndicators();
-    applyHistoryFilter();
+    applyHistoryFilter(true);
   });
 }
 
@@ -420,7 +452,7 @@ function setupHistoryCommissionSort() {
     currentHistorySavingsSort = null;
     currentHistoryCommissionSort = currentHistoryCommissionSort === 'desc' ? 'asc' : 'desc';
     updateHistorySortIndicators();
-    applyHistoryFilter();
+    applyHistoryFilter(true);
   });
 }
 
@@ -449,12 +481,17 @@ async function loadHistoryTable() {
   if (!tbody) return;
 
   tbody.innerHTML = '<tr><td colspan="11" class="text-muted">Cargando historial...</td></tr>';
+  for (const id of ['btn-prev-page-history', 'btn-next-page-history']) {
+    const button = document.getElementById(id);
+    if (button) button.disabled = true;
+  }
 
   try {
     cachedHistory = await getComparativas();
     
     setupHistoryColumnSearches();
     setupHistoryTypeFilter();
+    setupHistoryPagination();
 
     // Configurar desplegables de filtrado en cabeceras
     setupHistoryEstadoFilterDropdown();
@@ -486,48 +523,48 @@ async function loadHistoryTable() {
 
     applyHistoryFilter();
   } catch (error) {
+    cachedHistory = [];
+    currentHistoryPage = 1;
+    currentHistoryTotalPages = 1;
+    updateHistoryKpis(cachedHistory);
+    updateHistoryPagination(0);
     tbody.innerHTML = '<tr><td colspan="11" class="text-error">Error al cargar el historial.</td></tr>';
     console.error(error);
   }
 }
 
 function updateHistoryKpis(list) {
-  let totalEstudios = list.length;
-  let totalAceptadas = 0;
-  let totalComisionesCobradas = 0;
+  let pendientesAceptacion = 0;
+  let pendientesFirma = 0;
   let totalComisionesPendientes = 0;
   let legacyPendientes = 0;
   let legacyCobradas = 0;
   let legacyCount = 0;
 
   list.forEach(c => {
-    const isAceptada = c.estado === 'Aceptada';
-    if (isAceptada) totalAceptadas++;
+    if ((c.estado || 'Pendiente de aceptación') === 'Pendiente de aceptación') pendientesAceptacion++;
+    if (c.estado_contrato === 'En trámite') pendientesFirma++;
 
     const split = getCommissionSplit(c);
     const comision = split?.consultoria_centimos ?? 0;
     if (!split) legacyCount++;
     const isCobrado = c.estado_cobro === 'Cobrado';
-    const isScoringRejected = c.estado_contrato === 'Rechazado por Scoring';
 
     if (isCobrado) {
-      if (split) totalComisionesCobradas += comision;
-      else legacyCobradas += grossCommissionCents(c);
-    } else if (isAceptada && !isScoringRejected) {
+      if (!split) legacyCobradas += grossCommissionCents(c);
+    } else if (canManageCommissionCollection(c)) {
       if (split) totalComisionesPendientes += comision;
       else legacyPendientes += grossCommissionCents(c);
     }
   });
 
-  const elTotal = document.getElementById('history-kpi-total');
-  const elAceptadas = document.getElementById('history-kpi-aceptadas');
+  const elAceptacion = document.getElementById('history-kpi-acceptance-pending');
+  const elFirma = document.getElementById('history-kpi-signature-pending');
   const elPendientes = document.getElementById('history-kpi-pendientes');
-  const elCobradas = document.getElementById('history-kpi-cobradas');
 
-  if (elTotal) elTotal.textContent = totalEstudios.toString();
-  if (elAceptadas) elAceptadas.textContent = totalAceptadas.toString();
+  if (elAceptacion) elAceptacion.textContent = pendientesAceptacion.toString();
+  if (elFirma) elFirma.textContent = pendientesFirma.toString();
   if (elPendientes) elPendientes.textContent = commissionMoney(totalComisionesPendientes);
-  if (elCobradas) elCobradas.textContent = commissionMoney(totalComisionesCobradas);
   const legacy = document.getElementById('history-legacy-commissions');
   if (legacy) legacy.hidden = legacyCount === 0;
   const legacyPending = document.getElementById('history-legacy-pendientes');
@@ -536,7 +573,8 @@ function updateHistoryKpis(list) {
   if (legacyPaid) legacyPaid.textContent = commissionMoney(legacyCobradas);
 }
 
-function applyHistoryFilter() {
+function applyHistoryFilter(resetPage = false) {
+  if (resetPage) currentHistoryPage = 1;
   clearActiveLockTimers();
   historyContractControls.clear();
   const tbody = document.querySelector('#table-history tbody');
@@ -607,6 +645,9 @@ function applyHistoryFilter() {
     }
   }
 
+  currentHistoryTotalPages = Math.max(1, Math.ceil(filtered.length / HISTORY_PAGE_SIZE));
+  currentHistoryPage = Math.min(currentHistoryPage, currentHistoryTotalPages);
+  updateHistoryPagination(filtered.length);
   tbody.innerHTML = '';
 
   if (filtered.length === 0) {
@@ -621,7 +662,8 @@ function applyHistoryFilter() {
     return;
   }
 
-  filtered.forEach(c => {
+  const pageStart = (currentHistoryPage - 1) * HISTORY_PAGE_SIZE;
+  filtered.slice(pageStart, pageStart + HISTORY_PAGE_SIZE).forEach(c => {
     const split = getCommissionSplit(c);
     const commissionCell = split
       ? `<details class="commission-split"><summary aria-label="Comisión de consultoría: ${commissionMoney(split.consultoria_centimos)}. Ver reparto de ${commissionEscape(c.cliente_nombre)}">${commissionMoney(split.consultoria_centimos)}</summary>${commissionDetailHtml(split)}</details>`

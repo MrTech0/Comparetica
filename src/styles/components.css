@@ -1126,6 +1126,13 @@ body.private-mode-active .private-value::after {
   font-size: 13px;
 }
 
+.history-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .m3-autocomplete-list {
   display: none;
   position: absolute;

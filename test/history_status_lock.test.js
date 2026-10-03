@@ -58,7 +58,7 @@ async function mount(t, overrides = {}, updateContract) {
     reparto_comision_json: JSON.stringify({ version: 1, cliente_id: 1, cliente_nombre: 'Cliente de prueba', agente_id: 1, agente_nombre: 'Ana', retencion_id: 1, retencion_nombre: 'General', porcentaje_centesimas: 10000, ...splitCommission(10, 10000) }), ...overrides };
   const tbody = element(), nodes = new Map(), changes = [], collectionChanges = [], toasts = [], renewals = [], recomparisons = [];
   const dialogIds = ['dialog-scoring-rejection', 'dialog-scoring-client', 'dialog-scoring-id', 'dialog-scoring-reason',
-    'btn-close-scoring-dialog-x', 'btn-scoring-save-only', 'btn-scoring-recompare', 'history-kpi-pendientes',
+    'btn-close-scoring-dialog-x', 'btn-scoring-save-only', 'btn-scoring-recompare', 'history-kpi-pendientes', 'history-kpi-signature-pending',
     'dialog-mark-cobro', 'dialog-cobro-id', 'dialog-cobro-client', 'dialog-cobro-amount', 'dialog-cobro-status-badge',
     'dialog-cobro-date', 'btn-close-cobro-dialog-x', 'form-mark-cobro', 'btn-cobro-mark-pending'];
   for (const id of dialogIds) nodes.set(id, element());
@@ -113,15 +113,18 @@ test('signing enables commission collection in place and cancelling the renewal 
   const f = await mount(t, { estado: 'Aceptada', estado_cambiado_en: new Date(start).toISOString() });
   const row = f.row(), control = row.querySelector('.btn-manage-cobro');
   assert.equal(control.disabled, true);
+  assert.equal(f.nodes.get('history-kpi-pendientes').textContent, '0,00 €');
   await f.choose('contract', 'Firmado y Activado');
   assert.equal(f.row(), row);
   assert.equal(f.row().querySelector('.btn-manage-cobro'), control);
   assert.equal(control.disabled, false);
+  assert.equal(f.nodes.get('history-kpi-pendientes').textContent, '10,00 €');
   control.onclick();
   assert.equal(f.nodes.get('dialog-mark-cobro').classList.contains('active'), true);
   f.nodes.get('btn-close-cobro-dialog-x').onclick();
   await f.renewals[0].onCancelled();
   assert.equal(control.disabled, true);
+  assert.equal(f.nodes.get('history-kpi-pendientes').textContent, '0,00 €');
   control.onclick();
   assert.equal(f.nodes.get('dialog-mark-cobro').classList.contains('active'), false);
 });
@@ -319,13 +322,13 @@ test('filtering during a pending contract write cannot unlock acceptance', async
   assert.equal(f.select('contract').querySelector('.status-select-trigger').querySelector('span').textContent, 'En trámite');
 });
 
-test('saving scoring rejection updates commission totals while keeping the original row mounted', async t => {
-  const f = await mount(t, { estado: 'Aceptada', estado_cambiado_en: new Date(start).toISOString() });
+test('saving scoring rejection updates pending signatures while keeping the original row mounted', async t => {
+  const f = await mount(t, { estado: 'Aceptada', estado_contrato: 'En trámite', estado_cambiado_en: new Date(start).toISOString() });
   const row = f.row();
-  assert.equal(f.nodes.get('history-kpi-pendientes').textContent, '10,00 €');
+  assert.equal(f.nodes.get('history-kpi-signature-pending').textContent, '1');
   await f.choose('contract', 'Rechazado por Scoring');
   await f.nodes.get('btn-scoring-save-only').onclick(f.event);
-  assert.equal(f.nodes.get('history-kpi-pendientes').textContent, '0,00 €');
+  assert.equal(f.nodes.get('history-kpi-signature-pending').textContent, '0');
   assert.equal(f.row(), row);
 });
 

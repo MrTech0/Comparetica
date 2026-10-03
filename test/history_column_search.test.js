@@ -45,6 +45,7 @@ async function mount(t, records = comparisons) {
   const get = id => { if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); };
   const tbody = element();
   const container = element();
+  const appListeners = new Map();
   const filters = {
     'dropdown-history-estado-filter': ['ALL', 'Aceptada', 'Pendiente de aceptación', 'Rechazada'].map(value => Object.assign(element(), { 'data-estado': value })),
     'dropdown-history-contract-filter': ['ALL', 'En trámite'].map(value => Object.assign(element(), { 'data-contract': value })),
@@ -57,7 +58,8 @@ async function mount(t, records = comparisons) {
     querySelectorAll: () => []
   };
   globalThis.window = {
-    addEventListener() {}, removeEventListener() {},
+    addEventListener(name, handler) { appListeners.set(name, handler); },
+    removeEventListener(name) { appListeners.delete(name); },
     __TAURI__: { core: { invoke: async (command, args) => {
       assert.equal(command, 'db_select');
       if (/^SELECT id FROM comparativas/.test(args.query)) return [];
@@ -71,7 +73,7 @@ async function mount(t, records = comparisons) {
   const ids = () => tbody.children.map(row => Number(row.innerHTML.match(/data-id="(\d+)"/)[1]));
   const search = (column, value) => { const input = get(`search-history-${column}`); input.value = value; input.fire('input'); };
   const supply = value => { const select = get('filter-history-type'); select.value = value; select.fire('change'); };
-  return { get, tbody, ids, search, supply, view, filters };
+  return { get, tbody, ids, search, supply, view, filters, refresh: () => appListeners.get('comparison-saved')() };
 }
 
 test('historial: neto de consultoría, comercial, detalle y ordenación sin mezclar históricos', async t => {
@@ -95,19 +97,124 @@ test('historial: neto de consultoría, comercial, detalle y ordenación sin mezc
   assert.deepEqual(f.ids(), [1, 2, 3, 4]);
 });
 
-test('resúmenes: separar pendientes/cobradas de consultoría e importes sin reparto', async t => {
+test('resúmenes: aceptación, firma y solo comisiones de contratos activados pendientes de cobro', async t => {
   const accepted = { ...comparisons[0], estado: 'Aceptada', estado_contrato: 'Firmado y Activado' };
   const records = [withSplit({ ...accepted, id: 1, comision_total: 100, estado_cobro: 'Pendiente' }, 2000),
     withSplit({ ...accepted, id: 2, comision_total: 100, estado_cobro: 'Cobrado' }, 3000),
-    { ...accepted, id: 3, comision_total: 400, estado_cobro: 'Pendiente', reparto_comision_json: null },
+    { ...accepted, id: 3, comision_total: 400, estado_contrato: 'En trámite', estado_cobro: 'Pendiente', reparto_comision_json: null },
     { ...accepted, id: 4, comision_total: 500, estado_cobro: 'Cobrado', reparto_comision_json: null },
-    withSplit({ ...accepted, id: 5, comision_total: 100, estado_cobro: 'Pendiente', estado_contrato: 'Rechazado por Scoring' }, 5000)];
+    withSplit({ ...accepted, id: 5, comision_total: 100, estado_cobro: 'Pendiente', estado_contrato: 'Rechazado por Scoring' }, 5000),
+    { ...comparisons[1], id: 6 },
+    { ...comparisons[3], id: 7, estado: null },
+    withSplit({ ...accepted, id: 8, estado_contrato: 'Pendiente', comision_total: 100 }, 5000),
+    withSplit({ ...accepted, id: 9, estado_contrato: 'En trámite', comision_total: 100 }, 5000),
+    { ...accepted, id: 10, comision_total: 600, estado_cobro: 'Pendiente', reparto_comision_json: null }];
   const f = await mount(t, records);
   assert.equal(f.get('history-kpi-pendientes').textContent, '20,00 €');
-  assert.equal(f.get('history-kpi-cobradas').textContent, '30,00 €');
-  assert.equal(f.get('history-legacy-pendientes').textContent, '400,00 €');
+  assert.equal(f.get('history-kpi-acceptance-pending').textContent, '2');
+  assert.equal(f.get('history-kpi-signature-pending').textContent, '2');
+  assert.equal(f.get('history-legacy-pendientes').textContent, '600,00 €');
   assert.equal(f.get('history-legacy-cobradas').textContent, '500,00 €');
   assert.equal(f.get('history-legacy-commissions').hidden, false);
+});
+
+function paginatedRecords(count = 51) {
+  return Array.from({ length: count }, (_, index) => withSplit({
+    ...comparisons[1], id: index + 1, cliente_nombre: index === 0 ? 'Fuera de página' : `Cliente ${index + 1}`,
+    cliente_cups: `ES${index + 1}`, tipo_energia: index < 30 ? 'GAS' : 'LUZ', comision_total: index + 1,
+    estado_contrato: 'Pendiente', fecha: new Date(Date.UTC(2026, 9, 1, 0, index)).toISOString()
+  }));
+}
+
+test('paginación: 51 comparativas se reparten en 25, 25 y 1, sin perder ni repetir registros', async t => {
+  const f = await mount(t, paginatedRecords());
+  const pageOne = f.ids();
+  assert.equal(pageOne.length, 25);
+  assert.equal(pageOne[0], 51);
+  assert.equal(pageOne.at(-1), 27);
+  assert.equal(f.get('btn-prev-page-history').disabled, true);
+  assert.equal(f.get('btn-next-page-history').disabled, false);
+  assert.equal(f.get('history-pagination-info').textContent, 'Mostrando 1 - 25 de 51 comparativas');
+  assert.equal(f.get('history-kpi-acceptance-pending').textContent, '51', 'los indicadores incluyen las páginas que no se ven');
+  f.get('btn-next-page-history').fire('click');
+  const pageTwo = f.ids();
+  assert.equal(pageTwo.length, 25);
+  assert.equal(pageTwo[0], 26);
+  assert.equal(pageTwo.at(-1), 2);
+  assert.equal(f.get('history-page-indicator').textContent, 'Página 2 de 3');
+  f.get('btn-next-page-history').fire('click');
+  assert.deepEqual(f.ids(), [1]);
+  assert.equal(f.get('btn-next-page-history').disabled, true);
+  assert.equal(new Set([...pageOne, ...pageTwo, ...f.ids()]).size, 51);
+  f.get('btn-next-page-history').fire('click');
+  assert.deepEqual(f.ids(), [1], 'una acción antigua no puede pasar de la última página');
+  f.get('btn-prev-page-history').fire('click');
+  assert.deepEqual(f.ids(), pageTwo);
+});
+
+for (const count of [0, 25]) {
+  test(`paginación: ${count} resultados dejan ambos botones deshabilitados`, async t => {
+    const f = await mount(t, paginatedRecords(count));
+    assert.equal(f.ids().length, count);
+    assert.equal(f.get('btn-prev-page-history').disabled, true);
+    assert.equal(f.get('btn-next-page-history').disabled, true);
+    assert.equal(f.get('history-page-indicator').textContent, 'Página 1 de 1');
+    if (count === 0) assert.equal(f.get('history-pagination-info').textContent, 'Mostrando 0 - 0 de 0 comparativas');
+  });
+}
+
+test('búsquedas y filtros abarcan todas las páginas y vuelven a la primera al cambiar', async t => {
+  const f = await mount(t, paginatedRecords());
+  f.get('btn-next-page-history').fire('click');
+  f.search('client', 'Fuera de página');
+  assert.deepEqual(f.ids(), [1]);
+  assert.equal(f.get('history-page-indicator').textContent, 'Página 1 de 1');
+  assert.equal(f.get('history-kpi-acceptance-pending').textContent, '51');
+  f.get('btn-clear-history-client').fire('click');
+  assert.equal(f.ids()[0], 51);
+  f.get('btn-next-page-history').fire('click');
+  f.supply('GAS');
+  assert.equal(f.ids().length, 25);
+  assert.equal(f.ids()[0], 30);
+  assert.equal(f.get('history-page-indicator').textContent, 'Página 1 de 2');
+  f.get('btn-next-page-history').fire('click');
+  assert.deepEqual(f.ids(), [5, 4, 3, 2, 1]);
+  f.search('cups', 'no existe');
+  assert.deepEqual(f.ids(), []);
+  assert.equal(f.get('history-page-indicator').textContent, 'Página 1 de 1');
+  assert.equal(f.get('btn-next-page-history').disabled, true);
+});
+
+test('la ordenación se aplica a todo el historial antes de paginar y reinicia la página', async t => {
+  const f = await mount(t, paginatedRecords());
+  f.get('btn-next-page-history').fire('click');
+  f.get('th-history-date').fire('click');
+  assert.equal(f.ids().length, 25);
+  assert.equal(f.ids()[0], 1);
+  assert.equal(f.ids().at(-1), 25);
+  assert.equal(f.get('history-page-indicator').textContent, 'Página 1 de 3');
+  f.get('btn-next-page-history').fire('click');
+  f.get('btn-history-commission-sort').fire('click');
+  assert.equal(f.ids()[0], 51);
+  assert.equal(f.ids().at(-1), 27);
+  assert.equal(f.get('history-page-indicator').textContent, 'Página 1 de 3');
+});
+
+test('actualizar conserva la página si existe y retrocede cuando desaparece la última', async t => {
+  const records = paginatedRecords();
+  const f = await mount(t, records);
+  f.get('btn-next-page-history').fire('click');
+  await f.refresh();
+  assert.equal(f.get('history-page-indicator').textContent, 'Página 2 de 3');
+  f.get('btn-next-page-history').fire('click');
+  records.splice(0, 1);
+  await f.refresh();
+  assert.equal(f.get('history-page-indicator').textContent, 'Página 2 de 2');
+  assert.equal(f.ids().length, 25);
+  await f.view.initHistoryView();
+  assert.equal(f.get('history-page-indicator').textContent, 'Página 1 de 2');
+  f.get('btn-next-page-history').fire('click');
+  assert.equal(f.get('history-page-indicator').textContent, 'Página 2 de 2', 'reabrir no duplica las acciones de los botones');
 });
 
 test('history client and CUPS searches match only their own column', async t => {
