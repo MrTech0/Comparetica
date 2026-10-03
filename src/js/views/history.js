@@ -5,11 +5,23 @@ import { relaunchComparisonForScoring } from './calculator_view.js';
 import { invoke } from '../ipc.js';
 import { showToast, showConfirm } from '../ui.js';
 import { onAppEvent, APP_EVENTS } from '../events.js';
+import { getComparisonStatusLock } from '../comparison_status.js';
 
 let activeLockTimers = [];
 let isCobroDialogInitialized = false;
 let unsubComparisonSaved = null;
 const HISTORY_SEARCH_COLUMNS = ['client', 'cups'];
+const pendingHistoryChanges = new Set();
+
+function getStatusLockTitle(reason) {
+  if (reason === 'contract') return 'El estado está bloqueado por el estado del contrato.';
+  if (reason === 'pending') return 'Guardando el cambio. Espera un momento.';
+  return 'El estado ya no se puede modificar al haber transcurrido los 5 segundos de margen.';
+}
+
+function refreshHistoryContract() {
+  applyHistoryFilter();
+}
 
 function clearActiveLockTimers() {
   activeLockTimers.forEach(timer => clearTimeout(timer));
@@ -539,17 +551,9 @@ function applyHistoryFilter() {
     if (currentEstado === 'Aceptada') estadoClass = 'estado-aceptada';
     else if (currentEstado === 'Rechazada') estadoClass = 'estado-rechazada';
 
-    // Calcular si el selector de estado está bloqueado (transcurrido más de 1 minuto en Aceptada/Rechazada)
-    let isLocked = false;
-    if (currentEstado === 'Aceptada' || currentEstado === 'Rechazada') {
-      if (!c.estado_cambiado_en) {
-        isLocked = true; // Sin registro de tiempo (registro antiguo) -> bloqueado
-      } else {
-        const cambiadoEnMs = new Date(c.estado_cambiado_en).getTime();
-        const diffMs = Date.now() - cambiadoEnMs;
-        isLocked = diffMs >= 60 * 1000; // Bloquear después de 60 segundos
-      }
-    }
+    const statusLock = getComparisonStatusLock(c);
+    const isLocked = statusLock.locked || pendingHistoryChanges.has(c.id);
+    const lockTitle = getStatusLockTitle(statusLock.reason || 'pending');
 
     const isAceptada = (currentEstado === 'Aceptada');
     const deleteAttr = isAceptada
@@ -638,7 +642,7 @@ function applyHistoryFilter() {
       </td>
       <td class="text-success">${totalAhorro.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/año</td>
       <td>
-        <div class="m3-custom-status-select ${isLocked ? 'disabled' : ''}" data-id="${c.id}" ${isLocked ? 'title="El estado ya no se puede modificar al haber transcurrido el tiempo límite de cambio."' : ''}>
+        <div class="m3-custom-status-select ${isLocked ? 'disabled' : ''}" data-id="${c.id}" aria-disabled="${isLocked}" ${isLocked ? `title="${lockTitle}"` : ''}>
           <div class="status-select-trigger ${estadoClass}" style="${isLocked ? 'cursor: not-allowed; opacity: 0.75;' : ''}">
             <span>${escapeHtml(currentEstado)}</span>
             <svg class="status-select-arrow" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
@@ -745,28 +749,52 @@ function applyHistoryFilter() {
     // Configurar eventos para el custom select de estado
     const customSelect = tr.querySelector('.m3-custom-status-select');
     const trigger = customSelect.querySelector('.status-select-trigger');
-    const triggerText = trigger.querySelector('span');
     const options = customSelect.querySelectorAll('.status-select-option');
 
-    // Programar bloqueo automático a 1 minuto si está en ventana de gracia tras ser Aceptada o Rechazada
-    if ((currentEstado === 'Aceptada' || currentEstado === 'Rechazada') && !isLocked && c.estado_cambiado_en) {
-      const cambiadoEnMs = new Date(c.estado_cambiado_en).getTime();
-      const diffMs = Date.now() - cambiadoEnMs;
-      const remainingMs = Math.max(0, 60 * 1000 - diffMs);
+    const lockStatus = (reason) => {
+      clearTimeout(customSelect._lockTimer);
+      customSelect.classList.add('disabled');
+      customSelect.classList.remove('open');
+      customSelect.setAttribute('aria-disabled', 'true');
+      customSelect.setAttribute('title', getStatusLockTitle(reason));
+      trigger.style.cursor = 'not-allowed';
+      trigger.style.opacity = '0.75';
+    };
+    const isStatusUnavailable = () => {
+      const lock = getComparisonStatusLock(c);
+      if (lock.locked || pendingHistoryChanges.has(c.id)) {
+        lockStatus(lock.reason || 'pending');
+        return true;
+      }
+      return false;
+    };
+
+    // Mantener el plazo original incluso si se recarga, filtra o actualiza la fila.
+    const syncStatusLock = () => {
+      const lock = getComparisonStatusLock(c);
+      if (lock.locked || pendingHistoryChanges.has(c.id)) {
+        lockStatus(lock.reason || 'pending');
+        return;
+      }
+      clearTimeout(customSelect._lockTimer);
+      customSelect.classList.remove('disabled');
+      customSelect.setAttribute('aria-disabled', 'false');
+      customSelect.setAttribute('title', '');
+      trigger.style.cursor = '';
+      trigger.style.opacity = '';
+      if (lock.remainingMs === null) return;
       const timer = setTimeout(() => {
-        customSelect.classList.add('disabled');
-        customSelect.setAttribute('title', 'El estado ya no se puede modificar al haber transcurrido el tiempo límite de cambio.');
-        trigger.style.cursor = 'not-allowed';
-        trigger.style.opacity = '0.75';
+        lockStatus('elapsed');
         showToast(`El estado de la comparativa de ${c.cliente_nombre} ha quedado fijado de forma definitiva.`, "info");
-      }, remainingMs);
+      }, lock.remainingMs);
       customSelect._lockTimer = timer;
       activeLockTimers.push(timer);
-    }
+    };
+    syncStatusLock();
 
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (customSelect.classList.contains('disabled')) return;
+      if (isStatusUnavailable()) return;
       
       // Cerrar todos los demás custom status y contract selects abiertos
       document.querySelectorAll('.m3-custom-status-select, .m3-custom-contract-select').forEach(cs => {
@@ -781,12 +809,16 @@ function applyHistoryFilter() {
     options.forEach(option => {
       option.addEventListener('click', async (e) => {
         e.stopPropagation();
+        if (isStatusUnavailable()) return;
         const nuevoEstado = option.getAttribute('data-value');
         if (nuevoEstado === c.estado) {
           customSelect.classList.remove('open');
           return;
         }
         
+        pendingHistoryChanges.add(c.id);
+        lockStatus('pending');
+        let statusUpdated = false;
         try {
           await updateComparativaEstado(c.id, nuevoEstado);
           
@@ -802,18 +834,21 @@ function applyHistoryFilter() {
           
           customSelect.classList.remove('open');
           showToast("Estado de la comparativa actualizado correctamente.", "success");
-          
-          await loadHistoryTable();
-          
-          // Recargar tabla de clientes si es necesario para refrescar su Tipo Cliente
-          const clientsSection = document.getElementById('section-clients');
-          if (clientsSection && clientsSection.classList.contains('active')) {
-            const { loadClientsTable } = await import('./clients.js');
-            await loadClientsTable();
-          }
+          statusUpdated = true;
         } catch (err) {
-          showToast("Error al actualizar el estado.", "error");
+          showToast(err.message === 'COMPARISON_STATUS_LOCKED'
+            ? 'El estado ya está bloqueado y no se puede modificar.' : 'Error al actualizar el estado.', 'error');
           console.error(err);
+        } finally {
+          pendingHistoryChanges.delete(c.id);
+        }
+        await loadHistoryTable();
+
+        // Recargar tabla de clientes si es necesario para refrescar su Tipo Cliente.
+        const clientsSection = document.getElementById('section-clients');
+        if (statusUpdated && clientsSection && clientsSection.classList.contains('active')) {
+          const { loadClientsTable } = await import('./clients.js');
+          await loadClientsTable();
         }
       });
     });
@@ -826,6 +861,7 @@ function applyHistoryFilter() {
 
       contractTrigger.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (pendingHistoryChanges.has(c.id) || c.estado_contrato === 'Firmado y Activado') return;
         document.querySelectorAll('.m3-custom-status-select, .m3-custom-contract-select').forEach(cs => {
           if (cs !== contractSelect) cs.classList.remove('open');
         });
@@ -835,26 +871,40 @@ function applyHistoryFilter() {
       contractOptions.forEach(option => {
         option.addEventListener('click', async (e) => {
           e.stopPropagation();
+          if (pendingHistoryChanges.has(c.id) || c.estado_contrato === 'Firmado y Activado') return;
           const targetValue = option.getAttribute('data-value');
           contractSelect.classList.remove('open');
 
           if (targetValue === 'Rechazado por Scoring') {
             openScoringRejectionDialog(c);
-          } else if (targetValue === 'Firmado y Activado') {
-            await updateComparativaContrato(c.id, 'Firmado y Activado', '');
-            c.estado_contrato = 'Firmado y Activado';
+            return;
+          }
+          pendingHistoryChanges.add(c.id);
+          lockStatus('pending');
+          try {
+            await updateComparativaContrato(c.id, targetValue, '');
+            c.estado_contrato = targetValue;
             const foundInCache = cachedHistory.find(item => item.id === c.id);
-            if (foundInCache) foundInCache.estado_contrato = 'Firmado y Activado';
+            if (foundInCache) foundInCache.estado_contrato = targetValue;
+          } catch (err) {
+            pendingHistoryChanges.delete(c.id);
+            console.error(err);
+            showToast('Error al actualizar el estado del contrato.', 'error');
+            refreshHistoryContract(c);
+            return;
+          } finally {
+            pendingHistoryChanges.delete(c.id);
+          }
+          refreshHistoryContract(c);
 
-            await loadHistoryTable();
-
+          if (targetValue === 'Firmado y Activado') {
             openNewRenewalDialogFromHistory(c, {
               onSaved: async () => {
                 c.estado_contrato = 'Firmado y Activado';
                 const found = cachedHistory.find(item => item.id === c.id);
                 if (found) found.estado_contrato = 'Firmado y Activado';
                 showToast("Contrato firmado y activado. Renovación registrada.", "success");
-                await loadHistoryTable();
+                refreshHistoryContract(c);
               },
               onCancelled: async () => {
                 await updateComparativaContrato(c.id, 'En trámite', '');
@@ -862,17 +912,11 @@ function applyHistoryFilter() {
                 const found = cachedHistory.find(item => item.id === c.id);
                 if (found) found.estado_contrato = 'En trámite';
                 showToast("Renovación no guardada: el contrato ha vuelto a 'En trámite'.", "info");
-                await loadHistoryTable();
+                refreshHistoryContract(c);
               }
             });
           } else {
-            await updateComparativaContrato(c.id, targetValue, '');
-            c.estado_contrato = targetValue;
-            const foundInCache = cachedHistory.find(item => item.id === c.id);
-            if (foundInCache) foundInCache.estado_contrato = targetValue;
-
             showToast(`Estado de contrato actualizado a: ${targetValue}`, "success");
-            await loadHistoryTable();
           }
         });
       });
@@ -906,9 +950,13 @@ function openScoringRejectionDialog(c) {
     };
   }
 
-  if (btnSaveOnly) {
-    btnSaveOnly.onclick = async (e) => {
-      e.preventDefault();
+  const saveScoringRejection = async () => {
+    if (pendingHistoryChanges.has(c.id)) return false;
+    pendingHistoryChanges.add(c.id);
+    if (btnSaveOnly) btnSaveOnly.disabled = true;
+    if (btnRecompare) btnRecompare.disabled = true;
+    refreshHistoryContract(c);
+    try {
       const reason = reasonEl ? reasonEl.value.trim() : '';
       await updateComparativaContrato(c.id, 'Rechazado por Scoring', reason);
       c.estado_contrato = 'Rechazado por Scoring';
@@ -919,24 +967,31 @@ function openScoringRejectionDialog(c) {
         foundInCache.motivo_rechazo_scoring = reason;
       }
       closeDialog();
+      return true;
+    } catch (err) {
+      console.error(err);
+      showToast('Error al actualizar el estado del contrato.', 'error');
+      return false;
+    } finally {
+      pendingHistoryChanges.delete(c.id);
+      if (btnSaveOnly) btnSaveOnly.disabled = false;
+      if (btnRecompare) btnRecompare.disabled = false;
+      refreshHistoryContract(c);
+    }
+  };
+
+  if (btnSaveOnly) {
+    btnSaveOnly.onclick = async (e) => {
+      e.preventDefault();
+      if (!await saveScoringRejection()) return;
       showToast("Contrato marcado como Rechazado por Scoring.", "info");
-      await loadHistoryTable();
     };
   }
 
   if (btnRecompare) {
     btnRecompare.onclick = async (e) => {
       e.preventDefault();
-      const reason = reasonEl ? reasonEl.value.trim() : '';
-      await updateComparativaContrato(c.id, 'Rechazado por Scoring', reason);
-      c.estado_contrato = 'Rechazado por Scoring';
-      c.motivo_rechazo_scoring = reason;
-      const foundInCache = cachedHistory.find(item => item.id === c.id);
-      if (foundInCache) {
-        foundInCache.estado_contrato = 'Rechazado por Scoring';
-        foundInCache.motivo_rechazo_scoring = reason;
-      }
-      closeDialog();
+      if (!await saveScoringRejection()) return;
       await relaunchComparisonForScoring(c);
     };
   }

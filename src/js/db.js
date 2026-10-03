@@ -1,5 +1,6 @@
 // src/js/db.js
 import { invoke } from './ipc.js';
+import { COMPARISON_STATUS_GRACE_MS, CONTRACT_STATUSES_LOCKING_COMPARISON } from './comparison_status.js';
 
 let dbInstance = null;
 
@@ -881,11 +882,20 @@ export async function deleteCliente(id) {
  */
 export async function updateComparativaEstado(id, nuevoEstado) {
   const db = await getDb();
-  const cambiadoEn = (nuevoEstado === 'Pendiente de aceptación') ? null : new Date().toISOString();
-  return await db.execute(
-    "UPDATE comparativas SET estado = $1, estado_cambiado_en = $2 WHERE id = $3;",
-    [nuevoEstado, cambiadoEn, id]
+  const now = Date.now();
+  const cambiadoEn = (nuevoEstado === 'Pendiente de aceptación') ? null : new Date(now).toISOString();
+  // Validar también al guardar: una opción abierta o una vista antigua no puede saltarse el bloqueo.
+  const result = await db.execute(
+    `UPDATE comparativas SET estado = $1, estado_cambiado_en = $2
+     WHERE id = $3
+       AND (COALESCE(estado, 'Pendiente de aceptación') NOT IN ('Aceptada', 'Rechazada')
+         OR julianday(estado_cambiado_en) > julianday($4))
+       AND COALESCE(estado_contrato, 'Pendiente') NOT IN ($5, $6, $7);`,
+    [nuevoEstado, cambiadoEn, id, new Date(now - COMPARISON_STATUS_GRACE_MS).toISOString(),
+      ...CONTRACT_STATUSES_LOCKING_COMPARISON]
   );
+  if (result.rowsAffected === 0) throw new Error('COMPARISON_STATUS_LOCKED');
+  return result;
 }
 
 /**
