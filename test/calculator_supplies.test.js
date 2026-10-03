@@ -281,10 +281,10 @@ for (const [name, energy, index] of [['Solo Luz', 'LUZ', 4], ['Solo Gas', 'GAS',
 test('previewing and saving a calculated comparison keeps the branding captured when calculating', async () => {
   const captured = { config: { consultora_nombre: 'Consultora original' }, logo: 'data:image/png;base64,bG9nbyBB' };
   let current = captured;
-  const saved = [], reports = [];
+  const saved = [], reports = [], clientIds = [];
   const f = mount({
     getCompanySnapshot: async () => JSON.parse(JSON.stringify(current)),
-    addComparativa: async (...args) => { saved.push(JSON.parse(JSON.stringify(args[3]))); },
+    addComparativa: async (...args) => { saved.push(JSON.parse(JSON.stringify(args[3]))); clientIds.push(args[9]); },
     generatePDFReport: async data => { reports.push(JSON.parse(JSON.stringify(data))); }
   });
   await f.choose('Solo Gas'); f.fillBill(); await f.submit();
@@ -295,4 +295,5 @@ test('previewing and saving a calculated comparison keeps the branding captured 
   await card.querySelector('.btn-save-comparison').click();
   assert.deepEqual(reports[0]?.companySnapshot, captured);
   assert.deepEqual(saved[0]?.companySnapshot, captured);
+  assert.equal(clientIds[0], customers.find(c => c.nombre_empresa === 'Solo Gas').id);
 });

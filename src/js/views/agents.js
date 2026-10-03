@@ -7,15 +7,20 @@ import {
   toggleAgenteEstado,
   deleteAgente,
   reassignAgenteClientes,
+  getRetenciones,
   checkAgenteSetupStatus
 } from '../db.js';
 import { showToast, showConfirm } from '../ui.js';
+import { formatRetentionPercent } from '../commission_split.js';
+import { initRetentionsView } from './retentions.js';
 
 let cachedAgents = [];
 let agentToDeleteId = null;
 let currentSortClients = null; // 'desc' | 'asc' | null
 
 export async function initAgentsView() {
+  setupAgentsTabs();
+  if (document.getElementById('tab-btn-agents-retentions')?.classList.contains('active')) await initRetentionsView();
   setupDialogs();
   setupFormSubmit();
   setupReassignForm();
@@ -32,20 +37,49 @@ export async function initAgentsView() {
   await loadAgentsTable();
 }
 
+function setupAgentsTabs() {
+  for (const tab of ['agents', 'retentions']) {
+    const button = document.getElementById(`tab-btn-agents-${tab}`);
+    if (!button || button.dataset.listenerAdded) continue;
+    button.dataset.listenerAdded = 'true';
+    button.addEventListener('click', async () => {
+      for (const name of ['agents', 'retentions']) {
+        const selected = name === tab;
+        document.getElementById(`tab-btn-agents-${name}`).classList.toggle('active', selected);
+        document.getElementById(`tab-btn-agents-${name}`).setAttribute('aria-pressed', String(selected));
+        document.getElementById(`agents-panel-${name}`).hidden = !selected;
+      }
+      if (tab === 'retentions') await initRetentionsView();
+      else await loadAgentsTable();
+    });
+  }
+}
+
+async function openAgentDialog(agent = null) {
+  try {
+    const retentions = await getRetenciones();
+    const select = document.getElementById('dialog-agent-retention');
+    select.innerHTML = '<option value="">0%</option>' + retentions.map(item => `<option value="${item.id}">${formatRetentionPercent(item.porcentaje_centesimas)} %</option>`).join('');
+    if (agent?.retencion_id != null && !retentions.some(item => item.id === agent.retencion_id)) throw new Error('La retención del comercial ha cambiado. Actualiza el listado.');
+    document.getElementById('dialog-agent-form').reset();
+    document.getElementById('dialog-agent-title').innerText = agent ? 'Editar Agente Comercial' : 'Registrar Agente Comercial';
+    document.getElementById('dialog-agent-id').value = agent?.id ?? '';
+    document.getElementById('dialog-agent-name').value = agent?.nombre ?? '';
+    document.getElementById('dialog-agent-phone').value = agent?.telefono ?? '';
+    document.getElementById('dialog-agent-email').value = agent?.email ?? '';
+    select.value = agent?.retencion_id ?? '';
+    document.getElementById('dialog-agent').classList.add('active');
+  } catch (error) { showToast(`Error al cargar retenciones: ${error.message || error}`, 'error'); }
+}
+
 function setupDialogs() {
   const openBtn = document.getElementById('open-agent-dialog-btn');
   const closeBtn = document.getElementById('dialog-agent-close');
   const dialog = document.getElementById('dialog-agent');
-  const form = document.getElementById('dialog-agent-form');
+  if (!openBtn || !dialog || !closeBtn || openBtn.dataset.listenerAdded) return;
+  openBtn.dataset.listenerAdded = 'true';
 
-  if (!openBtn || !dialog || !closeBtn) return;
-
-  openBtn.addEventListener('click', () => {
-    document.getElementById('dialog-agent-title').innerText = "Registrar Agente Comercial";
-    document.getElementById('dialog-agent-id').value = "";
-    if (form) form.reset();
-    dialog.classList.add('active');
-  });
+  openBtn.addEventListener('click', () => openAgentDialog());
 
   closeBtn.addEventListener('click', () => {
     dialog.classList.remove('active');
@@ -56,15 +90,19 @@ function setupFormSubmit() {
   const form = document.getElementById('dialog-agent-form');
   const dialog = document.getElementById('dialog-agent');
 
-  if (!form || !dialog) return;
+  if (!form || !dialog || form.dataset.listenerAdded) return;
+  form.dataset.listenerAdded = 'true';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (form.dataset.saving === 'true') return;
 
     const id = document.getElementById('dialog-agent-id').value;
     const nombre = document.getElementById('dialog-agent-name').value.trim();
     const telefono = document.getElementById('dialog-agent-phone').value.trim() || null;
     const email = document.getElementById('dialog-agent-email').value.trim() || null;
+    const retentionValue = document.getElementById('dialog-agent-retention').value;
+    const retencionId = retentionValue ? Number(retentionValue) : null;
 
     if (!nombre) {
       showToast("El nombre del agente comercial es obligatorio.", "error");
@@ -72,6 +110,7 @@ function setupFormSubmit() {
     }
 
     try {
+      form.dataset.saving = 'true';
       const submitBtn = form.querySelector('button[type="submit"]');
       if (submitBtn) {
         submitBtn.disabled = true;
@@ -79,10 +118,10 @@ function setupFormSubmit() {
       }
 
       if (id) {
-        await updateAgente(parseInt(id, 10), nombre, telefono, email);
+        await updateAgente(parseInt(id, 10), nombre, telefono, email, retencionId);
         showToast("Agente comercial actualizado correctamente.", "success");
       } else {
-        await addAgente(nombre, telefono, email);
+        await addAgente(nombre, telefono, email, retencionId);
         showToast("Agente comercial registrado correctamente.", "success");
       }
 
@@ -93,6 +132,7 @@ function setupFormSubmit() {
       console.error("Error al guardar agente:", err);
       showToast(`Error al guardar agente: ${err.message || err}`, "error");
     } finally {
+      form.dataset.saving = 'false';
       const submitBtn = form.querySelector('button[type="submit"]');
       if (submitBtn) {
         submitBtn.disabled = false;
@@ -107,7 +147,8 @@ function setupReassignForm() {
   const dialog = document.getElementById('dialog-reassign-agent');
   const cancelBtn = document.getElementById('dialog-reassign-cancel');
 
-  if (!form || !dialog || !cancelBtn) return;
+  if (!form || !dialog || !cancelBtn || form.dataset.listenerAdded) return;
+  form.dataset.listenerAdded = 'true';
 
   cancelBtn.addEventListener('click', () => {
     dialog.classList.remove('active');
@@ -178,7 +219,7 @@ function renderAgentsTable() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align: center; color: var(--color-outline); padding: 32px 16px;">
+        <td colspan="7" style="text-align: center; color: var(--color-outline); padding: 32px 16px;">
           ${query ? 'No se encontraron agentes que coincidan con la búsqueda.' : 'No hay agentes registrados. Haga clic en \'Nuevo Agente\' para registrar uno.'}
         </td>
       </tr>
@@ -200,6 +241,7 @@ function renderAgentsTable() {
       <td>${escapeHtml(agent.telefono || '-')}</td>
       <td>${escapeHtml(agent.email || '-')}</td>
       <td>${clientCountBadge}</td>
+      <td>${agent.retencion_id == null ? '0%' : `${formatRetentionPercent(agent.porcentaje_centesimas ?? 0)} %`}</td>
       <td>${statusChip}</td>
       <td style="text-align: right; white-space: nowrap;">
         <button type="button" class="m3-btn-icon edit-agent-btn" data-id="${agent.id}" title="Editar Agente">
@@ -221,16 +263,11 @@ function renderAgentsTable() {
 
   // Eventos de Editar
   tbody.querySelectorAll('.edit-agent-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const id = parseInt(btn.getAttribute('data-id'), 10);
       const agent = cachedAgents.find(a => a.id === id);
       if (agent) {
-        document.getElementById('dialog-agent-title').innerText = "Editar Agente Comercial";
-        document.getElementById('dialog-agent-id').value = agent.id;
-        document.getElementById('dialog-agent-name').value = agent.nombre;
-        document.getElementById('dialog-agent-phone').value = agent.telefono || '';
-        document.getElementById('dialog-agent-email').value = agent.email || '';
-        document.getElementById('dialog-agent').classList.add('active');
+        await openAgentDialog(agent);
       }
     });
   });

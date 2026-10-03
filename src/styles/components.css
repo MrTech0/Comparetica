@@ -366,6 +366,15 @@
     padding: 6px 0;
   }
 
+  /* Keep the retention choices below their field, scrolling in the available space. */
+  #dialog-agent-retention::picker(select) {
+    inset: auto;
+    position-area: bottom span-right;
+    position-try-fallbacks: none;
+    margin: 4px 0 0;
+    max-height: min(250px, calc(100% - 8px));
+  }
+
   .m3-native-select option {
     padding: 10px 16px;
     background-color: var(--color-surface);
@@ -1066,6 +1075,55 @@ body.private-mode-active .private-value::after {
 .m3-autocomplete-container {
   position: relative;
   display: grid;
+}
+
+#agents-panel-agents[hidden],
+#agents-panel-retentions[hidden],
+#history-legacy-commissions[hidden] {
+  display: none;
+}
+
+.commission-split summary {
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--color-primary);
+}
+
+.commission-split summary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.commission-split-detail {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  margin-top: 10px;
+  min-width: 190px;
+  overflow-wrap: anywhere;
+}
+
+.commission-legacy-label {
+  display: block;
+  color: var(--color-on-surface-variant);
+  font-size: 11px;
+  font-weight: 400;
+  margin-top: 4px;
+}
+
+.commission-legacy-summary p {
+  font-size: 12px;
+  margin: 8px 0;
+}
+
+.commission-legacy-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  font-size: 13px;
 }
 
 .m3-autocomplete-list {

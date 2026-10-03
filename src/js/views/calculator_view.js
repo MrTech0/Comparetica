@@ -9,6 +9,7 @@ import { isValidSpanishCups, normalizeCups } from '../utils/validators.js';
 
 // Datos temporales de la última comparación realizada
 let lastComparisonData = {
+  clientId: null,
   clientName: '',
   clientCups: '',
   energyType: '',
@@ -652,6 +653,7 @@ function setupCalcFormSubmit() {
     // Inicializar temporales globales
     lastComparisonData = {
       companySnapshot,
+      clientId: matchedClient.id,
       clientName,
       clientCups,
       energyType,
@@ -798,6 +800,7 @@ function setupCalcFormReset() {
 
     // 4. Limpiar los datos temporales del último cálculo
     lastComparisonData = {
+      clientId: null,
       clientName: '',
       clientCups: '',
       energyType: '',
@@ -999,7 +1002,8 @@ async function saveComparisonToDb(item, type, buttonEl) {
       ahorroLuz,
       tarifaGasId,
       ahorroGas,
-      comisionTotal
+      comisionTotal,
+      lastComparisonData.clientId
     );
 
     buttonEl.innerHTML = `

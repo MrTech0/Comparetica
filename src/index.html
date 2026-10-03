@@ -442,9 +442,14 @@
                SECTION: AGENTS
                ========================================== -->
           <section id="section-agents" class="view-section">
-            <div class="m3-card margin-top-md">
+            <h2 class="m3-card-title margin-top-md">Gestión de Agentes y Comerciales</h2>
+            <div class="tabs-header" aria-label="Gestión de comerciales y retenciones">
+              <button type="button" class="m3-tab-btn active" id="tab-btn-agents-agents" aria-controls="agents-panel-agents" aria-pressed="true">Agentes</button>
+              <button type="button" class="m3-tab-btn" id="tab-btn-agents-retentions" aria-controls="agents-panel-retentions" aria-pressed="false">Retenciones</button>
+            </div>
+            <div id="agents-panel-agents" class="m3-card margin-top-md">
               <div class="flex-row-center-between" style="align-items: center; margin-bottom: 8px;">
-                <h2 class="m3-card-title" style="margin: 0;">Gestión de Agentes y Comerciales</h2>
+                <h3 class="m3-card-title" style="margin: 0;">Agentes</h3>
                 <button id="open-agent-dialog-btn" class="m3-btn">
                   <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:currentColor;margin-right:8px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                   Nuevo Agente
@@ -477,6 +482,7 @@
                           <span id="th-agent-clients-arrow" style="display: inline-flex; font-size: 13px; color: var(--color-on-surface-variant); transition: transform 0.2s;">↕</span>
                         </div>
                       </th>
+                      <th>Retención</th>
                       <th>Estado</th>
                       <th style="text-align: right;">Acciones</th>
                     </tr>
@@ -484,6 +490,19 @@
                   <tbody id="table-agents-body">
                     <!-- Inyectado dinámicamente -->
                   </tbody>
+                </table>
+              </div>
+            </div>
+            <div id="agents-panel-retentions" class="m3-card margin-top-md" hidden>
+              <div class="flex-row-center-between" style="margin-bottom:8px;">
+                <h3 class="m3-card-title" style="margin:0;">Retenciones</h3>
+                <button type="button" id="open-retention-dialog-btn" class="m3-btn">Nueva Retención</button>
+              </div>
+              <p class="text-muted" style="font-size:13px;line-height:1.5;">La retención es el porcentaje de la comisión que conserva la consultoría. El comercial recibe el resto. Sin retención, el comercial recibe el 100 %.</p>
+              <div class="table-container">
+                <table class="m3-table">
+                  <thead><tr><th>Retención</th><th>Comerciales asignados</th><th style="text-align:right;">Acciones</th></tr></thead>
+                  <tbody id="table-retentions-body"></tbody>
                 </table>
               </div>
             </div>
@@ -1079,15 +1098,24 @@
                   <div id="history-kpi-aceptadas" style="font-size: 18px; font-weight: 700; color: #3b82f6;">0</div>
                 </div>
                 <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #f59e0b;">
-                  <div style="font-size: 11px; color: #f59e0b; font-weight: 600;">🟡 PENDIENTE COBRO</div>
+                  <div style="font-size: 11px; color: #f59e0b; font-weight: 600;">CONSULTORÍA · PENDIENTE DE COBRO</div>
                   <div id="history-kpi-pendientes" style="font-size: 18px; font-weight: 700; color: #f59e0b;" class="private-value">0,00 €</div>
                 </div>
                 <div style="background-color: var(--color-surface-variant); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 4px solid #10b981;">
-                  <div style="font-size: 11px; color: #10b981; font-weight: 600;">✅ COBRADO REAL</div>
+                  <div style="font-size: 11px; color: #10b981; font-weight: 600;">CONSULTORÍA · COBRADO</div>
                   <div id="history-kpi-cobradas" style="font-size: 18px; font-weight: 700; color: #10b981;" class="private-value">0,00 €</div>
                 </div>
               </div>
 
+            </div>
+
+            <div id="history-legacy-commissions" class="m3-card commission-legacy-summary margin-top-md" hidden>
+              <strong>Importes totales sin reparto registrado</strong>
+              <p class="text-muted">Estas comisiones conservan su total original y no se suman a las comisiones de la consultoría.</p>
+              <div class="commission-legacy-totals">
+                <span>Pendientes: <strong id="history-legacy-pendientes" class="private-value">0,00 €</strong></span>
+                <span>Cobradas: <strong id="history-legacy-cobradas" class="private-value">0,00 €</strong></span>
+              </div>
             </div>
 
             <!-- Tabla del Historial -->
@@ -1207,11 +1235,12 @@
                     </th>
                     <!-- Comisión (Ordenable) -->
                     <th id="th-history-commission" scope="col" class="private-value" aria-sort="none">
-                      <button type="button" id="btn-history-commission-sort" class="m3-table-column-sort" title="Ordenar por comisión">
+                      <button type="button" id="btn-history-commission-sort" class="m3-table-column-sort" title="Ordenar por comisión de la consultoría">
                         <span>Comisión</span>
                         <span id="th-history-commission-sort-icon" aria-hidden="true">↕</span>
                       </button>
                     </th>
+                    <th scope="col" class="private-value">Comisión comercial</th>
                     <!-- Cobro Comisión (Filtrable con menú desplegable) -->
                     <th id="th-history-cobro" style="cursor: pointer; position: relative; user-select: none;">
                       <div style="display: inline-flex; align-items: center; gap: 4px;">
@@ -2200,9 +2229,10 @@
 
           <div style="background-color: var(--color-surface-variant); padding: 14px 16px; border-radius: var(--radius-md); margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <span class="text-muted" style="font-size: 12.5px;">Importe Comisión Aprobada:</span>
+              <span class="text-muted" style="font-size: 12.5px;">Comisión total del contrato:</span>
               <strong id="dialog-cobro-amount" class="private-value" style="font-size: 16px; color: var(--color-primary);">0,00 €</strong>
             </div>
+            <div id="dialog-cobro-split" class="private-value" style="margin:12px 0;"></div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <span class="text-muted" style="font-size: 12.5px;">Estado Actual de Cobro:</span>
               <span id="dialog-cobro-status-badge" class="status-select-trigger estado-pendiente" style="padding: 4px 10px; cursor: default;"><span>🟡 Pendiente</span></span>
@@ -2323,11 +2353,37 @@
                 <label class="m3-label" for="dialog-agent-email">Email de contacto</label>
                 <input type="email" id="dialog-agent-email" class="m3-input" placeholder="Ej. juan.perez@consultoria.com" />
               </div>
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-agent-retention">Retención de la consultoría</label>
+                <select id="dialog-agent-retention" name="retencion_id" class="m3-input m3-native-select" aria-describedby="dialog-agent-retention-help"><option value="">0%</option></select>
+                <p id="dialog-agent-retention-help" class="text-muted" style="font-size:12px;line-height:1.5;">Sin retención, el comercial recibe el 100 % de la comisión. Los cambios se aplican a nuevas comparativas guardadas.</p>
+              </div>
             </div>
             
             <div class="m3-dialog-actions">
               <button type="button" id="dialog-agent-close" class="m3-btn m3-btn-outlined">Cancelar</button>
               <button type="submit" class="m3-btn">Guardar Agente</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- DIÁLOGO: NUEVA/EDITAR RETENCIÓN -->
+      <div id="dialog-retention" class="m3-dialog-overlay">
+        <div class="m3-dialog" style="max-width:500px;">
+          <h3 class="m3-dialog-title" id="dialog-retention-title">Nueva Retención</h3>
+          <form id="dialog-retention-form">
+            <input type="hidden" id="dialog-retention-id" value="" />
+            <div class="dialog-form-content">
+              <div class="m3-field">
+                <label class="m3-label" for="dialog-retention-percent">Porcentaje que conserva la consultoría *</label>
+                <input type="text" inputmode="decimal" id="dialog-retention-percent" class="m3-input" placeholder="Ej. 20,25" aria-describedby="dialog-retention-help" required />
+                <p id="dialog-retention-help" class="text-muted" style="font-size:12px;line-height:1.5;">De 0 a 100 %, con hasta dos decimales (coma o punto). Al editarlo, las nuevas comparativas de los comerciales asignados usarán este porcentaje. Los repartos ya guardados se conservan.</p>
+              </div>
+            </div>
+            <div class="m3-dialog-actions">
+              <button type="button" id="dialog-retention-close" class="m3-btn m3-btn-outlined">Cancelar</button>
+              <button type="submit" class="m3-btn">Guardar Retención</button>
             </div>
           </form>
         </div>

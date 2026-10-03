@@ -1,12 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { splitCommission } from '../src/js/commission_split.js';
+
+function withSplit(record, percent = 10000) {
+  return { ...record, reparto_comision_json: JSON.stringify({ version: 1, cliente_id: 1, cliente_nombre: record.cliente_nombre || '', agente_id: 1, agente_nombre: 'Ana', retencion_id: 1, retencion_nombre: 'General', porcentaje_centesimas: percent, ...splitCommission(record.comision_total, percent) }) };
+}
 
 const comparisons = [
   { id: 1, cliente_nombre: 'Consultoría Muñoz', cliente_cups: 'ES002100001ALPHA', fecha: '2026-10-01', estado: 'Aceptada', estado_contrato: 'En trámite', estado_cobro: 'Cobrado', ahorro_luz_anual: 200, tipo_energia: 'LUZ', comision_total: 20 },
   { id: 2, cliente_nombre: 'Consultoría Muñoz', cliente_cups: 'ES003100002BETA', fecha: '2026-10-02', estado: 'Pendiente de aceptación', ahorro_luz_anual: 100, tipo_energia: 'GAS', comision_total: 100 },
   { id: 3, cliente_nombre: 'Alpha Servicios', cliente_cups: 'ES002100003GAMMA', fecha: '2026-10-03', estado: 'Rechazada', ahorro_luz_anual: 300, tipo_energia: 'Luz', comision_total: 9.5 },
   { id: 4, cliente_nombre: null, cliente_cups: null, fecha: '2026-09-30', ahorro_luz_anual: 0, tipo_energia: 'DUAL', comision_total: 0 }
-].map(c => ({ tipo_energia: 'Luz', ahorro_gas_anual: 0, comision_total: 10, ...c }));
+].map(c => withSplit({ tipo_energia: 'Luz', ahorro_gas_anual: 0, comision_total: 10, ...c }));
 let caseId = 0;
 
 function element() {
@@ -34,7 +39,7 @@ function element() {
   };
 }
 
-async function mount(t) {
+async function mount(t, records = comparisons) {
   const original = { document: globalThis.document, window: globalThis.window };
   const nodes = new Map();
   const get = id => { if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); };
@@ -57,7 +62,7 @@ async function mount(t) {
       assert.equal(command, 'db_select');
       if (/^SELECT id FROM comparativas/.test(args.query)) return [];
       assert.match(args.query, /FROM comparativas c/);
-      return comparisons;
+      return records;
     } } }
   };
   t.after(() => { for (const [key, value] of Object.entries(original)) { if (value === undefined) delete globalThis[key]; else globalThis[key] = value; } });
@@ -68,6 +73,42 @@ async function mount(t) {
   const supply = value => { const select = get('filter-history-type'); select.value = value; select.fire('change'); };
   return { get, tbody, ids, search, supply, view, filters };
 }
+
+test('historial: neto de consultoría, comercial, detalle y ordenación sin mezclar históricos', async t => {
+  const records = [withSplit({ ...comparisons[0], comision_total: 100 }, 2000), withSplit({ ...comparisons[1], comision_total: 50 }, 8000),
+    { ...comparisons[2], comision_total: 900, reparto_comision_json: null }, { ...comparisons[3], comision_total: 500, reparto_comision_json: null }];
+  const f = await mount(t, records);
+  const first = f.tbody.children.find(row => row.innerHTML.includes('data-id="1"'));
+  assert.match(first.innerHTML, /20,00 €/);
+  const summary = first.innerHTML.match(/<summary\b([^>]*)>([\s\S]*?)<\/summary>/);
+  const accessibleName = summary[1].match(/aria-label="([^"]*)"/)?.[1] ?? summary[2].replace(/<[^>]*>/g, '');
+  assert.match(accessibleName, /20,00 €/, 'el lector de pantalla debe anunciar la comisión de la consultoría sin desplegar el detalle');
+  assert.match(first.innerHTML, /80,00 €/);
+  assert.match(first.innerHTML, /Total del contrato.*100,00 €/s);
+  assert.match(first.innerHTML, /Ana/);
+  assert.match(first.innerHTML, /Retención: 20 %/);
+  assert.doesNotMatch(first.innerHTML, /General/, 'los repartos anteriores muestran el porcentaje sin el antiguo nombre de la retención');
+  assert.match(f.tbody.children.find(row => row.innerHTML.includes('data-id="3"')).innerHTML, /Sin reparto registrado/);
+  f.get('btn-history-commission-sort').fire('click');
+  assert.deepEqual(f.ids(), [2, 1, 3, 4]);
+  f.get('btn-history-commission-sort').fire('click');
+  assert.deepEqual(f.ids(), [1, 2, 3, 4]);
+});
+
+test('resúmenes: separar pendientes/cobradas de consultoría e importes sin reparto', async t => {
+  const accepted = { ...comparisons[0], estado: 'Aceptada', estado_contrato: 'Firmado y Activado' };
+  const records = [withSplit({ ...accepted, id: 1, comision_total: 100, estado_cobro: 'Pendiente' }, 2000),
+    withSplit({ ...accepted, id: 2, comision_total: 100, estado_cobro: 'Cobrado' }, 3000),
+    { ...accepted, id: 3, comision_total: 400, estado_cobro: 'Pendiente', reparto_comision_json: null },
+    { ...accepted, id: 4, comision_total: 500, estado_cobro: 'Cobrado', reparto_comision_json: null },
+    withSplit({ ...accepted, id: 5, comision_total: 100, estado_cobro: 'Pendiente', estado_contrato: 'Rechazado por Scoring' }, 5000)];
+  const f = await mount(t, records);
+  assert.equal(f.get('history-kpi-pendientes').textContent, '20,00 €');
+  assert.equal(f.get('history-kpi-cobradas').textContent, '30,00 €');
+  assert.equal(f.get('history-legacy-pendientes').textContent, '400,00 €');
+  assert.equal(f.get('history-legacy-cobradas').textContent, '500,00 €');
+  assert.equal(f.get('history-legacy-commissions').hidden, false);
+});
 
 test('history client and CUPS searches match only their own column', async t => {
   const f = await mount(t);

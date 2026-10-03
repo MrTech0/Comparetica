@@ -24,6 +24,7 @@
 - **Modo Privado (Confidencialidad)**: Interruptor en la barra lateral que oculta visualmente (difumina) las comisiones del asesor de cara al cliente en todas las vistas de la aplicación durante presentaciones en vivo.
 - **Seguridad y Cifrado Local**: Base de datos SQLite cifrada en reposo mediante AES-256-GCM, con derivación de claves por Argon2id y metadatos de bóveda en `vault.json`. Las operaciones habituales de descifrado y guardado usan memoria (`rusqlite::serialize`/`deserialize`); el archivo cifrado se escribe primero en un temporal sincronizado y después se sustituye mediante `fs::rename`.
 - **Gestión Integral de Cartera y Renovaciones**: Módulos completos para administración de clientes, agentes comerciales, panel de alertas de vencimiento de contratos y asistente guiado (*wizard*) para nuevos estudios.
+- **Retenciones y Reparto de Comisiones**: En Agentes se gestionan retenciones identificadas únicamente por su porcentaje, de 0 a 100 %, con hasta dos decimales. Cada comercial puede tener una asignada o quedar sin retención (recibe el 100 %). Al guardar una comparativa, se fija el reparto según el comercial del cliente: «Comisión» muestra la parte de la consultoría y «Comisión comercial» la del comercial. Cambiar después el porcentaje o las asignaciones conserva los repartos guardados. Los registros anteriores muestran «Sin reparto registrado» y sus totales se resumen aparte.
 - **Reportes Ejecutivos en PDF**:
   - **Previsualización en Pantalla**: Permite ver el diseño del reporte en tiempo real en un visor integrado sin necesidad de guardarlo en disco.
   - **Exportación Local**: Generación nativa de un PDF estético y estructurado con el desglose de conceptos para entregar al cliente.
@@ -126,6 +127,7 @@ El frontend usa módulos de JavaScript y estilos CSS; Tauri conecta la interfaz 
 │       ├── events.js                  # Eventos internos de la interfaz
 │       ├── ui.js                      # Notificaciones y diálogos comunes
 │       ├── calculator.js              # Cálculos de facturación de luz y gas
+│       ├── commission_split.js        # Validación de retenciones y reparto exacto en céntimos
 │       ├── pdf.js                     # Generación y vista previa de PDF con jsPDF
 │       ├── csv_importer.js            # Importación CSV de clientes y renovaciones
 │       ├── utils/validators.js        # Validación de DNI, CIF, NIE y CUPS
@@ -139,7 +141,8 @@ El frontend usa módulos de JavaScript y estilos CSS; Tauri conecta la interfaz 
 │           ├── history.js             # Historial de comparativas
 │           ├── tariffs.js             # Comercializadoras y tarifas
 │           ├── clients.js             # Clientes y puntos de suministro
-│           ├── agents.js              # Agentes comerciales
+│           ├── agents.js              # Agentes comerciales y asignación de retenciones
+│           ├── retentions.js          # Catálogo de tipos de retención
 │           ├── renewals.js            # Renovaciones y calendario
 │           ├── settings.js            # Ajustes y datos de la consultora
 │           └── backup.js              # Pantalla de copias de seguridad

@@ -1,5 +1,6 @@
 // src/js/db.js
 import { invoke } from './ipc.js';
+import { moneyToCents, parseRetentionPercent } from './commission_split.js';
 import { COMPARISON_STATUS_GRACE_MS, CONTRACT_STATUSES_LOCKING_COMPARISON } from './comparison_status.js';
 
 let dbInstance = null;
@@ -305,29 +306,47 @@ export async function deleteTarifaGas(id) {
  * @param {number} ahorroLuzAnual - Ahorro estimado anual en luz (€).
  * @param {number|null} tarifaGasPropuestaId - ID de la tarifa de gas recomendada.
  * @param {number} ahorroGasAnual - Ahorro estimado anual en gas (€).
- * @param {number} comisionTotal - Comisión total ganada por el consultor (€).
+ * @param {number} comisionTotal - Comisión total del contrato (€).
+ * @param {number} clienteId - Identidad del cliente seleccionado.
  * @returns {Promise<Object>} Resultado del registro de la comparativa.
  */
-export async function addComparativa(clienteNombre, clienteCups, tipoEnergia, datosClienteJson, tarifaLuzPropuestaId, ahorroLuzAnual, tarifaGasPropuestaId, ahorroGasAnual, comisionTotal) {
+export async function addComparativa(clienteNombre, clienteCups, tipoEnergia, datosClienteJson, tarifaLuzPropuestaId, ahorroLuzAnual, tarifaGasPropuestaId, ahorroGasAnual, comisionTotal, clienteId) {
+  const totalCentimos = moneyToCents(comisionTotal);
+  if (!Number.isSafeInteger(clienteId) || clienteId <= 0) throw new Error('Selecciona un cliente registrado antes de guardar la comparativa.');
   const db = await getDb();
   const savedData = {
     ...datosClienteJson,
     companySnapshot: datosClienteJson.companySnapshot || await getCompanySnapshot()
   };
-  return await db.execute(
+  // Una sola sentencia captura la asignación y el porcentaje vigentes. La división
+  // por partes evita desbordar los enteros SQLite al multiplicar cantidades grandes.
+  const consultoria = `(($10 / 10000) * COALESCE(r.porcentaje_centesimas, 0) + (($10 % 10000) * COALESCE(r.porcentaje_centesimas, 0) + 5000) / 10000)`;
+  const result = await db.execute(
     `INSERT INTO comparativas (
       cliente_nombre, cliente_cups, tipo_energia, datos_cliente_json, 
       tarifa_luz_propuesta_id, ahorro_luz_anual, 
       tarifa_gas_propuesta_id, ahorro_gas_anual, 
-      comision_total
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`,
+      comision_total, reparto_comision_json
+    ) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9,
+      json_object('version', 2, 'total_centimos', $10,
+        'cliente_id', cli.id, 'cliente_nombre', cli.nombre_empresa,
+        'agente_id', a.id, 'agente_nombre', a.nombre,
+        'retencion_id', r.id,
+        'porcentaje_centesimas', COALESCE(r.porcentaje_centesimas, 0),
+        'consultoria_centimos', ${consultoria}, 'comercial_centimos', $10 - ${consultoria})
+      FROM clientes cli JOIN agentes a ON a.id = cli.agente_id
+      LEFT JOIN retenciones r ON r.id = a.retencion_id
+      WHERE cli.id = $11 AND cli.estado = 'activo'
+        AND (a.retencion_id IS NULL OR r.id IS NOT NULL);`,
     [
       clienteNombre, clienteCups, tipoEnergia, JSON.stringify(savedData),
       tarifaLuzPropuestaId, ahorroLuzAnual, 
       tarifaGasPropuestaId, ahorroGasAnual, 
-      comisionTotal
+      comisionTotal, totalCentimos, clienteId
     ]
   );
+  if (result.rowsAffected === 0) throw new Error('El cliente o su comercial ya no están disponibles. Revisa la ficha del cliente y vuelve a intentarlo.');
+  return result;
 }
 
 /**
@@ -347,7 +366,10 @@ export async function getComparativas() {
     LEFT JOIN comercializadoras cl ON tl.comercializadora_id = cl.id
     LEFT JOIN tarifas_gas tg ON c.tarifa_gas_propuesta_id = tg.id
     LEFT JOIN comercializadoras cg ON tg.comercializadora_id = cg.id
-    LEFT JOIN clientes cli ON c.cliente_nombre = cli.nombre_empresa
+    LEFT JOIN clientes cli ON cli.id = CASE
+      WHEN json_valid(c.reparto_comision_json) THEN json_extract(c.reparto_comision_json, '$.cliente_id')
+      ELSE (SELECT legacy.id FROM clientes legacy WHERE legacy.nombre_empresa = c.cliente_nombre ORDER BY legacy.id LIMIT 1)
+    END
     ORDER BY c.fecha DESC;
   `);
 }
@@ -741,9 +763,10 @@ export async function getAgentes(onlyActive = false) {
   try {
     const where = onlyActive ? "WHERE a.activo = 1" : "";
     const agents = await db.select(`
-      SELECT a.*, 
+      SELECT a.*, r.porcentaje_centesimas,
              (SELECT COUNT(*) FROM clientes c WHERE c.agente_id = a.id) AS num_clientes
       FROM agentes a
+      LEFT JOIN retenciones r ON r.id = a.retencion_id
       ${where}
       ORDER BY a.nombre ASC;
     `);
@@ -760,23 +783,55 @@ export async function getAgentes(onlyActive = false) {
  * @param {string|null} telefono Teléfono de contacto.
  * @param {string|null} email Email de contacto.
  */
-export async function addAgente(nombre, telefono = null, email = null) {
+export async function addAgente(nombre, telefono = null, email = null, retencionId = null) {
   const db = await getDb();
   return await db.execute(
-    "INSERT INTO agentes (nombre, telefono, email, activo) VALUES ($1, $2, $3, 1);",
-    [nombre, telefono, email]
+    "INSERT INTO agentes (nombre, telefono, email, retencion_id, activo) VALUES ($1, $2, $3, $4, 1);",
+    [nombre, telefono, email, retencionId]
   );
 }
 
 /**
  * Actualiza la información de un agente existente.
  */
-export async function updateAgente(id, nombre, telefono = null, email = null) {
+export async function updateAgente(id, nombre, telefono = null, email = null, retencionId = null) {
   const db = await getDb();
   return await db.execute(
-    "UPDATE agentes SET nombre = $1, telefono = $2, email = $3 WHERE id = $4;",
-    [nombre, telefono, email, id]
+    "UPDATE agentes SET nombre = $1, telefono = $2, email = $3, retencion_id = $4 WHERE id = $5;",
+    [nombre, telefono, email, retencionId, id]
   );
+}
+
+// --- Tipos de retención ---
+export async function getRetenciones() {
+  const db = await getDb();
+  return await db.select(`SELECT r.*, (SELECT COUNT(*) FROM agentes a WHERE a.retencion_id = r.id) AS num_agentes FROM retenciones r ORDER BY r.porcentaje_centesimas ASC;`);
+}
+
+async function writeRetencion(query, params) {
+  const db = await getDb();
+  try { return await db.execute(query, params); }
+  catch (error) {
+    if (/UNIQUE.*retenciones\.porcentaje_centesimas/i.test(String(error?.message || error))) throw new Error('Ya existe una retención con ese porcentaje.');
+    throw error;
+  }
+}
+
+export async function addRetencion(porcentaje) {
+  return await writeRetencion('INSERT INTO retenciones (porcentaje_centesimas) VALUES ($1);', [parseRetentionPercent(porcentaje)]);
+}
+
+export async function updateRetencion(id, porcentaje) {
+  const result = await writeRetencion('UPDATE retenciones SET porcentaje_centesimas = $1 WHERE id = $2;', [parseRetentionPercent(porcentaje), id]);
+  if (result.rowsAffected === 0) throw new Error('La retención ya no existe. Actualiza el listado.');
+  return result;
+}
+
+export async function deleteRetencion(id) {
+  const db = await getDb();
+  const result = await db.execute('DELETE FROM retenciones WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM agentes WHERE retencion_id = $1);', [id]);
+  if (result.rowsAffected === 0) throw new Error('La retención sigue asignada a comerciales o ya no existe. Cambia primero su asignación.');
+  return result;
 }
 
 /**

@@ -16,11 +16,15 @@ function setup(t, logo = logoA) {
     CREATE TABLE ajustes (clave TEXT PRIMARY KEY, valor TEXT, actualizado_en TEXT);
     CREATE TABLE comparativas (id INTEGER PRIMARY KEY, cliente_nombre TEXT, cliente_cups TEXT,
       tipo_energia TEXT, datos_cliente_json TEXT, tarifa_luz_propuesta_id INTEGER, ahorro_luz_anual REAL,
-      tarifa_gas_propuesta_id INTEGER, ahorro_gas_anual REAL, comision_total REAL, fecha TEXT DEFAULT CURRENT_TIMESTAMP);
+      tarifa_gas_propuesta_id INTEGER, ahorro_gas_anual REAL, comision_total REAL, reparto_comision_json TEXT, fecha TEXT DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE tarifas_luz (id INTEGER, nombre TEXT, comercializadora_id INTEGER);
     CREATE TABLE tarifas_gas (id INTEGER, nombre TEXT, comercializadora_id INTEGER);
     CREATE TABLE comercializadoras (id INTEGER, nombre TEXT);
-    CREATE TABLE clientes (nombre_empresa TEXT, email TEXT);
+    CREATE TABLE retenciones (id INTEGER, porcentaje_centesimas INTEGER);
+    CREATE TABLE agentes (id INTEGER, nombre TEXT, retencion_id INTEGER);
+    CREATE TABLE clientes (id INTEGER, nombre_empresa TEXT, email TEXT, estado TEXT, agente_id INTEGER);
+    INSERT INTO agentes VALUES (1, 'Comercial de prueba', NULL);
+    INSERT INTO clientes VALUES (1, 'Cliente de prueba', NULL, 'activo', 1);
   `);
   const local = new Map();
   let failPreserving = false;
@@ -36,8 +40,10 @@ function setup(t, logo = logoA) {
     assert.ok(['db_select', 'db_execute'].includes(command), `unexpected command: ${command}`);
     if (failPreserving && /UPDATE comparativas/.test(query)) throw new Error('No se puede conservar el historial');
     const statement = sql.prepare(query);
-    const bindings = Object.fromEntries(params.map((value, index) => [`$${index + 1}`, value]));
-    return command === 'db_select' ? statement.all(bindings) : statement.run(bindings);
+    const bindings = Object.fromEntries(params.map((value, index) => [`$${index + 1}`, Number.isSafeInteger(value) ? BigInt(value) : value]));
+    if (command === 'db_select') return statement.all(bindings);
+    const result = statement.run(bindings);
+    return { rowsAffected: result.changes, lastInsertId: result.lastInsertRowid };
   } } } };
   t.after(() => {
     sql.close();
@@ -50,7 +56,7 @@ function setup(t, logo = logoA) {
     sql.prepare('INSERT INTO comparativas (id, cliente_nombre, tipo_energia, datos_cliente_json) VALUES (?, ?, ?, ?)')
       .run(id, 'Cliente de prueba', 'GAS', JSON.stringify(input));
   };
-  const add = (input = {}) => addComparativa('Cliente de prueba', 'ES0031000000000001AB', 'GAS', input, null, 0, 10, 100, 20);
+  const add = (input = {}) => addComparativa('Cliente de prueba', 'ES0031000000000001AB', 'GAS', input, null, 0, 10, 100, 20, 1);
   return { sql, data, legacy, add, failPreserving: () => { failPreserving = true; } };
 }
 

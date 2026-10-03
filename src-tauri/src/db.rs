@@ -617,15 +617,79 @@ impl DbState {
         conn.execute("PRAGMA foreign_keys = ON;", []).map_err(|e| e.to_string())?;
 
         conn.execute("
+            CREATE TABLE IF NOT EXISTS retenciones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                porcentaje_centesimas INTEGER NOT NULL UNIQUE CHECK (typeof(porcentaje_centesimas) = 'integer' AND porcentaje_centesimas BETWEEN 0 AND 10000)
+            );
+        ", []).map_err(|e| e.to_string())?;
+
+        conn.execute("
             CREATE TABLE IF NOT EXISTS agentes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nombre TEXT NOT NULL,
                 telefono TEXT,
                 email TEXT,
                 activo INTEGER DEFAULT 1,
+                retencion_id INTEGER REFERENCES retenciones(id) ON DELETE RESTRICT,
                 creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         ", []).map_err(|e| e.to_string())?;
+
+        let agent_cols: Vec<String> = {
+            let mut stmt = conn.prepare("PRAGMA table_info(agentes);").map_err(|e| e.to_string())?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1)).map_err(|e| e.to_string())?;
+            rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+        };
+        if !agent_cols.contains(&"retencion_id".to_string()) {
+            conn.execute("ALTER TABLE agentes ADD COLUMN retencion_id INTEGER REFERENCES retenciones(id) ON DELETE RESTRICT;", []).map_err(|e| e.to_string())?;
+        }
+
+        let retention_cols: Vec<String> = {
+            let mut stmt = conn.prepare("PRAGMA table_info(retenciones);").map_err(|e| e.to_string())?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(1)).map_err(|e| e.to_string())?;
+            rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+        };
+        if retention_cols.iter().any(|col| col == "nombre" || col == "nombre_normalizado") {
+            // Rebuild atomically; snapshots keep the original IDs and historical data.
+            conn.execute("PRAGMA foreign_keys = OFF;", []).map_err(|e| e.to_string())?;
+            let migration = (|| -> Result<(), String> {
+                let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+                tx.execute_batch("
+                    CREATE TABLE retenciones_sin_nombre (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        porcentaje_centesimas INTEGER NOT NULL UNIQUE CHECK (typeof(porcentaje_centesimas) = 'integer' AND porcentaje_centesimas BETWEEN 0 AND 10000)
+                    );
+                    INSERT INTO retenciones_sin_nombre(id, porcentaje_centesimas)
+                        SELECT MIN(id), porcentaje_centesimas FROM retenciones GROUP BY porcentaje_centesimas;
+                    UPDATE agentes SET retencion_id = (
+                        SELECT MIN(r.id) FROM retenciones r
+                        WHERE r.porcentaje_centesimas = (
+                            SELECT original.porcentaje_centesimas FROM retenciones original WHERE original.id = agentes.retencion_id
+                        )
+                    ) WHERE retencion_id IN (SELECT id FROM retenciones);
+                    UPDATE sqlite_sequence SET seq = MAX(seq, COALESCE(
+                        (SELECT seq FROM sqlite_sequence WHERE name = 'retenciones'), seq
+                    )) WHERE name = 'retenciones_sin_nombre';
+                    INSERT INTO sqlite_sequence(name, seq)
+                        SELECT 'retenciones_sin_nombre', seq FROM sqlite_sequence
+                        WHERE name = 'retenciones' AND NOT EXISTS (
+                            SELECT 1 FROM sqlite_sequence WHERE name = 'retenciones_sin_nombre'
+                        );
+                    DROP TABLE retenciones;
+                    ALTER TABLE retenciones_sin_nombre RENAME TO retenciones;
+                ").map_err(|e| e.to_string())?;
+                let invalid_refs: i64 = tx.query_row(
+                    "SELECT COUNT(*) FROM pragma_foreign_key_check('agentes')", [], |row| row.get(0)
+                ).map_err(|e| e.to_string())?;
+                if invalid_refs != 0 {
+                    return Err("No se pudieron conservar las retenciones asignadas a los comerciales".to_string());
+                }
+                tx.commit().map_err(|e| e.to_string())
+            })();
+            let enable_foreign_keys = conn.execute("PRAGMA foreign_keys = ON;", []).map_err(|e| e.to_string());
+            migration?;
+            enable_foreign_keys?;
+        }
 
         conn.execute("
             CREATE TABLE IF NOT EXISTS clientes (
@@ -731,6 +795,7 @@ impl DbState {
                 tarifa_gas_propuesta_id INTEGER,
                 ahorro_gas_anual REAL DEFAULT 0.0,
                 comision_total REAL DEFAULT 0.0,
+                reparto_comision_json TEXT,
                 estado TEXT NOT NULL DEFAULT 'Pendiente de aceptación',
                 estado_cambiado_en TEXT,
                 estado_cobro TEXT NOT NULL DEFAULT 'Pendiente',
@@ -753,6 +818,9 @@ impl DbState {
         }
         if !comp_cols.contains(&"comision_total".to_string()) {
             conn.execute("ALTER TABLE comparativas ADD COLUMN comision_total REAL DEFAULT 0.0;", []).map_err(|e| e.to_string())?;
+        }
+        if !comp_cols.contains(&"reparto_comision_json".to_string()) {
+            conn.execute("ALTER TABLE comparativas ADD COLUMN reparto_comision_json TEXT;", []).map_err(|e| e.to_string())?;
         }
         if !comp_cols.contains(&"estado".to_string()) {
             conn.execute("ALTER TABLE comparativas ADD COLUMN estado TEXT NOT NULL DEFAULT 'Pendiente de aceptación';", []).map_err(|e| e.to_string())?;
@@ -1053,6 +1121,104 @@ mod tests {
     const SQLITE_032_VAULT: &[u8] = include_bytes!("../tests/fixtures/rusqlite-0.32.1/vault.json");
 
     #[test]
+    fn test_retenciones_migration_preserves_legacy_and_is_idempotent() {
+        let mut state = DbState::new(std::env::temp_dir());
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE agentes (id INTEGER PRIMARY KEY, nombre TEXT, telefono TEXT, email TEXT, activo INTEGER, creado_en TEXT);
+            INSERT INTO agentes VALUES (1,'Comercial',NULL,NULL,1,NULL);
+            CREATE TABLE comparativas (id INTEGER PRIMARY KEY, cliente_nombre TEXT, cliente_cups TEXT, tipo_energia TEXT, fecha TEXT, datos_cliente_json TEXT, tarifa_luz_propuesta_id INTEGER, ahorro_luz_anual REAL, tarifa_gas_propuesta_id INTEGER, comision_total REAL);
+            INSERT INTO comparativas VALUES (1,'Cliente','ES123','LUZ',NULL,'{}',NULL,0,NULL,100);").unwrap();
+        state.conn = Some(conn);
+        state.init_schema().unwrap();
+        state.init_schema().unwrap();
+        let conn = state.conn.as_ref().unwrap();
+        let legacy: (f64, Option<String>) = conn.query_row("SELECT comision_total, reparto_comision_json FROM comparativas WHERE id=1", [], |row| Ok((row.get(0)?,row.get(1)?))).unwrap();
+        assert_eq!(legacy, (100.0, None));
+        let retention: Option<i64> = conn.query_row("SELECT retencion_id FROM agentes WHERE id=1", [], |row| row.get(0)).unwrap();
+        assert_eq!(retention, None);
+        conn.execute("INSERT INTO retenciones(porcentaje_centesimas) VALUES (2025)", []).unwrap();
+        conn.execute("UPDATE agentes SET retencion_id=1 WHERE id=1", []).unwrap();
+        assert!(conn.execute("DELETE FROM retenciones WHERE id=1", []).is_err());
+        assert!(conn.execute("INSERT INTO retenciones(porcentaje_centesimas) VALUES (10001)", []).is_err());
+    }
+
+    #[test]
+    fn test_retenciones_without_names_migrates_assignments_and_keeps_snapshots() {
+        let mut state = DbState::new(std::env::temp_dir());
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE retenciones (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL, nombre_normalizado TEXT NOT NULL UNIQUE, porcentaje_centesimas INTEGER NOT NULL);
+            INSERT INTO retenciones VALUES (2,'General','general',2000),(5,'Otra','otra',2000),(8,'Especial','especial',3025),(11,'Duplicada','duplicada',2000);
+            CREATE TABLE agentes (id INTEGER PRIMARY KEY, nombre TEXT, telefono TEXT, email TEXT, activo INTEGER, creado_en TEXT, retencion_id INTEGER REFERENCES retenciones(id));
+            INSERT INTO agentes VALUES (1,'Ana',NULL,NULL,1,NULL,5),(2,'Bea',NULL,NULL,1,NULL,8),(3,'Sin retención',NULL,NULL,1,NULL,NULL);
+            CREATE TABLE comparativas (id INTEGER PRIMARY KEY, cliente_nombre TEXT, cliente_cups TEXT, tipo_energia TEXT, fecha TEXT, datos_cliente_json TEXT, tarifa_luz_propuesta_id INTEGER, ahorro_luz_anual REAL, tarifa_gas_propuesta_id INTEGER, comision_total REAL, reparto_comision_json TEXT);
+            INSERT INTO comparativas VALUES (1,'Cliente','ES123','LUZ',NULL,'{}',NULL,0,NULL,100,'{\"version\":1,\"retencion_id\":5,\"retencion_nombre\":\"Otra\"}');").unwrap();
+        state.conn = Some(conn);
+        state.init_schema().unwrap();
+        state.init_schema().unwrap();
+        let conn = state.conn.as_ref().unwrap();
+        let cols: Vec<String> = conn.prepare("PRAGMA table_info(retenciones)").unwrap().query_map([], |row| row.get(1)).unwrap().collect::<Result<_,_>>().unwrap();
+        assert_eq!(cols, vec!["id", "porcentaje_centesimas"]);
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM retenciones", [], |row| row.get::<_,i64>(0)).unwrap(), 2);
+        assert_eq!(conn.query_row("SELECT retencion_id FROM agentes WHERE id=1", [], |row| row.get::<_,i64>(0)).unwrap(), 2);
+        assert_eq!(conn.query_row("SELECT retencion_id FROM agentes WHERE id=2", [], |row| row.get::<_,i64>(0)).unwrap(), 8);
+        assert_eq!(conn.query_row("SELECT retencion_id FROM agentes WHERE id=3", [], |row| row.get::<_,Option<i64>>(0)).unwrap(), None);
+        assert_eq!(conn.query_row("SELECT reparto_comision_json FROM comparativas", [], |row| row.get::<_,String>(0)).unwrap(), "{\"version\":1,\"retencion_id\":5,\"retencion_nombre\":\"Otra\"}");
+        assert!(conn.execute("INSERT INTO retenciones(porcentaje_centesimas) VALUES (2000)", []).is_err());
+        assert!(conn.execute("DELETE FROM retenciones WHERE id=2", []).is_err());
+        conn.execute("INSERT INTO retenciones(porcentaje_centesimas) VALUES (4000)", []).unwrap();
+        assert!(conn.last_insert_rowid() > 11, "no reutilizar IDs eliminados durante la migración");
+        assert_eq!(conn.query_row("PRAGMA foreign_keys", [], |row| row.get::<_,i64>(0)).unwrap(), 1);
+    }
+
+    #[test]
+    fn test_retenciones_failed_migration_rolls_back_and_restores_foreign_keys() {
+        let mut state = DbState::new(std::env::temp_dir());
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE retenciones (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL, nombre_normalizado TEXT NOT NULL UNIQUE, porcentaje_centesimas INTEGER NOT NULL);
+            INSERT INTO retenciones VALUES (1,'General','general',2000),(2,'Otra','otra',2000);
+            CREATE TABLE agentes (id INTEGER PRIMARY KEY, nombre TEXT, retencion_id INTEGER REFERENCES retenciones(id));
+            INSERT INTO agentes VALUES (1,'Ana',2);
+            CREATE TRIGGER reject_retention_change BEFORE UPDATE OF retencion_id ON agentes BEGIN SELECT RAISE(ABORT, 'migration failure'); END;").unwrap();
+        state.conn = Some(conn);
+        assert!(state.init_schema().unwrap_err().contains("migration failure"));
+        let conn = state.conn.as_ref().unwrap();
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM retenciones", [], |row| row.get::<_,i64>(0)).unwrap(), 2);
+        assert_eq!(conn.query_row("SELECT nombre FROM retenciones WHERE id=2", [], |row| row.get::<_,String>(0)).unwrap(), "Otra");
+        assert_eq!(conn.query_row("SELECT retencion_id FROM agentes", [], |row| row.get::<_,i64>(0)).unwrap(), 2);
+        assert_eq!(conn.query_row("PRAGMA foreign_keys", [], |row| row.get::<_,i64>(0)).unwrap(), 1);
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE name='retenciones_sin_nombre'", [], |row| row.get::<_,i64>(0)).unwrap(), 0);
+    }
+
+    #[test]
+    fn test_retenciones_encrypted_reopen_keeps_assignments_and_snapshot() {
+        let dir = setup_test_dir("retenciones_reopen");
+        let mut state = DbState::new(dir.clone());
+        state.setup_master_password("RetentionPassword2026!").unwrap();
+        state.execute("INSERT INTO retenciones(porcentaje_centesimas) VALUES (2000)".into(), vec![]).unwrap();
+        state.execute("INSERT INTO agentes(nombre,retencion_id) VALUES ('Ana',1)".into(), vec![]).unwrap();
+        let snapshot = serde_json::json!({"version":2,"cliente_id":1,"cliente_nombre":"Cliente","agente_id":1,"agente_nombre":"Ana","retencion_id":1,"porcentaje_centesimas":2000,"total_centimos":10000,"consultoria_centimos":2000,"comercial_centimos":8000}).to_string();
+        state.execute("INSERT INTO comparativas(cliente_nombre,tipo_energia,datos_cliente_json,comision_total,reparto_comision_json) VALUES ('Cliente','LUZ','{}',100,$1)".into(), vec![Value::String(snapshot.clone())]).unwrap();
+        state.logout().unwrap();
+        state.login("RetentionPassword2026!").unwrap();
+        assert_eq!(state.select("SELECT porcentaje_centesimas FROM retenciones".into(), vec![]).unwrap()[0]["porcentaje_centesimas"], 2000);
+        assert_eq!(state.select("SELECT retencion_id FROM agentes".into(), vec![]).unwrap()[0]["retencion_id"], 1);
+        assert_eq!(state.select("SELECT reparto_comision_json FROM comparativas".into(), vec![]).unwrap()[0]["reparto_comision_json"], snapshot);
+        let backup_db = fs::read(state.enc_db_path()).unwrap();
+        let backup_vault = fs::read(state.vault_path()).unwrap();
+        let restored_dir = setup_test_dir("retenciones_restore");
+        let mut restored = DbState::new(restored_dir.clone());
+        restored.restore_encrypted_backup(&backup_db, &backup_vault, "RetentionPassword2026!").unwrap();
+        restored.login("RetentionPassword2026!").unwrap();
+        assert_eq!(restored.select("SELECT reparto_comision_json FROM comparativas".into(), vec![]).unwrap()[0]["reparto_comision_json"], snapshot);
+        assert_eq!(restored.select("SELECT retencion_id FROM agentes".into(), vec![]).unwrap()[0]["retencion_id"], 1);
+        assert_eq!(restored.select("SELECT porcentaje_centesimas FROM retenciones".into(), vec![]).unwrap()[0]["porcentaje_centesimas"], 2000);
+        restored.logout().unwrap();
+        state.logout().unwrap();
+        fs::remove_dir_all(restored_dir).unwrap();
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn test_logout_blocks_access_and_preserves_data_for_next_login() {
         let dir = setup_test_dir("logout_relogin");
         let mut state = DbState::new(dir.clone());
@@ -1242,6 +1408,8 @@ mod tests {
 
         let mut reopened = DbState::new(dir.clone());
         reopened.login(SQLITE_032_PASSWORD).unwrap();
+        assert_eq!(reopened.select("SELECT COUNT(*) AS total FROM retenciones;", vec![]).unwrap()[0]["total"], 0);
+        assert!(reopened.select("PRAGMA table_info(comparativas);", vec![]).unwrap().iter().any(|column| column["name"] == "reparto_comision_json"));
         assert_eq!(reopened.select("SELECT email FROM clientes;", vec![]).unwrap(),
             vec![serde_json::json!({"email": "updated@example.invalid"})]);
         assert_eq!(reopened.select("SELECT termino_variable FROM tarifas_gas;", vec![]).unwrap(),

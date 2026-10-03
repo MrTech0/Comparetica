@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { getComparisonStatusLock, canManageCommissionCollection } from '../src/js/comparison_status.js';
+import { getCommissionSplit, formatRetentionPercent, moneyToCents, splitCommission } from '../src/js/commission_split.js';
 
 const start = Date.parse('2026-10-03T12:00:00.000Z');
 const source = fs.readFileSync(new URL('../src/js/views/history.js', import.meta.url), 'utf8')
@@ -53,7 +54,8 @@ async function mount(t, overrides = {}, updateContract) {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: start });
   const record = { id: 1, cliente_nombre: 'Cliente de prueba', cliente_cups: 'ES0031000000000001AB',
     tipo_energia: 'GAS', fecha: '2026-10-03', estado: 'Pendiente de aceptación', estado_contrato: 'Pendiente',
-    estado_cambiado_en: null, ahorro_luz_anual: 0, ahorro_gas_anual: 100, comision_total: 10, ...overrides };
+    estado_cambiado_en: null, ahorro_luz_anual: 0, ahorro_gas_anual: 100, comision_total: 10,
+    reparto_comision_json: JSON.stringify({ version: 1, cliente_id: 1, cliente_nombre: 'Cliente de prueba', agente_id: 1, agente_nombre: 'Ana', retencion_id: 1, retencion_nombre: 'General', porcentaje_centesimas: 10000, ...splitCommission(10, 10000) }), ...overrides };
   const tbody = element(), nodes = new Map(), changes = [], collectionChanges = [], toasts = [], renewals = [], recomparisons = [];
   const dialogIds = ['dialog-scoring-rejection', 'dialog-scoring-client', 'dialog-scoring-id', 'dialog-scoring-reason',
     'btn-close-scoring-dialog-x', 'btn-scoring-save-only', 'btn-scoring-recompare', 'history-kpi-pendientes',
@@ -66,6 +68,7 @@ async function mount(t, overrides = {}, updateContract) {
       querySelectorAll: () => tbody.children.flatMap(row => ['status', 'contract'].map(kind => row.querySelector(`.m3-custom-${kind}-select`)).filter(Boolean)) },
     window: { _historyScrollListenerAdded: true }, Date, setTimeout, clearTimeout, console: { error() {} },
     getComparisonStatusLock, canManageCommissionCollection,
+    getCommissionSplit, formatRetentionPercent, moneyToCents,
     APP_EVENTS: { COMPARISON_SAVED: 'saved' }, onAppEvent: () => () => {},
     getComparativas: async () => [structuredClone(record)],
     updateComparativaEstado: async (id, value) => {

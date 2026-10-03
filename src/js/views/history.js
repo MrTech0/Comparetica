@@ -6,6 +6,22 @@ import { invoke } from '../ipc.js';
 import { showToast, showConfirm } from '../ui.js';
 import { onAppEvent, APP_EVENTS } from '../events.js';
 import { getComparisonStatusLock, canManageCommissionCollection } from '../comparison_status.js';
+import { getCommissionSplit, formatRetentionPercent, moneyToCents } from '../commission_split.js';
+
+const commissionMoney = cents => `${(cents / 100).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const commissionEscape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
+function grossCommissionCents(record) {
+  try { return moneyToCents(record.comision_total ?? 0); } catch { return 0; }
+}
+function commissionDetailHtml(split) {
+  return `<div class="commission-split-detail">
+    <span>Total del contrato: <strong>${commissionMoney(split.total_centimos)}</strong></span>
+    <span>Comercial: <strong>${commissionEscape(split.agente_nombre)}</strong></span>
+    <span>Retención: ${formatRetentionPercent(split.porcentaje_centesimas)} %</span>
+    <span>Consultoría: <strong>${commissionMoney(split.consultoria_centimos)}</strong></span>
+    <span>Comercial: <strong>${commissionMoney(split.comercial_centimos)}</strong></span>
+  </div>`;
+}
 
 let activeLockTimers = [];
 let isCobroDialogInitialized = false;
@@ -432,7 +448,7 @@ async function loadHistoryTable() {
   const tbody = document.querySelector('#table-history tbody');
   if (!tbody) return;
 
-  tbody.innerHTML = '<tr><td colspan="10" class="text-muted">Cargando historial...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="11" class="text-muted">Cargando historial...</td></tr>';
 
   try {
     cachedHistory = await getComparativas();
@@ -470,7 +486,7 @@ async function loadHistoryTable() {
 
     applyHistoryFilter();
   } catch (error) {
-    tbody.innerHTML = '<tr><td colspan="10" class="text-error">Error al cargar el historial.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="text-error">Error al cargar el historial.</td></tr>';
     console.error(error);
   }
 }
@@ -480,19 +496,26 @@ function updateHistoryKpis(list) {
   let totalAceptadas = 0;
   let totalComisionesCobradas = 0;
   let totalComisionesPendientes = 0;
+  let legacyPendientes = 0;
+  let legacyCobradas = 0;
+  let legacyCount = 0;
 
   list.forEach(c => {
     const isAceptada = c.estado === 'Aceptada';
     if (isAceptada) totalAceptadas++;
 
-    const comision = c.comision_total || 0;
+    const split = getCommissionSplit(c);
+    const comision = split?.consultoria_centimos ?? 0;
+    if (!split) legacyCount++;
     const isCobrado = c.estado_cobro === 'Cobrado';
     const isScoringRejected = c.estado_contrato === 'Rechazado por Scoring';
 
     if (isCobrado) {
-      totalComisionesCobradas += comision;
+      if (split) totalComisionesCobradas += comision;
+      else legacyCobradas += grossCommissionCents(c);
     } else if (isAceptada && !isScoringRejected) {
-      totalComisionesPendientes += comision;
+      if (split) totalComisionesPendientes += comision;
+      else legacyPendientes += grossCommissionCents(c);
     }
   });
 
@@ -503,8 +526,14 @@ function updateHistoryKpis(list) {
 
   if (elTotal) elTotal.textContent = totalEstudios.toString();
   if (elAceptadas) elAceptadas.textContent = totalAceptadas.toString();
-  if (elPendientes) elPendientes.textContent = `${totalComisionesPendientes.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
-  if (elCobradas) elCobradas.textContent = `${totalComisionesCobradas.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  if (elPendientes) elPendientes.textContent = commissionMoney(totalComisionesPendientes);
+  if (elCobradas) elCobradas.textContent = commissionMoney(totalComisionesCobradas);
+  const legacy = document.getElementById('history-legacy-commissions');
+  if (legacy) legacy.hidden = legacyCount === 0;
+  const legacyPending = document.getElementById('history-legacy-pendientes');
+  const legacyPaid = document.getElementById('history-legacy-cobradas');
+  if (legacyPending) legacyPending.textContent = commissionMoney(legacyPendientes);
+  if (legacyPaid) legacyPaid.textContent = commissionMoney(legacyCobradas);
 }
 
 function applyHistoryFilter() {
@@ -559,7 +588,13 @@ function applyHistoryFilter() {
   // Aplicar ordenación activa
   if (currentHistoryCommissionSort !== null) {
     const direction = currentHistoryCommissionSort === 'desc' ? -1 : 1;
-    filtered.sort((a, b) => direction * ((a.comision_total || 0) - (b.comision_total || 0)));
+    filtered.sort((a, b) => {
+      const splitA = getCommissionSplit(a), splitB = getCommissionSplit(b);
+      if (splitA && splitB) return direction * (splitA.consultoria_centimos - splitB.consultoria_centimos);
+      if (splitA) return -1;
+      if (splitB) return 1;
+      return new Date(b.fecha).getTime() - new Date(a.fecha).getTime();
+    });
   } else if (currentHistorySavingsSort === 'desc') {
     filtered.sort((a, b) => ((b.ahorro_luz_anual || 0) + (b.ahorro_gas_anual || 0)) - ((a.ahorro_luz_anual || 0) + (a.ahorro_gas_anual || 0)));
   } else if (currentHistorySavingsSort === 'asc') {
@@ -578,7 +613,7 @@ function applyHistoryFilter() {
     const hasActiveFilters = clientQuery || cupsQuery || currentHistoryTypeFilter !== 'ALL' || currentHistoryEstadoFilter !== 'ALL' || currentHistoryContractFilter !== 'ALL' || currentHistoryCobroFilter !== 'ALL';
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" class="text-muted" style="text-align: center; padding: 32px 16px;">
+        <td colspan="11" class="text-muted" style="text-align: center; padding: 32px 16px;">
           ${hasActiveFilters ? 'No se encontraron comparativas con los filtros aplicados.' : 'No se han registrado comparativas aún.'}
         </td>
       </tr>
@@ -587,6 +622,10 @@ function applyHistoryFilter() {
   }
 
   filtered.forEach(c => {
+    const split = getCommissionSplit(c);
+    const commissionCell = split
+      ? `<details class="commission-split"><summary aria-label="Comisión de consultoría: ${commissionMoney(split.consultoria_centimos)}. Ver reparto de ${commissionEscape(c.cliente_nombre)}">${commissionMoney(split.consultoria_centimos)}</summary>${commissionDetailHtml(split)}</details>`
+      : `${commissionMoney(grossCommissionCents(c))}<small class="commission-legacy-label">${c.reparto_comision_json ? 'Reparto no válido' : 'Sin reparto registrado'}</small>`;
     const dateStr = new Date(c.fecha).toLocaleString('es-ES', {
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit'
@@ -694,7 +733,8 @@ function applyHistoryFilter() {
         </div>
       </td>
       ${contractCellHtml}
-      <td class="private-value" style="font-weight: 600;">${c.comision_total.toFixed(2)} €</td>
+      <td class="private-value" style="font-weight: 600;">${commissionCell}</td>
+      <td class="private-value" style="font-weight: 600;">${split ? commissionMoney(split.comercial_centimos) : '—'}</td>
       ${cobroCellHtml}
       <td style="text-align: right; white-space: nowrap;">
         <button class="m3-btn-icon btn-preview-history" data-id="${c.id}" title="Previsualizar Reporte PDF">
@@ -1308,6 +1348,9 @@ function openCobroDialog(c) {
   if (inputId) inputId.value = c.id;
   if (clientEl) clientEl.textContent = c.cliente_nombre || 'Cliente';
   if (amountEl) amountEl.textContent = `${(c.comision_total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  const breakdown = document.getElementById('dialog-cobro-split');
+  const split = getCommissionSplit(c);
+  if (breakdown) breakdown.innerHTML = split ? commissionDetailHtml(split) : '<p class="text-muted">Sin reparto registrado. Este importe total se contabiliza aparte de las comisiones de la consultoría.</p>';
 
   const isCobrado = c.estado_cobro === 'Cobrado';
   if (badgeEl) {
