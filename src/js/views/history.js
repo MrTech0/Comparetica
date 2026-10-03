@@ -12,6 +12,7 @@ let isCobroDialogInitialized = false;
 let unsubComparisonSaved = null;
 const HISTORY_SEARCH_COLUMNS = ['client', 'cups'];
 const pendingHistoryChanges = new Set();
+const historyContractControls = new Map();
 
 function getStatusLockTitle(reason) {
   if (reason === 'contract') return 'El estado está bloqueado por el estado del contrato.';
@@ -19,8 +20,15 @@ function getStatusLockTitle(reason) {
   return 'El estado ya no se puede modificar al haber transcurrido los 5 segundos de margen.';
 }
 
-function refreshHistoryContract() {
-  applyHistoryFilter();
+function refreshHistoryContract(c) {
+  updateHistoryKpis(cachedHistory);
+  // Un filtro de contrato puede hacer que la fila deje de pertenecer a la vista.
+  if (currentHistoryContractFilter !== 'ALL') {
+    applyHistoryFilter();
+    return;
+  }
+  const refreshControls = historyContractControls.get(c.id);
+  if (refreshControls && !refreshControls()) applyHistoryFilter();
 }
 
 function clearActiveLockTimers() {
@@ -389,6 +397,7 @@ function updateHistorySortIndicators() {
 
 async function loadHistoryTable() {
   clearActiveLockTimers();
+  historyContractControls.clear();
   const tbody = document.querySelector('#table-history tbody');
   if (!tbody) return;
 
@@ -466,6 +475,7 @@ function updateHistoryKpis(list) {
 
 function applyHistoryFilter() {
   clearActiveLockTimers();
+  historyContractControls.clear();
   const tbody = document.querySelector('#table-history tbody');
   if (!tbody) return;
 
@@ -921,6 +931,30 @@ function applyHistoryFilter() {
         });
       });
     }
+
+    historyContractControls.set(c.id, () => {
+      syncStatusLock();
+      // Si la vista se ha reconstruido durante el diálogo, restaurar el selector al cancelar.
+      if (!contractSelect) return false;
+      const value = c.estado_contrato || 'Pendiente';
+      const signed = value === 'Firmado y Activado';
+      const pending = pendingHistoryChanges.has(c.id);
+      const contractTrigger = contractSelect.querySelector('.status-select-trigger');
+      contractTrigger.classList.remove('contrato-pendiente', 'contrato-tramite', 'contrato-firmado', 'contrato-scoring');
+      let className = 'contrato-pendiente';
+      if (value === 'En trámite') className = 'contrato-tramite';
+      else if (signed) className = 'contrato-firmado';
+      else if (value === 'Rechazado por Scoring') className = 'contrato-scoring';
+      contractTrigger.classList.add(className);
+      contractTrigger.querySelector('span').textContent = signed ? '✅ Firmado y Activado' : value;
+      contractTrigger.style.cursor = signed ? 'default' : pending ? 'wait' : 'pointer';
+      contractSelect.classList.remove('open');
+      contractSelect.setAttribute('aria-disabled', String(signed || pending));
+      contractSelect.setAttribute('title', signed ? 'Contrato firmado y activado (bloqueado)' : pending ? getStatusLockTitle('pending') : '');
+      const arrow = contractTrigger.querySelector('.status-select-arrow');
+      if (arrow) arrow.style.display = signed ? 'none' : '';
+      return true;
+    });
 
     tbody.appendChild(tr);
   });

@@ -94,6 +94,34 @@ async function mount(t, overrides = {}, updateContract) {
     locked: () => select('status').classList.contains('disabled'), reload: () => browser.initHistoryView() };
 }
 
+test('changing an accepted contract to En trámite keeps the row in place without showing a loading placeholder', async t => {
+  const f = await mount(t);
+  await f.choose('status', 'Aceptada');
+  const row = f.row(), status = f.select('status'), contract = f.select('contract');
+  const writesBefore = f.tbody.htmlWrites.length;
+  await f.choose('contract', 'En trámite');
+  assert.equal(f.tbody.htmlWrites.length, writesBefore, 'the visible table must not be emptied during a contract change');
+  assert.equal(f.row(), row, 'the original row must remain mounted');
+  assert.equal(f.select('status'), status);
+  assert.equal(f.select('contract'), contract);
+  assert.equal(contract.querySelector('.status-select-trigger').querySelector('span').textContent, 'En trámite');
+  assert.equal(contract.querySelector('.status-select-trigger').classList.contains('contrato-tramite'), true);
+  assert.equal(f.locked(), true);
+  assert.match(status.getAttribute('title'), /contrato/);
+});
+
+test('a failed contract save restores its status control in place without restarting the five second deadline', async t => {
+  const f = await mount(t, { estado: 'Aceptada', estado_cambiado_en: new Date(start).toISOString() },
+    async () => { throw new Error('No se pudo guardar'); });
+  const row = f.row();
+  t.mock.timers.tick(3000);
+  await f.choose('contract', 'En trámite');
+  assert.equal(f.row(), row);
+  assert.equal(f.locked(), false);
+  t.mock.timers.tick(1999); assert.equal(f.locked(), false);
+  t.mock.timers.tick(1); assert.equal(f.locked(), true);
+});
+
 for (const state of ['Aceptada', 'Rechazada']) {
   test(`${state} remains editable for 4999 ms and locks at 5000 ms, closing its dropdown`, async t => {
     const f = await mount(t); await f.choose('status', state);
@@ -154,11 +182,21 @@ test('choosing En trámite blocks acceptance immediately while the contract writ
 
 test('cancelling the renewal after signing keeps acceptance locked when the contract returns to En trámite', async t => {
   const f = await mount(t, { estado: 'Aceptada', estado_cambiado_en: new Date(start).toISOString() });
+  const row = f.row(), contract = f.select('contract');
   await f.choose('contract', 'Firmado y Activado');
   assert.equal(f.locked(), true);
+  assert.equal(f.row(), row);
+  assert.equal(contract.querySelector('.status-select-trigger').querySelector('.status-select-arrow').style.display, 'none');
+  contract.querySelector('.status-select-trigger').onclick(f.event);
+  assert.equal(contract.classList.contains('open'), false);
+  await f.choose('contract', 'Pendiente');
+  assert.equal(f.record.estado_contrato, 'Firmado y Activado', 'the retained control cannot edit a signed contract');
   await f.renewals[0].onCancelled();
   assert.equal(f.record.estado_contrato, 'En trámite');
   assert.equal(f.locked(), true);
+  assert.equal(f.row(), row);
+  assert.equal(contract.querySelector('.status-select-trigger').querySelector('span').textContent, 'En trámite');
+  assert.equal(contract.querySelector('.status-select-trigger').querySelector('.status-select-arrow').style.display, '');
 });
 
 for (const action of ['btn-scoring-save-only', 'btn-scoring-recompare']) {
@@ -197,9 +235,38 @@ test('filtering during a pending contract write cannot unlock acceptance', async
   resolve(); await changing;
   assert.equal(f.record.estado, 'Aceptada');
   assert.equal(f.changes.length, 0);
+  assert.equal(f.row(), row);
+  assert.equal(f.select('contract').querySelector('.status-select-trigger').querySelector('span').textContent, 'En trámite');
 });
 
+test('saving scoring rejection updates commission totals while keeping the original row mounted', async t => {
+  const f = await mount(t, { estado: 'Aceptada', estado_cambiado_en: new Date(start).toISOString() });
+  const row = f.row();
+  assert.equal(f.nodes.get('history-kpi-pendientes').textContent, '10,00 €');
+  await f.choose('contract', 'Rechazado por Scoring');
+  await f.nodes.get('btn-scoring-save-only').onclick(f.event);
+  assert.equal(f.nodes.get('history-kpi-pendientes').textContent, '0,00 €');
+  assert.equal(f.row(), row);
+});
 
+test('a changed contract leaves the active Pending filter immediately without a loading placeholder', async t => {
+  const f = await mount(t, { estado: 'Aceptada', estado_cambiado_en: new Date(start).toISOString() });
+  for (const id of ['th-history-contract', 'dropdown-history-contract-filter']) f.nodes.set(id, element());
+  const items = ['ALL', 'Pendiente', 'En trámite'].map(value => {
+    const item = element(); item.setAttribute('data-contract', value); return item;
+  });
+  f.nodes.get('dropdown-history-contract-filter').querySelectorAll = () => items;
+  f.browser.setupHistoryContractFilterDropdown();
+  items[1].onclick(f.event);
+  const writesBefore = f.tbody.htmlWrites.length;
+  await f.choose('contract', 'En trámite');
+  assert.equal(f.tbody.children.length, 0);
+  assert.match(f.tbody.innerHTML, /No se encontraron comparativas con los filtros aplicados/);
+  assert.ok(f.tbody.htmlWrites.slice(writesBefore).every(html => !html.includes('Cargando historial')));
+  items[2].onclick(f.event);
+  assert.equal(f.tbody.children.length, 1);
+  assert.equal(f.locked(), true);
+});
 
 test('saving scoring rejection locks acceptance while its write is pending', async t => {
   let resolve;
