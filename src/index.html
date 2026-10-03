@@ -1106,7 +1106,7 @@
                       <details id="history-client-search" class="m3-table-column-search">
                         <summary>
                           <span>Cliente</span>
-                          <svg class="m3-table-column-search-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>
+                          <svg class="m3-table-column-search-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3a6.5 6.5 0 1 0 3.98 11.64L19.84 21 21 19.84l-6.36-6.36A6.5 6.5 0 0 0 9.5 3zm0 2a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z"/></svg>
                         </summary>
                         <label class="m3-label" for="search-history-client">Buscar cliente</label>
                         <div class="m3-table-column-search-field">
@@ -1121,7 +1121,7 @@
                       <details id="history-cups-search" class="m3-table-column-search">
                         <summary>
                           <span>CUPS</span>
-                          <svg class="m3-table-column-search-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>
+                          <svg class="m3-table-column-search-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3a6.5 6.5 0 1 0 3.98 11.64L19.84 21 21 19.84l-6.36-6.36A6.5 6.5 0 0 0 9.5 3zm0 2a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z"/></svg>
                         </summary>
                         <label class="m3-label" for="search-history-cups">Buscar CUPS</label>
                         <div class="m3-table-column-search-field">
@@ -1132,7 +1132,14 @@
                         </div>
                       </details>
                     </th>
-                    <th>Tipo</th>
+                    <th scope="col" aria-label="Tipo">
+                      <select id="filter-history-type" class="m3-input m3-native-select m3-table-column-filter" aria-label="Filtrar comparativas por tipo de suministro">
+                        <option value="ALL">Tipo: Todos</option>
+                        <option value="LUZ">Tipo: Luz</option>
+                        <option value="GAS">Tipo: Gas</option>
+                        <option value="DUAL">Tipo: Dual</option>
+                      </select>
+                    </th>
                     <!-- Ahorro Anual (Ordenable) -->
                     <th id="th-history-savings" style="cursor: pointer; user-select: none;" title="Ordenar por ahorro anual">
                       <div style="display: inline-flex; align-items: center; gap: 4px;">
@@ -1198,8 +1205,13 @@
                         </div>
                       </div>
                     </th>
-                    <!-- Comisión Asesor -->
-                    <th class="private-value">Comisión Asesor</th>
+                    <!-- Comisión (Ordenable) -->
+                    <th id="th-history-commission" scope="col" class="private-value" aria-sort="none">
+                      <button type="button" id="btn-history-commission-sort" class="m3-table-column-sort" title="Ordenar por comisión">
+                        <span>Comisión</span>
+                        <span id="th-history-commission-sort-icon" aria-hidden="true">↕</span>
+                      </button>
+                    </th>
                     <!-- Cobro Comisión (Filtrable con menú desplegable) -->
                     <th id="th-history-cobro" style="cursor: pointer; position: relative; user-select: none;">
                       <div style="display: inline-flex; align-items: center; gap: 4px;">

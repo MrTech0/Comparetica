@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const comparisons = [
-  { id: 1, cliente_nombre: 'Consultoría Muñoz', cliente_cups: 'ES002100001ALPHA', fecha: '2026-10-01', estado: 'Aceptada', estado_contrato: 'En trámite', estado_cobro: 'Cobrado', ahorro_luz_anual: 200 },
-  { id: 2, cliente_nombre: 'Consultoría Muñoz', cliente_cups: 'ES003100002BETA', fecha: '2026-10-02', estado: 'Pendiente de aceptación', ahorro_luz_anual: 100 },
-  { id: 3, cliente_nombre: 'Alpha Servicios', cliente_cups: 'ES002100003GAMMA', fecha: '2026-10-03', estado: 'Rechazada', ahorro_luz_anual: 300 },
-  { id: 4, cliente_nombre: null, cliente_cups: null, fecha: '2026-09-30', ahorro_luz_anual: 0 }
+  { id: 1, cliente_nombre: 'Consultoría Muñoz', cliente_cups: 'ES002100001ALPHA', fecha: '2026-10-01', estado: 'Aceptada', estado_contrato: 'En trámite', estado_cobro: 'Cobrado', ahorro_luz_anual: 200, tipo_energia: 'LUZ', comision_total: 20 },
+  { id: 2, cliente_nombre: 'Consultoría Muñoz', cliente_cups: 'ES003100002BETA', fecha: '2026-10-02', estado: 'Pendiente de aceptación', ahorro_luz_anual: 100, tipo_energia: 'GAS', comision_total: 100 },
+  { id: 3, cliente_nombre: 'Alpha Servicios', cliente_cups: 'ES002100003GAMMA', fecha: '2026-10-03', estado: 'Rechazada', ahorro_luz_anual: 300, tipo_energia: 'Luz', comision_total: 9.5 },
+  { id: 4, cliente_nombre: null, cliente_cups: null, fecha: '2026-09-30', ahorro_luz_anual: 0, tipo_energia: 'DUAL', comision_total: 0 }
 ].map(c => ({ tipo_energia: 'Luz', ahorro_gas_anual: 0, comision_total: 10, ...c }));
 let caseId = 0;
 
@@ -65,7 +65,8 @@ async function mount(t) {
   await view.initHistoryView();
   const ids = () => tbody.children.map(row => Number(row.innerHTML.match(/data-id="(\d+)"/)[1]));
   const search = (column, value) => { const input = get(`search-history-${column}`); input.value = value; input.fire('input'); };
-  return { get, tbody, ids, search, view, filters };
+  const supply = value => { const select = get('filter-history-type'); select.value = value; select.fire('change'); };
+  return { get, tbody, ids, search, supply, view, filters };
 }
 
 test('history client and CUPS searches match only their own column', async t => {
@@ -139,4 +140,80 @@ test('reentering history resets both searches without installing duplicate input
   assert.equal(f.get('history-client-search').classList.contains('is-filtered'), false);
   assert.deepEqual(f.ids(), [3, 2, 1, 4]);
   assert.equal(f.get('search-history-client').listenerCount, 1);
+});
+
+test('history supply filter selects electricity, gas and dual comparisons', async t => {
+  const f = await mount(t);
+  f.supply('LUZ');
+  assert.deepEqual(f.ids(), [3, 1], 'legacy mixed-case supply names still match');
+  f.supply('GAS');
+  assert.deepEqual(f.ids(), [2]);
+  f.supply('DUAL');
+  assert.deepEqual(f.ids(), [4]);
+  f.supply('ALL');
+  assert.deepEqual(f.ids(), [3, 2, 1, 4]);
+});
+
+test('history supply filter combines with both searches and all status filters', async t => {
+  const f = await mount(t);
+  f.search('client', 'Muñoz');
+  f.search('cups', 'ALPHA');
+  f.filters['dropdown-history-estado-filter'][1].fire('click');
+  f.filters['dropdown-history-contract-filter'][1].fire('click');
+  f.filters['dropdown-history-cobro-filter'][1].fire('click');
+  f.supply('GAS');
+  assert.deepEqual(f.ids(), []);
+  assert.match(f.tbody.innerHTML, /No se encontraron comparativas con los filtros aplicados/);
+  f.supply('LUZ');
+  assert.deepEqual(f.ids(), [1]);
+  f.supply('ALL');
+  assert.deepEqual(f.ids(), [1], 'clearing type preserves the other filters');
+});
+
+test('history commission sorting is numeric in both directions, including zero amounts', async t => {
+  const f = await mount(t);
+  f.get('btn-history-commission-sort').fire('click');
+  assert.deepEqual(f.ids(), [2, 1, 3, 4]);
+  assert.equal(f.get('th-history-commission-sort-icon').textContent, '↓');
+  assert.equal(f.get('th-history-commission').getAttribute('aria-sort'), 'descending');
+  f.get('btn-history-commission-sort').fire('click');
+  assert.deepEqual(f.ids(), [4, 3, 1, 2]);
+  assert.equal(f.get('th-history-commission-sort-icon').textContent, '↑');
+  assert.equal(f.get('th-history-commission').getAttribute('aria-sort'), 'ascending');
+});
+
+test('date, savings and commission sorting replace each other while preserving filters', async t => {
+  const f = await mount(t);
+  f.get('btn-history-commission-sort').fire('click');
+  f.supply('LUZ');
+  assert.deepEqual(f.ids(), [1, 3]);
+  f.get('th-history-savings').fire('click');
+  assert.deepEqual(f.ids(), [3, 1]);
+  assert.equal(f.get('th-history-commission-sort-icon').textContent, '↕');
+  f.get('btn-history-commission-sort').fire('click');
+  assert.deepEqual(f.ids(), [1, 3]);
+  assert.equal(f.get('th-history-savings-sort-icon').textContent, '↕');
+  f.get('th-history-date').fire('click');
+  assert.deepEqual(f.ids(), [3, 1]);
+  assert.equal(f.get('th-history-date').getAttribute('aria-sort'), 'descending');
+  f.get('th-history-date').fire('click');
+  assert.deepEqual(f.ids(), [1, 3]);
+  f.supply('ALL');
+  f.get('btn-history-commission-sort').fire('click');
+  assert.deepEqual(f.ids(), [2, 1, 3, 4]);
+  f.search('cups', 'ES002');
+  assert.deepEqual(f.ids(), [1, 3]);
+});
+
+test('reentering history preserves type and sorting without duplicate sort handlers', async t => {
+  const f = await mount(t);
+  f.supply('LUZ');
+  f.get('btn-history-commission-sort').fire('click');
+  await f.view.initHistoryView();
+  assert.deepEqual(f.ids(), [1, 3]);
+  assert.equal(f.get('filter-history-type').value, 'LUZ');
+  f.get('btn-history-commission-sort').fire('click');
+  assert.deepEqual(f.ids(), [3, 1], 'one click reverses the order exactly once');
+  f.supply('GAS');
+  assert.deepEqual(f.ids(), [2]);
 });

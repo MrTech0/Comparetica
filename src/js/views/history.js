@@ -99,6 +99,8 @@ async function refreshHistory() {
 let cachedHistory = [];
 let currentHistoryDateSort = 'desc'; // 'desc' (más reciente a más antigua) | 'asc' (más antigua a más reciente)
 let currentHistorySavingsSort = null; // 'desc' (mayor a menor) | 'asc' (menor a mayor) | null
+let currentHistoryCommissionSort = null;
+let currentHistoryTypeFilter = 'ALL';
 let currentHistoryEstadoFilter = 'ALL';
 let currentHistoryContractFilter = 'ALL';
 let currentHistoryCobroFilter = 'ALL';
@@ -127,6 +129,18 @@ function setupHistoryColumnSearches() {
       input.focus();
     });
   }
+}
+
+function setupHistoryTypeFilter() {
+  const select = document.getElementById('filter-history-type');
+  if (!select) return;
+  select.value = currentHistoryTypeFilter;
+  if (select.dataset.listenerAdded) return;
+  select.dataset.listenerAdded = 'true';
+  select.addEventListener('change', () => {
+    currentHistoryTypeFilter = select.value;
+    applyHistoryFilter();
+  });
 }
 
 function closeAllHistoryHeaderDropdowns() {
@@ -353,8 +367,9 @@ function setupHistoryDateSort() {
   th.dataset.sortInitialized = 'true';
 
   th.addEventListener('click', () => {
-    if (currentHistorySavingsSort !== null) {
+    if (currentHistorySavingsSort !== null || currentHistoryCommissionSort !== null) {
       currentHistorySavingsSort = null;
+      currentHistoryCommissionSort = null;
       currentHistoryDateSort = 'desc';
     } else {
       currentHistoryDateSort = currentHistoryDateSort === 'desc' ? 'asc' : 'desc';
@@ -370,6 +385,7 @@ function setupHistorySavingsSort() {
   th.dataset.sortInitialized = 'true';
 
   th.addEventListener('click', () => {
+    currentHistoryCommissionSort = null;
     if (!currentHistorySavingsSort || currentHistorySavingsSort === 'asc') {
       currentHistorySavingsSort = 'desc';
     } else {
@@ -380,36 +396,33 @@ function setupHistorySavingsSort() {
   });
 }
 
-function updateHistorySortIndicators() {
-  const dateIcon = document.getElementById('th-history-date-sort-icon');
-  const savingsIcon = document.getElementById('th-history-savings-sort-icon');
+function setupHistoryCommissionSort() {
+  const button = document.getElementById('btn-history-commission-sort');
+  if (!button || button.dataset.sortInitialized) return;
+  button.dataset.sortInitialized = 'true';
+  button.addEventListener('click', () => {
+    currentHistorySavingsSort = null;
+    currentHistoryCommissionSort = currentHistoryCommissionSort === 'desc' ? 'asc' : 'desc';
+    updateHistorySortIndicators();
+    applyHistoryFilter();
+  });
+}
 
-  if (currentHistorySavingsSort !== null) {
-    if (dateIcon) {
-      dateIcon.textContent = '↕';
-      dateIcon.style.color = 'var(--color-on-surface-variant)';
-      dateIcon.style.fontWeight = 'normal';
-      dateIcon.title = 'Haga clic para ordenar por fecha';
-    }
-    if (savingsIcon) {
-      savingsIcon.textContent = currentHistorySavingsSort === 'desc' ? '↓' : '↑';
-      savingsIcon.style.color = 'var(--color-primary)';
-      savingsIcon.style.fontWeight = 'bold';
-      savingsIcon.title = currentHistorySavingsSort === 'desc' ? 'Orden: Mayor a menor ahorro' : 'Orden: Menor a mayor ahorro';
-    }
-  } else {
-    if (savingsIcon) {
-      savingsIcon.textContent = '↕';
-      savingsIcon.style.color = 'var(--color-on-surface-variant)';
-      savingsIcon.style.fontWeight = 'normal';
-      savingsIcon.title = 'Haga clic para ordenar por ahorro anual';
-    }
-    if (dateIcon) {
-      dateIcon.textContent = currentHistoryDateSort === 'desc' ? '↓' : '↑';
-      dateIcon.style.color = 'var(--color-primary)';
-      dateIcon.style.fontWeight = 'bold';
-      dateIcon.title = currentHistoryDateSort === 'desc' ? 'Orden: Más reciente a más antigua' : 'Orden: Más antigua a más reciente';
-    }
+function updateHistorySortIndicators() {
+  const dateSort = currentHistorySavingsSort === null && currentHistoryCommissionSort === null ? currentHistoryDateSort : null;
+  for (const [column, direction, label, descending, ascending] of [
+    ['date', dateSort, 'fecha', 'Más reciente a más antigua', 'Más antigua a más reciente'],
+    ['savings', currentHistorySavingsSort, 'ahorro anual', 'Mayor a menor ahorro', 'Menor a mayor ahorro'],
+    ['commission', currentHistoryCommissionSort, 'comisión', 'Mayor a menor comisión', 'Menor a mayor comisión']
+  ]) {
+    const th = document.getElementById(`th-history-${column}`);
+    th?.setAttribute('aria-sort', direction ? (direction === 'desc' ? 'descending' : 'ascending') : 'none');
+    const icon = document.getElementById(`th-history-${column}-sort-icon`);
+    if (!icon) continue;
+    icon.textContent = direction ? (direction === 'desc' ? '↓' : '↑') : '↕';
+    icon.style.color = direction ? 'var(--color-primary)' : 'var(--color-on-surface-variant)';
+    icon.style.fontWeight = direction ? 'bold' : 'normal';
+    icon.title = direction ? `Orden: ${direction === 'desc' ? descending : ascending}` : `Haga clic para ordenar por ${label}`;
   }
 }
 
@@ -425,6 +438,7 @@ async function loadHistoryTable() {
     cachedHistory = await getComparativas();
     
     setupHistoryColumnSearches();
+    setupHistoryTypeFilter();
 
     // Configurar desplegables de filtrado en cabeceras
     setupHistoryEstadoFilterDropdown();
@@ -434,6 +448,8 @@ async function loadHistoryTable() {
     // Configurar ordenación en cabeceras
     setupHistoryDateSort();
     setupHistorySavingsSort();
+    setupHistoryCommissionSort();
+    updateHistorySortIndicators();
 
     const tableContainer = document.querySelector('#section-history .table-container');
     if (tableContainer && !tableContainer.dataset.scrollListenerAdded) {
@@ -521,6 +537,7 @@ function applyHistoryFilter() {
   const filtered = cachedHistory.filter(c => {
     if (clientQuery && !cleanString(c.cliente_nombre).includes(cleanClientQuery)) return false;
     if (cupsQuery && !cleanString(c.cliente_cups).includes(cleanCupsQuery)) return false;
+    if (currentHistoryTypeFilter !== 'ALL' && String(c.tipo_energia || '').toUpperCase() !== currentHistoryTypeFilter) return false;
 
     if (currentHistoryEstadoFilter !== 'ALL') {
       if ((c.estado || 'Pendiente de aceptación') !== currentHistoryEstadoFilter) return false;
@@ -540,7 +557,10 @@ function applyHistoryFilter() {
   });
 
   // Aplicar ordenación activa
-  if (currentHistorySavingsSort === 'desc') {
+  if (currentHistoryCommissionSort !== null) {
+    const direction = currentHistoryCommissionSort === 'desc' ? -1 : 1;
+    filtered.sort((a, b) => direction * ((a.comision_total || 0) - (b.comision_total || 0)));
+  } else if (currentHistorySavingsSort === 'desc') {
     filtered.sort((a, b) => ((b.ahorro_luz_anual || 0) + (b.ahorro_gas_anual || 0)) - ((a.ahorro_luz_anual || 0) + (a.ahorro_gas_anual || 0)));
   } else if (currentHistorySavingsSort === 'asc') {
     filtered.sort((a, b) => ((a.ahorro_luz_anual || 0) + (a.ahorro_gas_anual || 0)) - ((b.ahorro_luz_anual || 0) + (b.ahorro_gas_anual || 0)));
@@ -555,7 +575,7 @@ function applyHistoryFilter() {
   tbody.innerHTML = '';
 
   if (filtered.length === 0) {
-    const hasActiveFilters = clientQuery || cupsQuery || currentHistoryEstadoFilter !== 'ALL' || currentHistoryContractFilter !== 'ALL' || currentHistoryCobroFilter !== 'ALL';
+    const hasActiveFilters = clientQuery || cupsQuery || currentHistoryTypeFilter !== 'ALL' || currentHistoryEstadoFilter !== 'ALL' || currentHistoryContractFilter !== 'ALL' || currentHistoryCobroFilter !== 'ALL';
     tbody.innerHTML = `
       <tr>
         <td colspan="10" class="text-muted" style="text-align: center; padding: 32px 16px;">
