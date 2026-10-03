@@ -966,10 +966,13 @@ export async function syncPuntosSuministroCliente(clienteId, puntosArray) {
  */
 export async function updateComparativaCobro(id, estadoCobro, fechaCobro = null) {
   const db = await getDb();
-  return await db.execute(
-    "UPDATE comparativas SET estado_cobro = $1, fecha_cobro = $2 WHERE id = $3;",
+  const result = await db.execute(
+    `UPDATE comparativas SET estado_cobro = $1, fecha_cobro = $2
+     WHERE id = $3 AND estado = 'Aceptada' AND estado_contrato = 'Firmado y Activado';`,
     [estadoCobro, fechaCobro, id]
   );
+  if (result.rowsAffected === 0) throw new Error('COMMISSION_COLLECTION_LOCKED');
+  return result;
 }
 
 /**

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { updateComparativaEstado, updateComparativaContrato } from '../src/js/db.js';
+import { updateComparativaEstado, updateComparativaContrato, updateComparativaCobro } from '../src/js/db.js';
 
 const start = Date.parse('2026-10-03T12:00:00.000Z');
 
@@ -27,6 +27,43 @@ function setup(t, state = 'Pendiente de aceptación', changedAt = null) {
   });
   return { record: () => sql.prepare('SELECT * FROM comparativas WHERE id = 1').get() };
 }
+
+for (const contract of ['Pendiente', 'En trámite', 'Rechazado por Scoring']) {
+  test(`commission collection cannot be saved before signing a ${contract} contract`, async t => {
+    const f = setup(t, 'Aceptada');
+    await updateComparativaContrato(1, contract);
+    const before = f.record();
+    await assert.rejects(() => updateComparativaCobro(1, 'Cobrado', '2026-10-03'));
+    assert.deepEqual(f.record(), before);
+  });
+}
+
+for (const state of ['Pendiente de aceptación', 'Rechazada']) {
+  test(`commission collection cannot be saved for a ${state} comparison even if its contract says signed`, async t => {
+    const f = setup(t, state);
+    await updateComparativaContrato(1, 'Firmado y Activado');
+    await assert.rejects(() => updateComparativaCobro(1, 'Cobrado', '2026-10-03'));
+    assert.equal(f.record().estado_cobro, 'Pendiente');
+  });
+}
+
+test('a signed accepted comparison can record its commission and collection date', async t => {
+  const f = setup(t, 'Aceptada');
+  await updateComparativaContrato(1, 'Firmado y Activado');
+  await updateComparativaCobro(1, 'Cobrado', '2026-10-03');
+  assert.equal(f.record().estado_cobro, 'Cobrado');
+  assert.equal(f.record().fecha_cobro, '2026-10-03');
+});
+
+test('a stale collection dialog cannot edit an existing collection after the contract returns to En trámite', async t => {
+  const f = setup(t, 'Aceptada');
+  await updateComparativaContrato(1, 'Firmado y Activado');
+  await updateComparativaCobro(1, 'Cobrado', '2026-10-03');
+  await updateComparativaContrato(1, 'En trámite');
+  const before = f.record();
+  await assert.rejects(() => updateComparativaCobro(1, 'Pendiente', null));
+  assert.deepEqual(f.record(), before);
+});
 
 for (const state of ['Aceptada', 'Rechazada']) {
   test(`persistence allows editing ${state} at 4999 ms and resets the grace period`, async t => {

@@ -3,6 +3,10 @@ export const CONTRACT_STATUSES_LOCKING_COMPARISON = Object.freeze([
   'En trámite', 'Firmado y Activado', 'Rechazado por Scoring'
 ]);
 
+export function canManageCommissionCollection(comparison) {
+  return comparison.estado === 'Aceptada' && comparison.estado_contrato === 'Firmado y Activado';
+}
+
 export function getComparisonStatusLock(comparison, now = Date.now()) {
   if (CONTRACT_STATUSES_LOCKING_COMPARISON.includes(comparison.estado_contrato)) {
     return { locked: true, reason: 'contract', remainingMs: 0 };

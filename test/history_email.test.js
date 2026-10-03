@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { getComparisonStatusLock } from '../src/js/comparison_status.js';
+import { getComparisonStatusLock, canManageCommissionCollection } from '../src/js/comparison_status.js';
 
 const backend = fs.readFileSync(new URL('../src-tauri/src/lib.rs', import.meta.url), 'utf8');
 const registeredCommands = backend.match(/generate_handler!\[([\s\S]*?)\]/)[1].split(',').map(name => name.trim());
@@ -44,7 +44,7 @@ async function mount({ email = 'cliente@example.invalid', cancel = false, failOp
     },
     window: { __TAURI__: {}, _historyScrollListenerAdded: true },
     console: { error() {} }, setTimeout, clearTimeout,
-    getComparisonStatusLock,
+    getComparisonStatusLock, canManageCommissionCollection,
     APP_EVENTS: { COMPARISON_SAVED: 'comparison-saved' }, onAppEvent: () => () => {},
     getComparativas: async () => [record],
     generatePDFReport: async (data, preview, base64) => {

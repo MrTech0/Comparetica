@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { getComparisonStatusLock } from '../src/js/comparison_status.js';
+import { getComparisonStatusLock, canManageCommissionCollection } from '../src/js/comparison_status.js';
 
 const start = Date.parse('2026-10-03T12:00:00.000Z');
 const source = fs.readFileSync(new URL('../src/js/views/history.js', import.meta.url), 'utf8')
@@ -65,7 +65,7 @@ async function mount(t, overrides = {}, updateContract) {
       querySelector: selector => selector === '#table-history tbody' ? tbody : null,
       querySelectorAll: () => tbody.children.flatMap(row => ['status', 'contract'].map(kind => row.querySelector(`.m3-custom-${kind}-select`)).filter(Boolean)) },
     window: { _historyScrollListenerAdded: true }, Date, setTimeout, clearTimeout, console: { error() {} },
-    getComparisonStatusLock,
+    getComparisonStatusLock, canManageCommissionCollection,
     APP_EVENTS: { COMPARISON_SAVED: 'saved' }, onAppEvent: () => () => {},
     getComparativas: async () => [structuredClone(record)],
     updateComparativaEstado: async (id, value) => {
@@ -93,6 +93,56 @@ async function mount(t, overrides = {}, updateContract) {
   return { browser, record, changes, collectionChanges, toasts, renewals, recomparisons, nodes, tbody, row, select, choose, event,
     locked: () => select('status').classList.contains('disabled'), reload: () => browser.initHistoryView() };
 }
+
+for (const contract of ['Pendiente', 'En trámite', 'Rechazado por Scoring']) {
+  for (const payment of ['Pendiente', 'Cobrado']) {
+    test(`commission ${payment} cannot open its dialog while the contract is ${contract}`, async t => {
+      const f = await mount(t, { estado: 'Aceptada', estado_contrato: contract, estado_cobro: payment });
+      const control = f.row().querySelector('.btn-manage-cobro');
+      assert.equal(control.disabled, true);
+      control.onclick(); // Un evento antiguo tampoco debe permitir abrir el formulario.
+      assert.equal(f.nodes.get('dialog-mark-cobro').classList.contains('active'), false);
+    });
+  }
+}
+
+test('signing enables commission collection in place and cancelling the renewal disables it again', async t => {
+  const f = await mount(t, { estado: 'Aceptada', estado_cambiado_en: new Date(start).toISOString() });
+  const row = f.row(), control = row.querySelector('.btn-manage-cobro');
+  assert.equal(control.disabled, true);
+  await f.choose('contract', 'Firmado y Activado');
+  assert.equal(f.row(), row);
+  assert.equal(f.row().querySelector('.btn-manage-cobro'), control);
+  assert.equal(control.disabled, false);
+  control.onclick();
+  assert.equal(f.nodes.get('dialog-mark-cobro').classList.contains('active'), true);
+  f.nodes.get('btn-close-cobro-dialog-x').onclick();
+  await f.renewals[0].onCancelled();
+  assert.equal(control.disabled, true);
+  control.onclick();
+  assert.equal(f.nodes.get('dialog-mark-cobro').classList.contains('active'), false);
+});
+
+test('a stored signed contract permits recording a pending commission', async t => {
+  const f = await mount(t, { estado: 'Aceptada', estado_contrato: 'Firmado y Activado', estado_cobro: 'Pendiente' });
+  const control = f.row().querySelector('.btn-manage-cobro');
+  assert.equal(control.disabled, false);
+  control.onclick();
+  assert.equal(f.nodes.get('dialog-mark-cobro').classList.contains('active'), true);
+});
+
+
+
+
+test('a failed signature does not enable commission collection', async t => {
+  const f = await mount(t, { estado: 'Aceptada', estado_cambiado_en: new Date(start).toISOString() },
+    async () => { throw new Error('No se pudo guardar'); });
+  const control = f.row().querySelector('.btn-manage-cobro');
+  await f.choose('contract', 'Firmado y Activado');
+  assert.equal(control.disabled, true);
+  control.onclick();
+  assert.equal(f.nodes.get('dialog-mark-cobro').classList.contains('active'), false);
+});
 
 test('changing an accepted contract to En trámite keeps the row in place without showing a loading placeholder', async t => {
   const f = await mount(t);

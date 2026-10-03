@@ -5,7 +5,7 @@ import { relaunchComparisonForScoring } from './calculator_view.js';
 import { invoke } from '../ipc.js';
 import { showToast, showConfirm } from '../ui.js';
 import { onAppEvent, APP_EVENTS } from '../events.js';
-import { getComparisonStatusLock } from '../comparison_status.js';
+import { getComparisonStatusLock, canManageCommissionCollection } from '../comparison_status.js';
 
 let activeLockTimers = [];
 let isCobroDialogInitialized = false;
@@ -18,6 +18,24 @@ function getStatusLockTitle(reason) {
   if (reason === 'contract') return 'El estado está bloqueado por el estado del contrato.';
   if (reason === 'pending') return 'Guardando el cambio. Espera un momento.';
   return 'El estado ya no se puede modificar al haber transcurrido los 5 segundos de margen.';
+}
+
+function getCommissionControlTitle(c) {
+  if (c.estado_cobro === 'Cobrado') {
+    const date = c.fecha_cobro ? new Date(c.fecha_cobro).toLocaleDateString('es-ES') : '';
+    return `${date ? `Cobrado el ${date}.` : 'Cobrado.'} Haz clic para gestionar.`;
+  }
+  if (!canManageCommissionCollection(c)) return 'El cobro solo se puede gestionar cuando el contrato está firmado y activado.';
+  if (pendingHistoryChanges.has(c.id)) return getStatusLockTitle('pending');
+  return 'Pendiente de cobro. Haz clic para registrar cobro.';
+}
+
+function syncCommissionControl(control, c) {
+  if (!control) return;
+  control.disabled = !canManageCommissionCollection(c) || pendingHistoryChanges.has(c.id);
+  control.setAttribute('title', getCommissionControlTitle(c));
+  const arrow = control.querySelector('.status-select-arrow');
+  if (arrow) arrow.style.display = control.disabled ? 'none' : '';
 }
 
 function refreshHistoryContract(c) {
@@ -573,23 +591,14 @@ function applyHistoryFilter() {
     const isCobrado = (c.estado_cobro === 'Cobrado');
     let cobroCellHtml = '';
     if (isAceptada) {
-      if (isCobrado) {
-        const fechaFmt = c.fecha_cobro ? new Date(c.fecha_cobro).toLocaleDateString('es-ES') : '';
-        const titleStr = fechaFmt ? `Cobrado el ${fechaFmt}. Haz clic para gestionar.` : 'Cobrado. Haz clic para gestionar.';
-        cobroCellHtml = `<td>
-          <div class="status-select-trigger estado-aceptada btn-manage-cobro" data-id="${c.id}" title="${titleStr}" style="cursor: pointer;">
-            <span>✅ Cobrado</span>
-            <svg class="status-select-arrow" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
-          </div>
-        </td>`;
-      } else {
-        cobroCellHtml = `<td>
-          <div class="status-select-trigger estado-pendiente btn-manage-cobro" data-id="${c.id}" title="Pendiente de cobro. Haz clic para registrar cobro." style="cursor: pointer;">
-            <span>🟡 Pendiente</span>
-            <svg class="status-select-arrow" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
-          </div>
-        </td>`;
-      }
+      const collectionDisabled = !canManageCommissionCollection(c) || pendingHistoryChanges.has(c.id);
+      cobroCellHtml = `<td>
+        <button type="button" class="status-select-trigger ${isCobrado ? 'estado-aceptada' : 'estado-pendiente'} btn-manage-cobro"
+          data-id="${c.id}" title="${getCommissionControlTitle(c)}" ${collectionDisabled ? 'disabled' : ''}>
+          <span>${isCobrado ? '✅ Cobrado' : '🟡 Pendiente'}</span>
+          <svg class="status-select-arrow" viewBox="0 0 24 24" ${collectionDisabled ? 'style="display: none;"' : ''} aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>
+        </button>
+      </td>`;
     } else {
       cobroCellHtml = `<td><span class="text-muted" style="font-size: 12px; display: block; text-align: center;">—</span></td>`;
     }
@@ -934,6 +943,7 @@ function applyHistoryFilter() {
 
     historyContractControls.set(c.id, () => {
       syncStatusLock();
+      syncCommissionControl(btnCobro, c);
       // Si la vista se ha reconstruido durante el diálogo, restaurar el selector al cancelar.
       if (!contractSelect) return false;
       const value = c.estado_contrato || 'Pendiente';
@@ -1265,6 +1275,7 @@ export function promptRenewalFromHistory(comparativa) {
 }
 
 function openCobroDialog(c) {
+  if (!canManageCommissionCollection(c) || pendingHistoryChanges.has(c.id)) return;
   const dialog = document.getElementById('dialog-mark-cobro');
   if (!dialog) return;
 
