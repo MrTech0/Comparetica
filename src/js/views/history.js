@@ -23,7 +23,7 @@ function getStatusLockTitle(reason) {
 function getCommissionControlTitle(c) {
   if (c.estado_cobro === 'Cobrado') {
     const date = c.fecha_cobro ? new Date(c.fecha_cobro).toLocaleDateString('es-ES') : '';
-    return `${date ? `Cobrado el ${date}.` : 'Cobrado.'} Haz clic para gestionar.`;
+    return `${date ? `Cobrado el ${date}.` : 'Cobrado.'} El cobro es definitivo y no se puede modificar.`;
   }
   if (!canManageCommissionCollection(c)) return 'El cobro solo se puede gestionar cuando el contrato está firmado y activado.';
   if (pendingHistoryChanges.has(c.id)) return getStatusLockTitle('pending');
@@ -1320,7 +1320,6 @@ function setupCobroDialog() {
   const dialog = document.getElementById('dialog-mark-cobro');
   const closeBtnX = document.getElementById('btn-close-cobro-dialog-x');
   const form = document.getElementById('form-mark-cobro');
-  const btnPending = document.getElementById('btn-cobro-mark-pending');
 
   if (dialog) {
     dialog.onclick = (e) => {
@@ -1338,33 +1337,25 @@ function setupCobroDialog() {
       const id = parseInt(document.getElementById('dialog-cobro-id').value, 10);
       const fecha = document.getElementById('dialog-cobro-date').value;
       if (!id) return;
+      const comparison = cachedHistory.find(c => c.id === id);
+      if (!comparison || !canManageCommissionCollection(comparison) || pendingHistoryChanges.has(id)) return;
 
+      pendingHistoryChanges.add(id);
       try {
         await updateComparativaCobro(id, 'Cobrado', fecha);
+        comparison.estado_cobro = 'Cobrado';
+        comparison.fecha_cobro = fecha;
         dialog.classList.remove('active');
         showToast("✅ Comisión marcada como COBRADA.", "success");
-        await refreshHistory();
       } catch (err) {
         console.error("Error al actualizar estado de cobro:", err);
-        showToast("Error al registrar el cobro.", "error");
+        showToast(err.message === 'COMMISSION_COLLECTION_LOCKED'
+          ? 'Solo se puede registrar un cobro pendiente con el contrato firmado y activado.' : 'Error al registrar el cobro.', 'error');
+        return;
+      } finally {
+        pendingHistoryChanges.delete(id);
       }
-    };
-  }
-
-  if (btnPending) {
-    btnPending.onclick = async () => {
-      const id = parseInt(document.getElementById('dialog-cobro-id').value, 10);
-      if (!id) return;
-
-      try {
-        await updateComparativaCobro(id, 'Pendiente', null);
-        dialog.classList.remove('active');
-        showToast("🟡 Estado de cobro cambiado a PENDIENTE.", "info");
-        await refreshHistory();
-      } catch (err) {
-        console.error("Error al actualizar estado de cobro:", err);
-        showToast("Error al actualizar estado de cobro.", "error");
-      }
+      await refreshHistory();
     };
   }
 }

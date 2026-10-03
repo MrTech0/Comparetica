@@ -958,9 +958,9 @@ export async function syncPuntosSuministroCliente(clienteId, puntosArray) {
 }
 
 /**
- * Actualiza el estado de cobro de una comparativa.
+ * Registra un cobro definitivo de una comparativa pendiente de cobro.
  * @param {number} id - ID de la comparativa.
- * @param {string} estadoCobro - 'Pendiente' o 'Cobrado'.
+ * @param {string} estadoCobro - 'Cobrado'.
  * @param {string|null} fechaCobro - Fecha de cobro (YYYY-MM-DD o ISO string).
  * @returns {Promise<Object>} Resultado de la actualización.
  */
@@ -968,7 +968,8 @@ export async function updateComparativaCobro(id, estadoCobro, fechaCobro = null)
   const db = await getDb();
   const result = await db.execute(
     `UPDATE comparativas SET estado_cobro = $1, fecha_cobro = $2
-     WHERE id = $3 AND estado = 'Aceptada' AND estado_contrato = 'Firmado y Activado';`,
+     WHERE id = $3 AND estado = 'Aceptada' AND estado_contrato = 'Firmado y Activado'
+       AND $1 = 'Cobrado' AND COALESCE(estado_cobro, 'Pendiente') != 'Cobrado';`,
     [estadoCobro, fechaCobro, id]
   );
   if (result.rowsAffected === 0) throw new Error('COMMISSION_COLLECTION_LOCKED');

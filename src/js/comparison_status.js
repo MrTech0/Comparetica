@@ -4,7 +4,8 @@ export const CONTRACT_STATUSES_LOCKING_COMPARISON = Object.freeze([
 ]);
 
 export function canManageCommissionCollection(comparison) {
-  return comparison.estado === 'Aceptada' && comparison.estado_contrato === 'Firmado y Activado';
+  return comparison.estado === 'Aceptada' && comparison.estado_contrato === 'Firmado y Activado'
+    && comparison.estado_cobro !== 'Cobrado';
 }
 
 export function getComparisonStatusLock(comparison, now = Date.now()) {

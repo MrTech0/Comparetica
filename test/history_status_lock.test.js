@@ -131,8 +131,35 @@ test('a stored signed contract permits recording a pending commission', async t 
   assert.equal(f.nodes.get('dialog-mark-cobro').classList.contains('active'), true);
 });
 
+test('a collected commission stays disabled even with a signed contract and cannot reopen its dialog', async t => {
+  const f = await mount(t, { estado: 'Aceptada', estado_contrato: 'Firmado y Activado', estado_cobro: 'Cobrado', fecha_cobro: '2026-10-03' });
+  const control = f.row().querySelector('.btn-manage-cobro');
+  assert.equal(control.disabled, true);
+  control.onclick();
+  assert.equal(f.nodes.get('dialog-mark-cobro').classList.contains('active'), false);
+});
 
+test('recording a pending commission closes the form and locks the collected value permanently', async t => {
+  const f = await mount(t, { estado: 'Aceptada', estado_contrato: 'Firmado y Activado', estado_cobro: 'Pendiente' });
+  f.row().querySelector('.btn-manage-cobro').onclick();
+  f.nodes.get('dialog-cobro-date').value = '2026-10-03';
+  await f.nodes.get('form-mark-cobro').onsubmit(f.event);
+  assert.deepEqual(f.collectionChanges, [{ id: 1, value: 'Cobrado', date: '2026-10-03' }]);
+  assert.equal(f.nodes.get('dialog-mark-cobro').classList.contains('active'), false);
+  const control = f.row().querySelector('.btn-manage-cobro');
+  assert.equal(control.disabled, true);
+  control.onclick();
+  assert.equal(f.nodes.get('dialog-mark-cobro').classList.contains('active'), false);
+  await f.nodes.get('form-mark-cobro').onsubmit(f.event);
+  assert.equal(f.collectionChanges.length, 1, 'a stale form cannot change a recorded collection');
+});
 
+test('the collection dialog offers no action to revert a collected commission to pending', async t => {
+  const f = await mount(t);
+  assert.equal(f.nodes.get('btn-cobro-mark-pending').onclick, undefined);
+  const html = fs.readFileSync(new URL('../src/index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /id="btn-cobro-mark-pending"/);
+});
 
 test('a failed signature does not enable commission collection', async t => {
   const f = await mount(t, { estado: 'Aceptada', estado_cambiado_en: new Date(start).toISOString() },

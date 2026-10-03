@@ -47,12 +47,17 @@ for (const state of ['Pendiente de aceptación', 'Rechazada']) {
   });
 }
 
-test('a signed accepted comparison can record its commission and collection date', async t => {
+test('a signed accepted comparison can record a collection once, keeping its date and collected status permanently', async t => {
   const f = setup(t, 'Aceptada');
   await updateComparativaContrato(1, 'Firmado y Activado');
   await updateComparativaCobro(1, 'Cobrado', '2026-10-03');
   assert.equal(f.record().estado_cobro, 'Cobrado');
   assert.equal(f.record().fecha_cobro, '2026-10-03');
+  const before = f.record();
+  await assert.rejects(() => updateComparativaCobro(1, 'Pendiente', null));
+  assert.deepEqual(f.record(), before);
+  await assert.rejects(() => updateComparativaCobro(1, 'Cobrado', '2026-10-04'));
+  assert.deepEqual(f.record(), before);
 });
 
 test('a stale collection dialog cannot edit an existing collection after the contract returns to En trámite', async t => {
